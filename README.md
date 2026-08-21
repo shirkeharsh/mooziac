@@ -1,11 +1,14 @@
-# 🎵 Mooziac — Native macOS Menu Bar Music Player
+# 🎵 Mooziac — Native YouTube Music macOS Player & Menu Bar Companion
 
 [![macOS 13.0+](https://img.shields.io/badge/macOS-13.0%2B%20Ventura%20%7C%20Sonoma%20%7C%20Sequoia-black?style=for-the-badge&logo=apple)](https://developer.apple.com/macos/)
 [![Swift 5.9](https://img.shields.io/badge/Swift-5.9-orange?style=for-the-badge&logo=swift)](https://swift.org)
 [![Universal 2](https://img.shields.io/badge/Architecture-Universal%20(Apple%20Silicon%20%2B%20Intel)-brightgreen?style=for-the-badge)](https://developer.apple.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
+[![Website](https://img.shields.io/badge/Website-mooziac.threeten.site-007AFF?style=for-the-badge)](https://mooziac.threeten.site)
 
-**Mooziac** is an ultra-lightweight, native macOS menu bar app designed for **YouTube Music** and **local audio playback**. Built with Swift and AppKit, it delivers a **Dynamic Island** audio player experience, real-time synchronized lyrics, gesture-based volume/track navigation, zero background battery drain, and complete user privacy.
+**Mooziac** is a lightweight, high-performance **native YouTube Music desktop player for macOS**. Built in Swift and AppKit, Mooziac lives right in your menu bar — featuring a sleek **Dynamic Island** audio player, real-time synchronized lyrics, multi-touch trackpad gestures, and native offline audio playback with zero background battery drain and 100% privacy.
+
+> 🌐 **Official Website & Universal Downloads**: [mooziac.threeten.site](https://mooziac.threeten.site)
 
 ---
 
