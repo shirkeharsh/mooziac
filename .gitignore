@@ -1,0 +1,15 @@
+# Build artifacts
+.build/
+dist/
+
+# OS cruft
+.DS_Store
+
+# Secrets
+client_secret*.json
+*.secret.json
+credentials.json
+
+# Local dev tooling & artifacts (never published)
+dev/
+
