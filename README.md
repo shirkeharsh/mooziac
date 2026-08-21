@@ -2,7 +2,7 @@
   <img src="Resources/launch_transparent.png" alt="Mooziac Logo - Native macOS Music Player" width="300">
 </p>
 
-# Mooziac — Native macOS Music Player
+<h1 align="center">Mooziac — Native macOS Music Player</h1>
 
 <p align="center">
   <strong>Mooziac is a beautiful native macOS music player built with Swift and SwiftUI.</strong><br>
