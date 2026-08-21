@@ -9,20 +9,13 @@
 
 ---
 
-## 📸 Architecture & Design System
+## 📸 Interface & Design System
 
 Mooziac is crafted following Apple’s **Human Interface Guidelines (HIG)** and an **8px Spacing Grid System**. It features a glassmorphic Dynamic Island player interface, a custom text-centered glass search field, reactive micro-animations, and ambient track artwork themes.
 
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│ 🎵 Song Title (Bold)                            [❤️]  [🎨]  [⋯]         │
-│    Artist Name (Medium)                                                │
-│                                                                        │
-│ ◀◀  ▶  ▶▶   [ Search songs, artists...                          ]     │
-│                                                                        │
-│ ─── ▂ ▃ ▅ ▆ █ ▇ ▅ ▃ ▂ ─── Waveform Progress Bar ───────────── 01:42 / 03:45 │
-└────────────────────────────────────────────────────────────────────────┘
-```
+<p align="center">
+  <img src="Resources/Animals.png" alt="Mooziac Dynamic Island Player" width="560">
+</p>
 
 ---
 
