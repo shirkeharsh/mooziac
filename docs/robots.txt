@@ -1,0 +1,14 @@
+# robots.txt for Mooziac (https://mooziac.threeten.site)
+User-agent: *
+Allow: /
+
+# Googlebot specific rules (explicit allowance)
+User-agent: Googlebot
+Allow: /
+
+User-agent: Googlebot-Image
+Allow: /assets/
+Allow: /
+
+# XML Sitemap location
+Sitemap: https://mooziac.threeten.site/sitemap.xml

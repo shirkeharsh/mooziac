@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en" prefix="og: https://ogp.me/ns#">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- Primary Meta Tags -->
+  <title>Mooziac — Native macOS Music Player</title>
+  <meta name="title" content="Mooziac — Native macOS Music Player">
+  <meta name="description" content="Mooziac is a beautiful native macOS music player built with Swift and SwiftUI. Stream YouTube Music, play local FLAC/MP3 files, and control playback with trackpad edge gestures.">
+  <meta name="keywords" content="Mooziac, Mooziac macOS, Mooziac music player, Mooziac GitHub, Mooziac YouTube Music, macOS music player, Swift, SwiftUI, native macOS app, menu bar music player, trackpad gestures, synced lyrics">
+  <meta name="author" content="Harsh Shirke">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+  <meta name="theme-color" content="#090B10">
+  
+  <!-- Canonical & Alternate URLs -->
+  <link rel="canonical" href="https://mooziac.threeten.site/">
+  <link rel="alternate" hreflang="x-default" href="https://mooziac.threeten.site/">
+  <link rel="alternate" hreflang="en" href="https://mooziac.threeten.site/">
+
+  <!-- Open Graph / Facebook / LinkedIn -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://mooziac.threeten.site/">
+  <meta property="og:site_name" content="Mooziac">
+  <meta property="og:title" content="Mooziac — Native macOS Music Player">
+  <meta property="og:description" content="Mooziac is a beautiful native macOS music player built with Swift and SwiftUI. Stream YouTube Music, play local FLAC/MP3 files, and control playback with trackpad edge gestures.">
+  <meta property="og:image" content="https://mooziac.threeten.site/assets/og-image.png">
+  <meta property="og:image:secure_url" content="https://mooziac.threeten.site/assets/og-image.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Mooziac - Native macOS Music Player with YouTube Music support and trackpad gestures">
+  <meta property="og:locale" content="en_US">
+
+  <!-- Twitter / X Card Metadata -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="https://mooziac.threeten.site/">
+  <meta name="twitter:title" content="Mooziac — Native macOS Music Player">
+  <meta name="twitter:description" content="Mooziac is a beautiful native macOS music player built with Swift and SwiftUI.">
+  <meta name="twitter:image" content="https://mooziac.threeten.site/assets/og-image.png">
+  <meta name="twitter:image:alt" content="Mooziac - Native macOS Music Player">
+  <meta name="twitter:creator" content="@shirkeharsh">
+
+  <!-- Favicons & Apple Touch Icons -->
+  <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+  <link rel="manifest" href="site.webmanifest">
+  <meta name="apple-mobile-web-app-title" content="Mooziac">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+
+  <!-- JSON-LD Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://mooziac.threeten.site/#software",
+        "name": "Mooziac",
+        "alternateName": [
+          "Mooziac macOS",
+          "Mooziac Music Player",
+          "Mooziac for Mac",
+          "Mooziac YouTube Music"
+        ],
+        "applicationCategory": "MusicApplication",
+        "operatingSystem": "macOS 13.0 or later (Universal binary for Apple Silicon and Intel)",
+        "softwareVersion": "1.0.0",
+        "description": "Mooziac is a beautiful native macOS music player built with Swift and SwiftUI. Stream YouTube Music, play local FLAC/MP3 files, and control playback with trackpad gestures from your Mac's menu bar.",
+        "url": "https://mooziac.threeten.site/",
+        "downloadUrl": "https://github.com/shirkeharsh/mooziac/releases/latest/download/Mooziac.dmg",
+        "installUrl": "https://github.com/shirkeharsh/mooziac/releases/latest",
+        "codeRepository": "https://github.com/shirkeharsh/mooziac",
+        "screenshot": "https://mooziac.threeten.site/assets/screenshot-player.png",
+        "image": "https://mooziac.threeten.site/assets/og-image.png",
+        "author": {
+          "@type": "Person",
+          "name": "Harsh Shirke",
+          "url": "https://github.com/shirkeharsh"
+        },
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD",
+          "availability": "https://schema.org/InStock"
+        },
+        "featureList": [
+          "Native macOS menu bar integration",
+          "Physical trackpad edge volume control",
+          "YouTube Music integration with Liked Songs and playlists",
+          "Offline local audio playback for MP3, FLAC, WAV, and M4A",
+          "Real-time synchronized LRC lyrics display",
+          "Discord Rich Presence integration",
+          "Zero telemetry and 100% local SQLite storage",
+          "Universal 2 binary for Apple Silicon (M1/M2/M3/M4) and Intel"
+        ]
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://mooziac.threeten.site/#website",
+        "url": "https://mooziac.threeten.site/",
+        "name": "Mooziac — Native macOS Music Player",
+        "description": "Mooziac is a beautiful native macOS music player built with Swift and SwiftUI.",
+        "publisher": {
+          "@type": "Person",
+          "name": "Harsh Shirke",
+          "url": "https://github.com/shirkeharsh"
+        },
+        "inLanguage": "en-US"
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://mooziac.threeten.site/#faq",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What is Mooziac?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Mooziac is an open-source, native macOS music player engineered in Swift and SwiftUI. It tucks right into your Mac menu bar, giving you instant access to YouTube Music streaming, offline local audio playback, synchronized lyrics, and trackpad edge volume gestures."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does Mooziac support both YouTube Music and local audio files?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes! Mooziac connects securely to your YouTube Music account for Liked Songs and custom playlists, while also featuring a high-performance CoreAudio player for offline audio files including FLAC, MP3, WAV, and M4A."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How do Mooziac trackpad gestures work?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Mooziac hooks into macOS multitouch events to allow sliding along the rightmost 1mm edge of your MacBook trackpad to adjust volume with tactile haptic feedback. You can also double-tap or triple-tap corners to skip tracks or play/pause."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is Mooziac free and open-source?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes, Mooziac is 100% free and open-source under the MIT license. The full source code is available on GitHub at https://github.com/shirkeharsh/mooziac."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Which macOS versions and Macs are supported?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Mooziac is built as a Universal 2 binary supporting both Apple Silicon (M1, M2, M3, M4) and Intel Macs running macOS 13.0 (Ventura), macOS 14.0 (Sonoma), macOS 15.0 (Sequoia), and later."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+
+  <!-- Site Navigation -->
+  <header class="site-header" role="banner">
+    <div class="container">
+      <a href="https://mooziac.threeten.site/" class="brand" aria-label="Mooziac Home">
+        <img src="assets/favicon-32x32.png" alt="Mooziac App Icon" class="brand-icon" width="36" height="36">
+        <span>Mooziac</span>
+      </a>
+
+      <nav aria-label="Main Navigation">
+        <ul class="nav-menu" id="navMenu">
+          <li><a href="#features" class="nav-link">Features</a></li>
+          <li><a href="#gestures" class="nav-link">Gestures</a></li>
+          <li><a href="#compatibility" class="nav-link">Compatibility</a></li>
+          <li><a href="#install" class="nav-link">Install</a></li>
+          <li><a href="#faq" class="nav-link">FAQ</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-actions">
+        <a href="https://github.com/shirkeharsh/mooziac" class="btn btn-secondary btn-sm" target="_blank" rel="noopener noreferrer" aria-label="GitHub Repository">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+          </svg>
+          <span>GitHub</span>
+        </a>
+        <a href="https://github.com/shirkeharsh/mooziac/releases/latest/download/Mooziac.dmg" class="btn btn-primary btn-sm">
+          <span>Download</span>
+        </a>
+        <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle navigation menu" aria-expanded="false">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero Section -->
+    <section class="hero" id="hero">
+      <div class="container">
+        <div class="badge-wrapper">
+          <div class="badge">
+            <span class="badge-dot"></span>
+            <span>macOS 13+ • Universal 2 Binary • Open Source MIT</span>
+          </div>
+        </div>
+
+        <h1 class="hero-title">
+          Mooziac — <span class="gradient-text">Native macOS</span> Music Player
+        </h1>
+
+        <p class="hero-subtitle">
+          A fast, distraction-free YouTube Music & local audio player tucked right into your Mac’s menu bar. Built with pure Swift and SwiftUI.
+        </p>
+
+        <div class="hero-cta">
+          <a href="https://github.com/shirkeharsh/mooziac/releases/latest/download/Mooziac.dmg" class="btn btn-primary" aria-label="Download Mooziac DMG Installer for macOS">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            <span>Download for macOS (.dmg)</span>
+          </a>
+
+          <a href="https://github.com/shirkeharsh/mooziac" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+            </svg>
+            <span>Star on GitHub</span>
+          </a>
+        </div>
+
+        <div class="hero-meta-badges">
+          <span class="hero-meta-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+            Apple Silicon & Intel
+          </span>
+          <span>•</span>
+          <span class="hero-meta-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+            Zero Telemetry
+          </span>
+          <span>•</span>
+          <span class="hero-meta-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+            Swift 5.9 SPM
+          </span>
+        </div>
+
+        <!-- Hero Visual Display -->
+        <figure class="hero-visual">
+          <div class="glow-ambient"></div>
+          <div class="player-preview-card">
+            <img src="assets/screenshot-player.png" alt="Mooziac macOS Music Player Interface showing album art, live waveform, and playback controls" width="812" height="372" loading="eager">
+          </div>
+        </figure>
+      </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="section" id="features">
+      <div class="container">
+        <header class="section-header">
+          <span class="section-tag">Pure macOS Experience</span>
+          <h2 class="section-title">Engineered for speed, privacy, and simplicity</h2>
+          <p class="section-desc">Mooziac eliminates bloated browser tabs and heavy desktop apps with a lightweight, native Swift architecture.</p>
+        </header>
+
+        <div class="features-grid">
+          <article class="feature-card">
+            <div class="feature-icon-box">🏝️</div>
+            <h3 class="feature-title">Lives in Your Menu Bar</h3>
+            <p class="feature-text">Click the menu bar icon or press a global hotkey to pop open your music controls. Click away and Mooziac gracefully tucks back into your Mac status bar.</p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon-box">🔄</div>
+            <h3 class="feature-title">YouTube Music + Local Audio</h3>
+            <p class="feature-text">Stream your YouTube Music Liked Songs and playlists, or drop in high-res local audio files including FLAC, MP3, WAV, and M4A.</p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon-box">🖐️</div>
+            <h3 class="feature-title">Trackpad Edge Gestures</h3>
+            <p class="feature-text">Slide your finger along the far-right edge of your MacBook trackpad to adjust volume with realistic tactile haptics. Corner taps let you skip or pause.</p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon-box">📜</div>
+            <h3 class="feature-title">Synchronized LRC Lyrics</h3>
+            <p class="feature-text">Experience real-time lyric scrolling synchronized line-by-line with your playback for a distraction-free sing-along experience.</p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon-box">🎮</div>
+            <h3 class="feature-title">Discord Rich Presence</h3>
+            <p class="feature-text">Share what you’re listening to with friends on Discord. Displays album artwork, song title, artist, and live playback timestamps automatically.</p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon-box">🔒</div>
+            <h3 class="feature-title">100% Private & Local</h3>
+            <p class="feature-text">Zero third-party analytics, zero user tracking, and zero ads. Your playlists, history, and favorites are stored securely in a local SQLite database on your Mac.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Gestures & Controls Section -->
+    <section class="section" id="gestures">
+      <div class="container">
+        <header class="section-header">
+          <span class="section-tag">Effortless Control</span>
+          <h2 class="section-title">Physical gestures and tactile hotkeys</h2>
+          <p class="section-desc">Control your music without ever opening a window or interrupting your workflow.</p>
+        </header>
+
+        <div class="gestures-wrapper">
+          <!-- Trackpad Gestures -->
+          <div class="gesture-column">
+            <h3 class="gesture-column-title">
+              <span>🖐️</span> Trackpad Multitouch Gestures
+            </h3>
+            <div class="gesture-list">
+              <div class="gesture-item">
+                <div>
+                  <div class="gesture-name">Edge Slide</div>
+                  <div class="gesture-detail">Rightmost 1mm of trackpad</div>
+                </div>
+                <span class="key-pill">Volume ± (Haptic Tick)</span>
+              </div>
+
+              <div class="gesture-item">
+                <div>
+                  <div class="gesture-name">Double Tap</div>
+                  <div class="gesture-detail">Bottom-right corner</div>
+                </div>
+                <span class="key-pill">Next Track</span>
+              </div>
+
+              <div class="gesture-item">
+                <div>
+                  <div class="gesture-name">Triple Tap</div>
+                  <div class="gesture-detail">Bottom-right corner</div>
+                </div>
+                <span class="key-pill">Previous Track</span>
+              </div>
+
+              <div class="gesture-item">
+                <div>
+                  <div class="gesture-name">Double Tap</div>
+                  <div class="gesture-detail">Bottom-left corner</div>
+                </div>
+                <span class="key-pill">Play / Pause</span>
+              </div>
+
+              <div class="gesture-item">
+                <div>
+                  <div class="gesture-name">Scroll Wheel</div>
+                  <div class="gesture-detail">Over menu bar icon</div>
+                </div>
+                <span class="key-pill">Volume Nudge</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Keyboard Shortcuts -->
+          <div class="gesture-column">
+            <h3 class="gesture-column-title">
+              <span>⌨️</span> Keyboard Shortcuts
+            </h3>
+            <div class="gesture-list">
+              <div class="gesture-item">
+                <div class="gesture-name">Play / Pause</div>
+                <span class="key-pill">Space</span>
+              </div>
+
+              <div class="gesture-item">
+                <div class="gesture-name">Next Track</div>
+                <span class="key-pill">⌘ + →</span>
+              </div>
+
+              <div class="gesture-item">
+                <div class="gesture-name">Previous Track</div>
+                <span class="key-pill">⌘ + ←</span>
+              </div>
+
+              <div class="gesture-item">
+                <div class="gesture-name">Like / Unlike Song</div>
+                <span class="key-pill">L</span>
+              </div>
+
+              <div class="gesture-item">
+                <div class="gesture-name">Reload Web Engine</div>
+                <span class="key-pill">⌘ + R</span>
+              </div>
+
+              <div class="gesture-item">
+                <div class="gesture-name">Quit Mooziac</div>
+                <span class="key-pill">⌘ + Q</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Compatibility Section -->
+    <section class="section" id="compatibility">
+      <div class="container">
+        <header class="section-header">
+          <span class="section-tag">Universal macOS Support</span>
+          <h2 class="section-title">Built natively for every modern Mac</h2>
+          <p class="section-desc">Mooziac is packaged as a Universal 2 binary, fully optimized for both Apple Silicon and Intel hardware.</p>
+        </header>
+
+        <div class="features-grid">
+          <article class="feature-card">
+            <div class="feature-icon-box">⚡</div>
+            <h3 class="feature-title">Apple Silicon Optimized</h3>
+            <p class="feature-text">Runs natively on M1, M2, M3, M4 Macs with minimal CPU overhead, preserving your MacBook battery life during long listening sessions.</p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon-box">💻</div>
+            <h3 class="feature-title">macOS 13.0+ Ready</h3>
+            <p class="feature-text">Fully tested and optimized on macOS 13 Ventura, macOS 14 Sonoma, and macOS 15 Sequoia, adopting modern macOS design standards.</p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon-box">📦</div>
+            <h3 class="feature-title">Lightweight Footprint</h3>
+            <p class="feature-text">No bloated web wrapper frameworks or Chromium instances eating gigabytes of RAM. Pure Swift, AppKit, and WebKit integration.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Installation Section -->
+    <section class="section" id="install">
+      <div class="container">
+        <header class="section-header">
+          <span class="section-tag">Get Started</span>
+          <h2 class="section-title">Install Mooziac in Seconds</h2>
+          <p class="section-desc">Choose between the precompiled DMG installer or build directly from source using Swift Package Manager.</p>
+        </header>
+
+        <div class="install-grid">
+          <div class="install-card">
+            <span class="install-badge">Recommended</span>
+            <h3 class="install-title">Direct DMG Download</h3>
+            <p class="install-desc">Download the latest universal release, drag the app into your Applications folder, and launch.</p>
+            <a href="https://github.com/shirkeharsh/mooziac/releases/latest/download/Mooziac.dmg" class="btn btn-primary" style="width: 100%;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span>Download Mooziac.dmg</span>
+            </a>
+          </div>
+
+          <div class="install-card">
+            <span class="install-badge">Developers</span>
+            <h3 class="install-title">Build from Source</h3>
+            <p class="install-desc">Clone the official repository and compile with Xcode Command Line Tools.</p>
+            <div class="code-box">
+              <code>git clone https://github.com/shirkeharsh/mooziac.git<br>cd mooziac<br>./build_app.sh</code>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section class="section" id="faq">
+      <div class="container">
+        <header class="section-header">
+          <span class="section-tag">Questions & Answers</span>
+          <h2 class="section-title">Frequently Asked Questions</h2>
+          <p class="section-desc">Everything you need to know about Mooziac for macOS.</p>
+        </header>
+
+        <div class="faq-accordion">
+          <details class="faq-item">
+            <summary class="faq-question">What is Mooziac?</summary>
+            <div class="faq-answer">
+              Mooziac is an open-source, native macOS music player designed for modern Mac users. It lives in your menu bar and seamlessly integrates YouTube Music streaming, offline local audio playback (.mp3, .flac, .wav, .m4a), synchronized LRC lyrics, and haptic trackpad edge volume gestures.
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary class="faq-question">How does Mooziac connect with YouTube Music?</summary>
+            <div class="faq-answer">
+              Mooziac uses an isolated native WebKit session to connect securely with your YouTube Music account. You can access your Liked Songs, artist radio, and customized playlists without keeping an entire browser window open.
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary class="faq-question">Can Mooziac play offline local music files?</summary>
+            <div class="faq-answer">
+              Yes! Mooziac features a high-performance native CoreAudio engine that can play local audio files in formats like FLAC, MP3, WAV, and M4A. Simply drag and drop your music files or folders into the player.
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary class="faq-question">How does trackpad edge volume control work?</summary>
+            <div class="faq-answer">
+              Mooziac monitors multitouch input on the rightmost 1mm edge of your MacBook trackpad. Sliding your finger vertically along this edge gives you precision volume adjustments paired with tactile haptic feedback ticks.
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary class="faq-question">Is Mooziac free and open source?</summary>
+            <div class="faq-answer">
+              Yes, Mooziac is 100% free and open-source under the MIT license. You can inspect the source code, contribute features, and build it yourself from the <a href="https://github.com/shirkeharsh/mooziac" target="_blank" rel="noopener noreferrer" style="color: var(--accent-pink); text-decoration: underline;">GitHub repository</a>.
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary class="faq-question">What are the macOS system requirements?</summary>
+            <div class="faq-answer">
+              Mooziac requires macOS 13.0 (Ventura) or later, including macOS 14 (Sonoma) and macOS 15 (Sequoia). It runs natively on both Apple Silicon (M1/M2/M3/M4) and Intel-based Macs.
+            </div>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="section">
+      <div class="container">
+        <div class="cta-banner">
+          <h2 class="cta-title">Ready to upgrade your Mac listening experience?</h2>
+          <p class="cta-desc">Download Mooziac today and enjoy fast, native, menu bar music playback.</p>
+          <div class="cta-actions">
+            <a href="https://github.com/shirkeharsh/mooziac/releases/latest/download/Mooziac.dmg" class="btn btn-primary">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span>Download Mooziac for macOS</span>
+            </a>
+            <a href="https://github.com/shirkeharsh/mooziac" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">
+              <span>View Source on GitHub</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-top">
+        <a href="https://mooziac.threeten.site/" class="brand" aria-label="Mooziac Home">
+          <img src="assets/favicon-32x32.png" alt="Mooziac Icon" width="28" height="28">
+          <span>Mooziac</span>
+        </a>
+
+        <ul class="footer-links">
+          <li><a href="https://github.com/shirkeharsh/mooziac" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+          <li><a href="https://github.com/shirkeharsh/mooziac/releases/latest" target="_blank" rel="noopener noreferrer">Releases</a></li>
+          <li><a href="https://github.com/shirkeharsh/mooziac/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a></li>
+          <li><a href="https://github.com/shirkeharsh" target="_blank" rel="noopener noreferrer">Created by Harsh Shirke</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-bottom">
+        <div>&copy; 2026 ThreeTen / Harsh Shirke. Released under the MIT License.</div>
+        <div>Mooziac is an independent open-source project and is not affiliated with Google or YouTube.</div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Interactive JavaScript for mobile menu and interactions -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const toggle = document.getElementById('mobileToggle');
+      const menu = document.getElementById('navMenu');
+      if (toggle && menu) {
+        toggle.addEventListener('click', () => {
+          const isExpanded = toggle.getAttribute('aria-expanded') === 'true';
+          toggle.setAttribute('aria-expanded', !isExpanded);
+          menu.classList.toggle('active');
+        });
+      }
+
+      // Close menu on link click
+      document.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', () => {
+          if (menu && menu.classList.contains('active')) {
+            menu.classList.remove('active');
+            if (toggle) toggle.setAttribute('aria-expanded', 'false');
+          }
+        });
+      });
+    });
+  </script>
+</body>
+</html>

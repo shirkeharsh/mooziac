@@ -1,49 +1,60 @@
 <p align="center">
-  <img src="Resources/launch_transparent.png" alt="Mooziac Logo" width="280">
+  <img src="Resources/launch_transparent.png" alt="Mooziac Logo - Native macOS Music Player" width="300">
+</p>
+
+# Mooziac — Native macOS Music Player
+
+<p align="center">
+  <strong>Mooziac is a beautiful native macOS music player built with Swift and SwiftUI.</strong><br>
+  A fast, distraction-free YouTube Music & local audio player tucked right into your Mac’s menu bar.
 </p>
 
 <p align="center">
-  <strong>A fast, distraction-free YouTube Music & local audio player tucked right into your Mac’s menu bar.</strong>
+  <a href="https://mooziac.threeten.site"><img src="https://img.shields.io/badge/Website-mooziac.threeten.site-007AFF?style=flat-square&logo=safari&logoColor=white" alt="Mooziac Website"></a>
+  <a href="https://github.com/shirkeharsh/mooziac/releases/latest"><img src="https://img.shields.io/badge/macOS-13.0+-black?style=flat-square&logo=apple&logoColor=white" alt="macOS 13+ Compatibility"></a>
+  <a href="https://github.com/shirkeharsh/mooziac/releases/latest"><img src="https://img.shields.io/badge/Apple%20Silicon%20+%20Intel-Universal%202-success?style=flat-square" alt="Universal 2 Binary"></a>
+  <a href="https://github.com/shirkeharsh/mooziac/releases/latest"><img src="https://img.shields.io/github/v/release/shirkeharsh/mooziac?style=flat-square&color=orange" alt="Latest Release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-purple?style=flat-square" alt="MIT License"></a>
 </p>
 
 <p align="center">
-  <a href="https://mooziac.threeten.site"><img src="https://img.shields.io/badge/Website-mooziac.threeten.site-007AFF?style=flat-square&logo=safari&logoColor=white" alt="Website"></a>
-  <a href="https://github.com/shirkeharsh/mooziac/releases/latest"><img src="https://img.shields.io/badge/macOS-13.0+-black?style=flat-square&logo=apple&logoColor=white" alt="macOS 13+"></a>
-  <a href="https://github.com/shirkeharsh/mooziac/releases/latest"><img src="https://img.shields.io/badge/Apple%20Silicon%20+%20Intel-Universal%202-success?style=flat-square" alt="Universal Binary"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-purple?style=flat-square" alt="License"></a>
-</p>
-
-<p align="center">
-  <a href="https://mooziac.threeten.site"><strong>Explore Website</strong></a> •
-  <a href="https://github.com/shirkeharsh/mooziac/releases/latest/download/Mooziac.dmg"><strong>Download DMG</strong></a> •
-  <a href="#-building-from-source"><strong>Build from Source</strong></a>
+  <a href="https://mooziac.threeten.site"><strong>🌐 Official Website</strong></a> •
+  <a href="https://github.com/shirkeharsh/mooziac/releases/latest/download/Mooziac.dmg"><strong>⬇️ Download DMG</strong></a> •
+  <a href="https://github.com/shirkeharsh/mooziac/releases/latest"><strong>📦 Release Notes</strong></a> •
+  <a href="#-building-from-source"><strong>🛠️ Build from Source</strong></a>
 </p>
 
 <br>
 
 <p align="center">
-  <img src="Resources/Animals.png" alt="Mooziac Player Interface" width="620">
+  <img src="Resources/Animals.png" alt="Mooziac native macOS music player interface with real-time waveform and album art" width="640">
 </p>
 
 ---
 
-## ✨ Why Mooziac?
+## 🎵 What is Mooziac?
 
-Heavy desktop apps and open browser tabs eat up battery and clutter your screen. Mooziac is written from the ground up in **pure Swift and AppKit** so it stays featherlight, instantaneous, and out of your way:
+**Mooziac** is a lightweight, open-source **macOS music player** engineered from the ground up as a **native macOS app** using **Swift** and **SwiftUI**. Instead of running heavy browser tabs or resource-hungry desktop wrappers, Mooziac sits discreetly in your Mac’s menu bar, giving you instant playback controls, **YouTube Music** integration, offline local audio playback, synchronized lyrics, and innovative trackpad edge volume gestures.
 
-- 🏝️ **Lives in your menu bar** — Click the icon or hit a shortcut to peek at controls; click away and it tucks itself back into the status bar.
-- 🎨 **Adaptive Dynamic Island UI** — Real-time audio waveform progress bar, smooth bouncy animations, and an ambient color glow that extracts tones from your current album art.
-- 🖐️ **Physical trackpad gestures** — Slide your finger along the far-right edge of your trackpad to smoothly adjust system volume with tactile haptics.
-- 🔄 **YouTube Music + Local Files** — Connect your account to play Liked Songs and playlists, or drop in offline `.mp3`, `.flac`, `.wav`, and `.m4a` files.
-- 📜 **Synchronized Lyrics** — Real-time `.lrc` lyric flow that syncs line-by-line with the music.
-- 🎮 **Discord Rich Presence** — Broadcasts what you’re playing to your Discord status with artwork and timestamp.
-- 🔒 **Zero telemetry, 100% private** — No background analytics, no ads. Your library, playlists, and history stay right on your Mac in a local SQLite file.
+---
+
+## ✨ Features
+
+- 🏝️ **Menu Bar Native** — Sits seamlessly in your macOS menu bar. Click the icon or hit a global hotkey to pop open your controls; click away and it tucks itself back into the status bar.
+- 🔄 **YouTube Music Streaming** — Securely connect your YouTube Music account to stream Liked Songs, artist radios, and personalized playlists without keeping a browser open.
+- 📁 **High-Res Local Audio Playback** — Built-in native CoreAudio engine to play offline `.mp3`, `.flac`, `.wav`, and `.m4a` files with drag-and-drop ease.
+- 🎨 **Adaptive Dynamic Island UI** — Real-time audio waveform visualizer, fluid spring animations, and an ambient color glow dynamically sampled from the current album art.
+- 🖐️ **Physical Trackpad Gestures** — Slide your finger along the far-right edge of your MacBook trackpad to adjust volume with tactile haptic feedback ticks.
+- 📜 **Synchronized LRC Lyrics** — Real-time `.lrc` lyric flow synchronized line-by-line with the music.
+- 🎮 **Discord Rich Presence** — Automatically broadcast what you’re playing (song title, artist, album art, and timestamps) to your Discord status.
+- 🔒 **Zero Telemetry & 100% Private** — No ads, no tracking scripts, and no background telemetry. Your library, playlists, and history stay strictly local in a SQLite database on your Mac.
+- ⚡ **Universal 2 Architecture** — Optimized natively for Apple Silicon (M1/M2/M3/M4) and Intel-based Macs.
 
 ---
 
 ## 🖐️ Gestures & Shortcuts
 
-### Trackpad Gestures
+### Trackpad Multitouch Gestures
 | Gesture | Location | Action |
 | :--- | :--- | :--- |
 | **Edge Slide** | Rightmost 1mm of trackpad | Smooth volume adjustment with haptic tick |
@@ -60,16 +71,31 @@ Heavy desktop apps and open browser tabs eat up battery and clutter your screen.
 | `⌘ + ←` | Previous track |
 | `L` | Like / Unlike song |
 | `⌘ + R` | Reload web engine |
-| `⌘ + Q` | Quit |
+| `⌘ + Q` | Quit Mooziac |
 
 ---
 
-## 🛠️ Building from Source
+## 💻 System Compatibility
 
-Mooziac uses the standard **Swift Package Manager**. You only need Xcode Command Line Tools installed.
+- **Operating System:** macOS 13.0 (Ventura), macOS 14.0 (Sonoma), macOS 15.0 (Sequoia), and later.
+- **Hardware Architecture:** Universal Binary supporting both Apple Silicon (`arm64`) and Intel (`x86_64`).
+- **Dependencies:** Standalone native app (no external runtimes or framework dependencies needed).
+
+---
+
+## 📦 Installation
+
+### Option 1: Direct Download (Recommended)
+1. Download the latest **[Mooziac.dmg](https://github.com/shirkeharsh/mooziac/releases/latest/download/Mooziac.dmg)**.
+2. Open the `.dmg` file.
+3. Drag **Mooziac** into your **Applications** folder.
+4. Launch Mooziac from your Applications or Spotlight.
+
+### Option 2: Building from Source
+Mooziac uses standard **Swift Package Manager (SPM)**. You only need Xcode Command Line Tools installed.
 
 ```bash
-# Clone the repository
+# Clone the Mooziac repository
 git clone https://github.com/shirkeharsh/mooziac.git
 cd mooziac
 
@@ -81,7 +107,7 @@ To build a standalone `.dmg` installer without launching:
 ```bash
 ./build_app.sh --no-launch
 ```
-The output `.app` and `.dmg` will be generated in `dist/`.
+The output `.app` and `.dmg` will be generated in the `dist/` directory.
 
 ---
 
@@ -105,4 +131,4 @@ Sources/Mooziac/
 ## 📄 License
 
 Mooziac is open-source software licensed under the [MIT License](LICENSE).  
-Feel free to fork, customize, and make it your own!
+Feel free to star, fork, and contribute!
