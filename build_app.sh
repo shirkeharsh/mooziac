@@ -56,7 +56,9 @@ sleep 1
 # Clean previous build artifacts
 rm -rf "$DIST_DIR"
 mkdir -p "$DIST_DIR"
+touch "$DIST_DIR/.metadata_never_index"
 mkdir -p "$STAGING_DIR"
+touch "$STAGING_DIR/.metadata_never_index"
 
 # Ensure DMG background exists
 if [ -f "scripts/generate_dmg_background.swift" ] && [ ! -f "Resources/dmg_background.png" ]; then
@@ -163,8 +165,12 @@ SIGN_STATUS="Ad-hoc signed (Hardened Runtime)"
 SIGN_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | awk '/Apple Development|Developer ID Application/ {print $2}' | head -1)
 if [ -n "$SIGN_IDENTITY" ]; then
     echo "    Signing with certificate: $SIGN_IDENTITY"
-    codesign --force --deep --options runtime $ENTITLEMENTS_FLAG --sign "$SIGN_IDENTITY" --identifier "$APP_BUNDLE_ID" "$TARGET_APP"
-    SIGN_STATUS="Valid signature ($SIGN_IDENTITY)"
+    if ! codesign --force --deep --options runtime $ENTITLEMENTS_FLAG --sign "$SIGN_IDENTITY" --identifier "$APP_BUNDLE_ID" "$TARGET_APP" 2>/dev/null; then
+        echo "    Certificate signing unavailable. Falling back to ad-hoc signing..."
+        codesign --force --deep --options runtime $ENTITLEMENTS_FLAG --sign - --identifier "$APP_BUNDLE_ID" "$TARGET_APP"
+    else
+        SIGN_STATUS="Valid signature ($SIGN_IDENTITY)"
+    fi
 else
     echo "    Ad-hoc signing with Hardened Runtime..."
     codesign --force --deep --options runtime $ENTITLEMENTS_FLAG --sign - --identifier "$APP_BUNDLE_ID" "$TARGET_APP"
@@ -279,6 +285,13 @@ echo "[7/7] Installing to ~/Applications & Launching..."
 mkdir -p "$HOME/Applications"
 rm -rf "$LOCAL_APP_DEST"
 cp -R "$TARGET_APP" "$LOCAL_APP_DEST"
+
+# Unregister staging app and register destination app with LaunchServices
+LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+if [ -x "$LSREGISTER" ]; then
+    "$LSREGISTER" -u "$TARGET_APP" 2>/dev/null || true
+    "$LSREGISTER" -f "$LOCAL_APP_DEST" 2>/dev/null || true
+fi
 
 if [ "$LAUNCH_AFTER_BUILD" = true ]; then
     echo "    Launching $LOCAL_APP_DEST..."

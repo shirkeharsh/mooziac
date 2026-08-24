@@ -70,15 +70,26 @@ extension DynamicIslandPlayerView {
             toggle: discordToggle,
             onToggle: { DiscordRPCManager.shared.isEnabled = $0 }
         )
+
         let featuresStack = NSStackView(views: [themeRow, progressRow, volumeRow, gesturesRow, lyricsRow, discordRow])
         featuresStack.orientation = .vertical
         featuresStack.alignment = .leading
         featuresStack.spacing = 3
         featuresStack.translatesAutoresizingMaskIntoConstraints = false
 
+        let versionLabel = NSTextField(labelWithString: "Mooziac v\(UpdateManager.shared.currentVersion)")
+        versionLabel.font = NSFont.systemFont(ofSize: 9.5, weight: .regular)
+        versionLabel.alignment = .center
+        versionLabel.isEditable = false
+        versionLabel.isSelectable = false
+        versionLabel.refusesFirstResponder = true
+        versionLabel.translatesAutoresizingMaskIntoConstraints = false
+        settingsVersionLabel = versionLabel
+
         let mainStack = NSStackView(views: [
             featuresSectionLabel,
-            featuresStack
+            featuresStack,
+            versionLabel
         ])
         mainStack.orientation = .vertical
         mainStack.alignment = .leading
@@ -597,6 +608,7 @@ extension DynamicIslandPlayerView {
             mainStack.topAnchor.constraint(equalTo: settingsContainerView.topAnchor, constant: 4),
             mainStack.leadingAnchor.constraint(equalTo: settingsContainerView.leadingAnchor, constant: 12),
             mainStack.trailingAnchor.constraint(equalTo: settingsContainerView.trailingAnchor, constant: -12),
+            mainStack.bottomAnchor.constraint(equalTo: settingsContainerView.bottomAnchor, constant: -4),
 
             subView.topAnchor.constraint(equalTo: settingsContainerView.topAnchor, constant: 4),
             subView.leadingAnchor.constraint(equalTo: settingsContainerView.leadingAnchor, constant: 4),
@@ -604,6 +616,8 @@ extension DynamicIslandPlayerView {
             subView.bottomAnchor.constraint(equalTo: settingsContainerView.bottomAnchor, constant: -4),
 
             featuresStack.widthAnchor.constraint(equalTo: mainStack.widthAnchor),
+            versionLabel.widthAnchor.constraint(equalTo: mainStack.widthAnchor),
+            versionLabel.heightAnchor.constraint(equalToConstant: 14),
 
             themeRow.widthAnchor.constraint(equalTo: featuresStack.widthAnchor),
             progressRow.widthAnchor.constraint(equalTo: featuresStack.widthAnchor),
@@ -3391,6 +3405,8 @@ extension DynamicIslandPlayerView {
         for desc in featureDescLabels {
             desc.textColor = tone.secondaryText
         }
+
+        settingsVersionLabel?.textColor = tone.secondaryText.withAlphaComponent(0.6)
 
         playlistSearchField?.applyPlaylistContainerStyle(tone: tone)
 

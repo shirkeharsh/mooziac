@@ -146,6 +146,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     var appVolumeToggle = NativeCapsuleToggleView()
     var lyricsToggle = NativeCapsuleToggleView()
     var discordToggle = NativeCapsuleToggleView()
+    var settingsVersionLabel: NSTextField?
     var themeToggle = NativeCapsuleStepToggleView()
     var progressToggle = NativeCapsuleStepToggleView()
     var progressDescLabel: NSTextField?
@@ -754,7 +755,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
 
     public func expandPreferences() {
         activeSettingsMode = .preferences
-        settingsContainerHeightConstraint?.constant = 292
+        settingsContainerHeightConstraint?.constant = 272
         showMainSettingsView()
         expandSettingsPanel()
     }
