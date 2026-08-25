@@ -231,8 +231,8 @@ public final class LocalDatabaseManager {
         executeRaw(sql: "PRAGMA synchronous = NORMAL;")
         executeRaw(sql: "PRAGMA foreign_keys = ON;")
         executeRaw(sql: "PRAGMA busy_timeout = 5000;")
-        executeRaw(sql: "PRAGMA mmap_size = 268435456;")
-        executeRaw(sql: "PRAGMA cache_size = -64000;")
+        executeRaw(sql: "PRAGMA mmap_size = 16777216;")
+        executeRaw(sql: "PRAGMA cache_size = -2000;")
         executeRaw(sql: "PRAGMA temp_store = MEMORY;")
 
         applySchemaIfNeeded()
@@ -278,8 +278,8 @@ public final class LocalDatabaseManager {
             executeRaw(sql: "PRAGMA synchronous = NORMAL;")
             executeRaw(sql: "PRAGMA foreign_keys = ON;")
             executeRaw(sql: "PRAGMA busy_timeout = 5000;")
-            executeRaw(sql: "PRAGMA mmap_size = 268435456;")
-            executeRaw(sql: "PRAGMA cache_size = -64000;")
+            executeRaw(sql: "PRAGMA mmap_size = 16777216;")
+            executeRaw(sql: "PRAGMA cache_size = -2000;")
             executeRaw(sql: "PRAGMA temp_store = MEMORY;")
             applySchemaIfNeeded()
         }

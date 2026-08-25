@@ -37,6 +37,8 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     let browserButton = ReactiveIconButton()
     let fullScreenButton = ReactiveIconButton()
     let resetPositionButton = ReactiveIconButton()
+    let visualEffectBackdrop = NSVisualEffectView()
+    let glassSheenLayer = CAGradientLayer()
     var isLiked: Bool = false
     var isRepeatActive: Bool = false
     var repeatMode: RepeatMode = .off
@@ -141,6 +143,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     var featureIconViews: [NSImageView] = []
     var featureTitleLabels: [NSTextField] = []
     var featureDescLabels: [NSTextField] = []
+    var featureRowContainers: [NSView] = []
 
     var masterGesturesToggle = NativeCapsuleToggleView()
     var appVolumeToggle = NativeCapsuleToggleView()
@@ -152,6 +155,15 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     var progressDescLabel: NSTextField?
     var themeDescLabel: NSTextField?
 
+    // Gesture Mapping Sub-View
+    var gestureMappingSubView: NSView?
+    var gestureMappingRows: [GestureMappingRowView] = []
+    var gestureMappingSectionLabel: NSTextField?
+    var gestureMappingBackButton: NSButton?
+    var gestureMappingResetButton: NSButton?
+    var gestureMappingStackView: NSStackView?
+    var gestureMappingScrollView: NSScrollView?
+
     func updateRepeatButtonColor() {
         let iconName = (repeatMode == .one) ? "repeat.1" : "repeat"
         let iconConfig = NSImage.SymbolConfiguration(pointSize: 14.0, weight: .semibold)
@@ -162,10 +174,13 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         if repeatMode != .off {
             repeatButton.contentTintColor = NSColor(red: 0.0, green: 0.80, blue: 1.0, alpha: 1.0)
         } else {
-            if PlayerDesign.current == .glassMode {
+            switch PlayerDesign.current {
+            case .glassMode:
                 repeatButton.contentTintColor = NSColor(red: 0.082, green: 0.082, blue: 0.082, alpha: 1.0)
-            } else {
+            case .adaptive, .darkMode:
                 repeatButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
+            case .native:
+                repeatButton.contentTintColor = NSColor(white: 0.88, alpha: 1.0)
             }
         }
     }
@@ -188,7 +203,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     var lastTrackTitle = ""
     var lastTrackArtist = ""
 
-    static let artworkCache = NSCache<NSString, NSImage>()
+
     
     let toastView = NSView()
     let toastLabel = NSTextField(labelWithString: "")
@@ -316,6 +331,33 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         containerPill.onBackgroundClick = { [weak self] in
             self?.collapseSettingsForOutsideClick()
         }
+
+        visualEffectBackdrop.translatesAutoresizingMaskIntoConstraints = false
+        visualEffectBackdrop.material = .underWindowBackground
+        visualEffectBackdrop.blendingMode = .behindWindow
+        visualEffectBackdrop.state = .active
+        visualEffectBackdrop.wantsLayer = true
+        visualEffectBackdrop.layer?.cornerRadius = 20
+        visualEffectBackdrop.layer?.masksToBounds = true
+        visualEffectBackdrop.isHidden = true
+        containerPill.addSubview(visualEffectBackdrop, positioned: .below, relativeTo: nil)
+        NSLayoutConstraint.activate([
+            visualEffectBackdrop.topAnchor.constraint(equalTo: containerPill.topAnchor),
+            visualEffectBackdrop.leadingAnchor.constraint(equalTo: containerPill.leadingAnchor),
+            visualEffectBackdrop.trailingAnchor.constraint(equalTo: containerPill.trailingAnchor),
+            visualEffectBackdrop.bottomAnchor.constraint(equalTo: containerPill.bottomAnchor),
+        ])
+
+        glassSheenLayer.colors = [
+            NSColor(white: 1.0, alpha: 0.14).cgColor,
+            NSColor(white: 1.0, alpha: 0.03).cgColor,
+            NSColor(white: 1.0, alpha: 0.00).cgColor
+        ]
+        glassSheenLayer.locations = [0.0, 0.45, 1.0]
+        glassSheenLayer.cornerRadius = 20
+        glassSheenLayer.masksToBounds = true
+        glassSheenLayer.isHidden = true
+        containerPill.layer?.addSublayer(glassSheenLayer)
         
         artworkImageView.translatesAutoresizingMaskIntoConstraints = false
         artworkImageView.wantsLayer = true
@@ -1099,10 +1141,12 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
             switch PlayerDesign.current {
             case .glassMode:
                 browserButton.contentTintColor = NSColor(red: 0.082, green: 0.082, blue: 0.082, alpha: 1.0)
-            case .adaptive, .native:
+            case .adaptive:
                 browserButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
             case .darkMode:
                 browserButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
+            case .native:
+                browserButton.contentTintColor = NSColor(white: 0.88, alpha: 1.0)
             }
         }
     }
@@ -1116,10 +1160,12 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
             switch PlayerDesign.current {
             case .glassMode:
                 addToPlaylistButton.contentTintColor = NSColor(red: 0.082, green: 0.082, blue: 0.082, alpha: 1.0)
-            case .adaptive, .native:
+            case .adaptive:
                 addToPlaylistButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
             case .darkMode:
                 addToPlaylistButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
+            case .native:
+                addToPlaylistButton.contentTintColor = NSColor(white: 0.88, alpha: 1.0)
             }
         }
     }
@@ -1190,6 +1236,11 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
             return
         }
         super.keyDown(with: event)
+    }
+
+    override func layout() {
+        super.layout()
+        glassSheenLayer.frame = containerPill.bounds
     }
 }
 

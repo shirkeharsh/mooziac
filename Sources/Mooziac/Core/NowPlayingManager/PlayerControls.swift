@@ -9,14 +9,13 @@ import MediaPlayer
 private final class NowPlayingArtworkLoader {
     static let shared = NowPlayingArtworkLoader()
 
-    private let cache = NSCache<NSString, NSImage>()
     private var inFlight = Set<String>()
     private var currentKey = ""
 
     func applyArtwork(urlString: String, videoId: String) {
         let key = videoId.isEmpty ? urlString : videoId
         currentKey = key
-        if let img = cache.object(forKey: key as NSString) {
+        if let img = AppArtworkHelper.shared.getMemoryCachedImage(forKey: key) {
             apply(img, key: key)
             return
         }
@@ -30,7 +29,7 @@ private final class NowPlayingArtworkLoader {
                 return
             }
             DispatchQueue.main.async {
-                self.cache.setObject(img, forKey: key as NSString)
+                AppArtworkHelper.shared.setMemoryCachedImage(img, forKey: key)
                 self.inFlight.remove(key)
                 self.apply(img, key: key)
             }
@@ -52,6 +51,15 @@ private final class NowPlayingArtworkLoader {
 
 extension NowPlayingManager {
     func updateSystemNowPlayingInfo(_ state: PlaybackState) {
+        // When online, WebKit natively manages the single Now Playing session in Control Center.
+        // We only use MPNowPlayingInfoCenter for local offline audio playback.
+        guard engineMode == .offline else {
+            if MPNowPlayingInfoCenter.default().nowPlayingInfo != nil {
+                MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+            }
+            return
+        }
+
         let center = MPNowPlayingInfoCenter.default()
         var info = center.nowPlayingInfo ?? [:]
 
@@ -63,25 +71,14 @@ extension NowPlayingManager {
         info[MPMediaItemPropertyPlaybackDuration] = state.duration
         info[MPNowPlayingInfoPropertyPlaybackRate] = state.isPlaying ? 1.0 : 0.0
 
-        // Preserve the artwork attached by NativeAudioPlayer unless the
-        // track changed (keyed by videoId, NOT the artwork URL — YTM
-        // rotates its signed thumbnail URLs so the URL string changes
-        // even when the image is identical).
         let trackKey = state.videoId.isEmpty ? state.artworkUrl : state.videoId
         if lastNowPlayingTrackKey != trackKey {
             info.removeValue(forKey: MPMediaItemPropertyArtwork)
             lastNowPlayingTrackKey = trackKey
         }
 
-        // Online tracks report a remote artwork URL; load it so the system
-        // media player shows the correct artwork instead of a stale image.
-        if state.artworkUrl.hasPrefix("http") {
-            NowPlayingArtworkLoader.shared.applyArtwork(urlString: state.artworkUrl, videoId: state.videoId)
-        } else {
-            NowPlayingArtworkLoader.shared.cancelCurrent()
-        }
-
         center.nowPlayingInfo = info
+        center.playbackState = state.isPlaying ? .playing : .paused
     }
     
     // Playback Controls Injection using native #movie_player API or NativeAudioPlayer

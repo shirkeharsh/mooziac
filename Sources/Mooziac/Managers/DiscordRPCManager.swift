@@ -21,6 +21,7 @@ final class DiscordRPCManager {
     // Official Mooziac Discord RPC Client ID (Authenticated & Registered with Discord)
     private let clientId = "1537169013174435870"
     private var reconnectTimer: Timer?
+    private var currentBackoffInterval: TimeInterval = 4.0
     private var periodicRefreshCounter: Int = 0
     private let queue = DispatchQueue(label: "com.mooziac.discordrpc", qos: .utility)
     
@@ -31,6 +32,7 @@ final class DiscordRPCManager {
             queue.async { [weak self] in
                 guard let self = self else { return }
                 if newValue {
+                    self.currentBackoffInterval = 4.0
                     self.tryConnectInternal()
                     self.updatePresenceInternal(state: NowPlayingManager.shared.currentState)
                 } else {
@@ -44,7 +46,27 @@ final class DiscordRPCManager {
     private init() {
         // Prevent process termination on SIGPIPE when socket writes fail (EPIPE)
         signal(SIGPIPE, SIG_IGN)
+        setupAppLaunchObserver()
         startReconnectLoop()
+    }
+
+    private func setupAppLaunchObserver() {
+        let center = NSWorkspace.shared.notificationCenter
+        center.addObserver(forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main) { [weak self] note in
+            guard let self = self, self.isEnabled else { return }
+            if let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication {
+                let name = (app.localizedName ?? "").lowercased()
+                let bundle = (app.bundleIdentifier ?? "").lowercased()
+                if name.contains("discord") || bundle.contains("discord") {
+                    self.resetBackoffAndConnect()
+                }
+            }
+        }
+    }
+
+    public func resetBackoffAndConnect() {
+        currentBackoffInterval = 4.0
+        tryConnect()
     }
     
     deinit {
@@ -55,14 +77,25 @@ final class DiscordRPCManager {
     }
     
     public func startReconnectLoop() {
+        scheduleNextLoop(after: currentBackoffInterval)
+    }
+
+    private func scheduleNextLoop(after interval: TimeInterval) {
         DispatchQueue.main.async { [weak self] in
-            self?.reconnectTimer?.invalidate()
-            self?.reconnectTimer = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            self.reconnectTimer?.invalidate()
+            let timer = Timer(timeInterval: interval, repeats: false) { [weak self] _ in
                 guard let self = self else { return }
                 self.queue.async { [weak self] in
                     guard let self = self, self.isEnabled else { return }
                     if !self._isConnected {
                         self.tryConnectInternal()
+                        if !self._isConnected {
+                            self.currentBackoffInterval = min(60.0, self.currentBackoffInterval * 1.5)
+                        } else {
+                            self.currentBackoffInterval = 4.0
+                        }
+                        self.scheduleNextLoop(after: self.currentBackoffInterval)
                     } else {
                         // Periodic heartbeat/refresh every 12 seconds to prevent presence timeouts
                         self.periodicRefreshCounter += 1
@@ -73,9 +106,12 @@ final class DiscordRPCManager {
                                 self.updatePresenceInternal(state: NowPlayingManager.shared.currentState)
                             }
                         }
+                        self.scheduleNextLoop(after: 4.0)
                     }
                 }
             }
+            RunLoop.main.add(timer, forMode: .common)
+            self.reconnectTimer = timer
         }
     }
     
@@ -295,7 +331,11 @@ final class DiscordRPCManager {
     
     public func updatePresence(state: PlaybackState) {
         queue.async { [weak self] in
-            self?.updatePresenceInternal(state: state)
+            guard let self = self else { return }
+            if !self._isConnected && state.isPlaying {
+                self.currentBackoffInterval = 4.0
+            }
+            self.updatePresenceInternal(state: state)
         }
     }
     

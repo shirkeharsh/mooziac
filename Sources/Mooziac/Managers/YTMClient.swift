@@ -35,6 +35,12 @@ public final class YTMClient {
         public let title: String
     }
 
+    public struct PlaylistDetail {
+        public let playlistId: String
+        public let title: String
+        public let tracks: [Track]
+    }
+
     public struct Track {
         public let videoId: String
         public let title: String
@@ -109,33 +115,30 @@ public final class YTMClient {
         body["context"] = Self.clientContext
 
         authorizationHeader { result in
-            switch result {
-            case .failure(let error):
-                completion(.failure(error))
-            case .success(let authHeader):
+            if case .success(let authHeader) = result {
                 request.setValue(authHeader, forHTTPHeaderField: "Authorization")
-                do {
-                    request.httpBody = try JSONSerialization.data(withJSONObject: body)
-                } catch {
-                    completion(.failure(error))
+            }
+            do {
+                request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            } catch {
+                completion(.failure(error))
+                return
+            }
+            let task = URLSession.shared.dataTask(with: request) { data, response, error in
+                if let error = error {
+                    completion(.failure(YTMError.network(error.localizedDescription)))
                     return
                 }
-                let task = URLSession.shared.dataTask(with: request) { data, response, error in
-                    if let error = error {
-                        completion(.failure(YTMError.network(error.localizedDescription)))
-                        return
-                    }
-                    guard let http = response as? HTTPURLResponse,
-                          (200...299).contains(http.statusCode),
-                          let data = data,
-                          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                        completion(.failure(YTMError.badResponse))
-                        return
-                    }
-                    completion(.success(json))
+                guard let http = response as? HTTPURLResponse,
+                      (200...299).contains(http.statusCode),
+                      let data = data,
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    completion(.failure(YTMError.badResponse))
+                    return
                 }
-                task.resume()
+                completion(.success(json))
             }
+            task.resume()
         }
         return nil
     }
@@ -191,6 +194,110 @@ public final class YTMClient {
                 completion(.success(tracks))
             }
         }
+    }
+
+    /// Fetches all details (title and tracks) for any public, unlisted, or account playlist.
+    public func fetchPlaylistDetails(playlistId: String, pageLimit: Int = 15,
+                                     completion: @escaping (Result<PlaylistDetail, Error>) -> Void) {
+        let cleanId = playlistId.replacingOccurrences(of: "VL", with: "")
+        let browseId = "VL\(cleanId)"
+        fetchAllBrowsePages(browseId: browseId, pageLimit: pageLimit) { result in
+            switch result {
+            case .failure(let error):
+                completion(.failure(error))
+            case .success(let pages):
+                guard let firstPage = pages.first else {
+                    completion(.failure(YTMError.badResponse))
+                    return
+                }
+                let title = Self.parsePlaylistTitle(from: firstPage)
+                var seen = Set<String>()
+                var tracks: [Track] = []
+                for page in pages {
+                    for t in Self.parseTracks(from: page) where !seen.contains(t.videoId) {
+                        seen.insert(t.videoId)
+                        tracks.append(t)
+                    }
+                }
+                completion(.success(PlaylistDetail(playlistId: cleanId, title: title, tracks: tracks)))
+            }
+        }
+    }
+
+    /// Fetches single track details (title, artist, artwork, duration) from public oEmbed with player fallback.
+    public func fetchTrackDetails(videoId: String, completion: @escaping (Result<Track, Error>) -> Void) {
+        guard let oembedURL = URL(string: "https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=\(videoId)&format=json") else {
+            completion(.failure(YTMError.badResponse))
+            return
+        }
+
+        let task = URLSession.shared.dataTask(with: oembedURL) { [weak self] data, response, error in
+            if let data = data,
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                let rawTitle = json["title"] as? String ?? "YouTube Track"
+                var author = json["author_name"] as? String ?? ""
+                var title = rawTitle
+
+                if rawTitle.contains(" - ") {
+                    let parts = rawTitle.components(separatedBy: " - ")
+                    if parts.count >= 2 {
+                        let potentialArtist = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
+                        let potentialTitle = parts[1...].joined(separator: " - ").trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !potentialArtist.isEmpty && !potentialTitle.isEmpty {
+                            author = potentialArtist
+                            title = potentialTitle
+                        }
+                    }
+                }
+
+                let cleanedTitle = title
+                    .replacingOccurrences(of: "(Official Video)", with: "", options: .caseInsensitive)
+                    .replacingOccurrences(of: "(Official Music Video)", with: "", options: .caseInsensitive)
+                    .replacingOccurrences(of: "[Official Music Video]", with: "", options: .caseInsensitive)
+                    .replacingOccurrences(of: "(Official Audio)", with: "", options: .caseInsensitive)
+                    .replacingOccurrences(of: "[Official Audio]", with: "", options: .caseInsensitive)
+                    .replacingOccurrences(of: "(Audio)", with: "", options: .caseInsensitive)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+
+                let artworkUrl = (json["thumbnail_url"] as? String) ?? "https://i.ytimg.com/vi/\(videoId)/hqdefault.jpg"
+
+                completion(.success(Track(
+                    videoId: videoId,
+                    title: cleanedTitle.isEmpty ? rawTitle : cleanedTitle,
+                    artist: author,
+                    album: "",
+                    artworkUrl: artworkUrl,
+                    duration: ""
+                )))
+                return
+            }
+
+            // Fallback to InnerTube player endpoint
+            let payload: [String: Any] = ["videoId": videoId]
+            self?.post(endpoint: "player", payload: payload) { result in
+                switch result {
+                case .failure(let err):
+                    completion(.failure(err))
+                case .success(let json):
+                    if let details = json["videoDetails"] as? [String: Any] {
+                        let title = details["title"] as? String ?? "YouTube Track"
+                        let artist = details["author"] as? String ?? ""
+                        let artworkUrl = "https://i.ytimg.com/vi/\(videoId)/hqdefault.jpg"
+                        completion(.success(Track(
+                            videoId: videoId,
+                            title: title,
+                            artist: artist,
+                            album: "",
+                            artworkUrl: artworkUrl,
+                            duration: ""
+                        )))
+                    } else {
+                        completion(.failure(YTMError.badResponse))
+                    }
+                }
+            }
+        }
+        task.resume()
     }
 
     /// Loops through `continuation` tokens until the response stops returning one
@@ -362,6 +469,38 @@ public final class YTMClient {
             return textFrom(col["text"])
         }
         return ""
+    }
+
+    /// Extracts the playlist's own title from the top-level browse page response.
+    public static func parsePlaylistTitle(from page: [String: Any]) -> String {
+        if let header = page["header"] as? [String: Any] {
+            if let respHeader = header["musicResponsiveHeaderRenderer"] as? [String: Any],
+               let title = respHeader["title"] as? [String: Any] {
+                let t = textFrom(title)
+                if !t.isEmpty { return t }
+            }
+            if let editHeader = header["musicEditablePlaylistDetailHeaderRenderer"] as? [String: Any],
+               let innerHeader = editHeader["header"] as? [String: Any],
+               let respHeader = innerHeader["musicResponsiveHeaderRenderer"] as? [String: Any],
+               let title = respHeader["title"] as? [String: Any] {
+                let t = textFrom(title)
+                if !t.isEmpty { return t }
+            }
+            if let detailHeader = header["musicDetailHeaderRenderer"] as? [String: Any],
+               let title = detailHeader["title"] as? [String: Any] {
+                let t = textFrom(title)
+                if !t.isEmpty { return t }
+            }
+        }
+        if let microformat = page["microformat"] as? [String: Any],
+           let microData = microformat["microformatDataRenderer"] as? [String: Any],
+           let title = microData["title"] as? String, !title.isEmpty {
+            return title
+        }
+        if let title = findFirstString(in: page, key: "title", prefix: nil), !title.isEmpty {
+            return title
+        }
+        return "Imported Playlist"
     }
 
     private static func parsePlaylistSummaries(from page: [String: Any]) -> [PlaylistSummary] {

@@ -80,6 +80,20 @@ public final class GestureMappingManager {
             if let button = StatusItemManager.shared?.statusItem.button {
                 StatusItemManager.shared?.togglePanel(button)
             }
+        case .seekForward:
+            NowPlayingManager.shared.fastForward(seconds: 10)
+            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Seek +10s")
+        case .seekBackward:
+            NowPlayingManager.shared.rewind(seconds: 10)
+            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Seek -10s")
+        case .toggleShuffle:
+            NowPlayingManager.shared.toggleShuffle()
+            let enabled = NowPlayingManager.shared.isShuffleActive
+            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: enabled ? "Shuffle On" : "Shuffle Off")
+        case .toggleRepeat:
+            NowPlayingManager.shared.toggleRepeat()
+            let mode = NowPlayingManager.shared.repeatMode
+            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Repeat: \(mode.displayName)")
         }
     }
 }

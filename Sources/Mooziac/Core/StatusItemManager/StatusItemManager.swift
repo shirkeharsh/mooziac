@@ -381,10 +381,12 @@ class StatusItemManager: NSObject {
             panel.animator().alphaValue = 1.0
         }
         
+        NowPlayingManager.shared.setPanelVisibility(true)
         startEventMonitors()
     }
     
     func closePanel() {
+        NowPlayingManager.shared.setPanelVisibility(false)
         mainViewController.dynamicIslandPlayer.collapseSettings()
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.10

@@ -6,7 +6,7 @@ extension DynamicIslandPlayerView {
     func loadArtwork(urlStr: String) {
         guard let url = URL(string: urlStr) else { return }
 
-        if let cached = DynamicIslandPlayerView.artworkCache.object(forKey: urlStr as NSString) {
+        if let cached = AppArtworkHelper.shared.getMemoryCachedImage(forKey: urlStr) {
             applyArtworkAnimation { [weak self] in self?.artworkImageView.image = cached }
             return
         }
@@ -24,9 +24,8 @@ extension DynamicIslandPlayerView {
                   let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return }
             let thumbnail = NSImage(cgImage: cgImage, size: NSSize(width: 44, height: 44))
 
-            let urlToCache = urlStr as NSString
             DispatchQueue.main.async {
-                DynamicIslandPlayerView.artworkCache.setObject(thumbnail, forKey: urlToCache)
+                AppArtworkHelper.shared.setMemoryCachedImage(thumbnail, forKey: urlStr)
                 self.applyArtworkAnimation { self.artworkImageView.image = thumbnail }
                 self.updateAmbientGlow(cgImage: cgImage)
             }
@@ -114,7 +113,7 @@ extension DynamicIslandPlayerView {
         DynamicIslandPlayerView.sharedAmbientAccentColor = dominantColor
         NotificationCenter.default.post(name: NSNotification.Name("YTM_ambientThemeChanged"), object: nil)
 
-        guard PlayerDesign.current == .adaptive || PlayerDesign.current == .native else { return }
+        guard PlayerDesign.current == .adaptive else { return }
 
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.5
@@ -133,7 +132,9 @@ extension DynamicIslandPlayerView {
             
             switch design {
 
-            case .adaptive, .native:
+            case .adaptive:
+                visualEffectBackdrop.isHidden = true
+                glassSheenLayer.isHidden = true
                 let bg = lastAmbientBgColor ?? NSColor(red: 0.08, green: 0.08, blue: 0.10, alpha: 0.98).cgColor
                 containerPill.layer?.backgroundColor = bg
                 containerPill.layer?.borderWidth = 1.0
@@ -158,8 +159,42 @@ extension DynamicIslandPlayerView {
                 fullScreenButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
                 browserButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
                 resetPositionButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
+
+            case .native:
+                visualEffectBackdrop.isHidden = false
+                visualEffectBackdrop.material = .underWindowBackground
+                visualEffectBackdrop.blendingMode = .behindWindow
+                visualEffectBackdrop.state = .active
+                glassSheenLayer.isHidden = false
+                glassSheenLayer.frame = containerPill.bounds
+                containerPill.layer?.backgroundColor = NSColor(white: 0.0, alpha: 0.02).cgColor
+                containerPill.layer?.borderWidth = 1.0
+                containerPill.layer?.borderColor = NSColor(white: 1.0, alpha: 0.24).cgColor
                 
+                titleLabel.font = NSFont.systemFont(ofSize: 13, weight: .bold)
+                artistLabel.font = NSFont.systemFont(ofSize: 11, weight: .medium)
+                timeLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular)
+                
+                titleLabel.textColor = NSColor.white
+                artistLabel.textColor = NSColor(white: 0.76, alpha: 1.0)
+                timeLabel.textColor = NSColor(white: 0.70, alpha: 1.0)
+                
+                waveformProgressView.accentColor = NSColor.white
+                
+                playPauseButton.contentTintColor = NSColor.white
+                previousButton.contentTintColor = NSColor(white: 0.88, alpha: 1.0)
+                nextButton.contentTintColor = NSColor(white: 0.88, alpha: 1.0)
+                addToPlaylistButton.contentTintColor = NSColor(white: 0.88, alpha: 1.0)
+                repeatButton.contentTintColor = (repeatMode != .off) ? NSColor.white : NSColor(white: 0.88, alpha: 1.0)
+                likeButton.contentTintColor = isLiked ? NSColor(red: 1.0, green: 0.28, blue: 0.38, alpha: 1.0) : NSColor(white: 0.88, alpha: 1.0)
+                searchIconButton.contentTintColor = NSColor(white: 0.88, alpha: 1.0)
+                fullScreenButton.contentTintColor = NSColor(white: 0.88, alpha: 1.0)
+                browserButton.contentTintColor = NSColor(white: 0.88, alpha: 1.0)
+                resetPositionButton.contentTintColor = NSColor(white: 0.88, alpha: 1.0)
+
             case .darkMode:
+                visualEffectBackdrop.isHidden = true
+                glassSheenLayer.isHidden = true
                 containerPill.layer?.backgroundColor = NSColor(red: 0.04, green: 0.04, blue: 0.05, alpha: 0.98).cgColor
                 containerPill.layer?.borderWidth = 1.0
                 containerPill.layer?.borderColor = NSColor(white: 1.0, alpha: 0.12).cgColor
@@ -185,6 +220,8 @@ extension DynamicIslandPlayerView {
                 resetPositionButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
                 
             case .glassMode:
+                visualEffectBackdrop.isHidden = true
+                glassSheenLayer.isHidden = true
                 // Premium Light Mode #EFF2F0
                 containerPill.layer?.backgroundColor = NSColor(red: 0.93725, green: 0.94902, blue: 0.94118, alpha: 0.98).cgColor
                 containerPill.layer?.borderWidth = 1.0

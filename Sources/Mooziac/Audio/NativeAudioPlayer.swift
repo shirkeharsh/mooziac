@@ -9,6 +9,7 @@ public final class NativeAudioPlayer: NSObject {
     private var player: AVPlayer?
     private var timeObserverToken: Any?
     private var itemEndObserverToken: Any?
+    private var lastArtworkTrackID: String = ""
 
     public private(set) var currentQueue: [LocalTrack] = []
     public private(set) var shuffledQueue: [LocalTrack] = []
@@ -447,12 +448,15 @@ public final class NativeAudioPlayer: NSObject {
         NowPlayingManager.shared.notifyObservers(state)
         NowPlayingManager.shared.updateSystemNowPlayingInfo(state)
 
-        // If track has artwork image, set it in MPRemoteCommandCenter
-        if let artImg = track.artwork {
-            let center = MPNowPlayingInfoCenter.default()
-            var info = center.nowPlayingInfo ?? [:]
-            info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: artImg.size) { _ in artImg }
-            center.nowPlayingInfo = info
+        // Only update MPRemoteCommandCenter artwork on track change to save CPU/allocations
+        if lastArtworkTrackID != track.id {
+            lastArtworkTrackID = track.id
+            if let artImg = track.artwork {
+                let center = MPNowPlayingInfoCenter.default()
+                var info = center.nowPlayingInfo ?? [:]
+                info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: artImg.size) { _ in artImg }
+                center.nowPlayingInfo = info
+            }
         }
     }
 }

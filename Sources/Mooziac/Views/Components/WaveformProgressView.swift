@@ -9,7 +9,9 @@ class InteractiveWaveformProgressView: NSView {
     var progress: Double = 0.0 {
         didSet {
             if !isUserScrubbing {
-                needsDisplay = true
+                if let window = self.window, window.isVisible, !self.isHidden {
+                    needsDisplay = true
+                }
                 updateThumbPosition()
             }
         }
@@ -23,6 +25,56 @@ class InteractiveWaveformProgressView: NSView {
             } else {
                 stopWaveAnimation()
             }
+        }
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window?.isVisible == true && isPlaying && !isHidden {
+            startWaveAnimation()
+        } else {
+            stopWaveAnimation()
+        }
+    }
+
+    override func viewDidHide() {
+        super.viewDidHide()
+        stopWaveAnimation()
+    }
+
+    override func viewDidUnhide() {
+        super.viewDidUnhide()
+        if isPlaying {
+            startWaveAnimation()
+        }
+    }
+    
+    private func updateThumbPosition() {
+        let xPos = CGFloat(progress) * bounds.width
+        let thumbX = max(0, min(bounds.width - 9, xPos - 4.5))
+        let thumbY = (bounds.height - 9) / 2.0
+        thumbView.frame = CGRect(x: thumbX, y: thumbY, width: 9, height: 9)
+    }
+    
+    private func startWaveAnimation() {
+        stopWaveAnimation()
+        guard let window = self.window, window.isVisible, !self.isHidden else { return }
+        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.12, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            guard let window = self.window, window.isVisible, !self.isHidden else {
+                self.stopWaveAnimation()
+                return
+            }
+            self.wavePhase += 0.3
+            self.needsDisplay = true
+        }
+    }
+    
+    private func stopWaveAnimation() {
+        animationTimer?.invalidate()
+        animationTimer = nil
+        if let window = self.window, window.isVisible, !self.isHidden {
+            needsDisplay = true
         }
     }
     
@@ -164,28 +216,6 @@ class InteractiveWaveformProgressView: NSView {
         progress = ratio
         needsDisplay = true
         updateThumbPosition()
-    }
-    
-    private func updateThumbPosition() {
-        let xPos = CGFloat(progress) * bounds.width
-        let thumbX = max(0, min(bounds.width - 9, xPos - 4.5))
-        let thumbY = (bounds.height - 9) / 2.0
-        thumbView.frame = CGRect(x: thumbX, y: thumbY, width: 9, height: 9)
-    }
-    
-    private func startWaveAnimation() {
-        stopWaveAnimation()
-        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.12, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            self.wavePhase += 0.3
-            self.needsDisplay = true
-        }
-    }
-    
-    private func stopWaveAnimation() {
-        animationTimer?.invalidate()
-        animationTimer = nil
-        needsDisplay = true
     }
     
     override func draw(_ dirtyRect: NSRect) {

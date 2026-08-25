@@ -125,14 +125,10 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
         self.lastState = state
 
         if isEnabled && state.isPlaying && !state.title.isEmpty && state.title != "Not Playing" {
-            if displayTimer == nil {
-                startLoop()
-            }
+            updateLyricsFrame()
         } else {
-            if displayTimer != nil {
-                displayTimer?.invalidate()
-                displayTimer = nil
-            }
+            displayTimer?.invalidate()
+            displayTimer = nil
             if window?.isVisible == true && !isShowingVolumeOverlay {
                 lyricsLabel.stringValue = ""
                 window?.orderOut(nil)
@@ -151,16 +147,29 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
                 // Silently discard completions that no longer belong to the displayed track
                 guard let self = self, requestKey == self.currentTrackKey else { return }
                 self.currentLRCLines = lrcLines
+                self.updateLyricsFrame()
             }
         }
     }
 
     private func startLoop() {
         displayTimer?.invalidate()
-        displayTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+        displayTimer = nil
+        updateLyricsFrame()
+    }
+
+    private func scheduleNextTick(after delay: TimeInterval) {
+        displayTimer?.invalidate()
+        guard isEnabled, lastState.isPlaying else {
+            displayTimer = nil
+            return
+        }
+        let clampedDelay = max(0.1, min(4.0, delay))
+        let timer = Timer(timeInterval: clampedDelay, repeats: false) { [weak self] _ in
             self?.updateLyricsFrame()
         }
-        RunLoop.main.add(displayTimer!, forMode: .common)
+        RunLoop.main.add(timer, forMode: .common)
+        displayTimer = timer
     }
 
     private func updateLyricsFrame() {
@@ -169,6 +178,8 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
                 lyricsLabel.stringValue = ""
                 window?.orderOut(nil)
             }
+            displayTimer?.invalidate()
+            displayTimer = nil
             return
         }
         let state = lastState
@@ -178,6 +189,8 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
                 lyricsLabel.stringValue = ""
                 window?.orderOut(nil)
             }
+            displayTimer?.invalidate()
+            displayTimer = nil
             return
         }
 
@@ -185,14 +198,32 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
 
         let accurateTime = state.getAccurateTime()
         var textToDisplay = ""
+        var nextEventDelay: TimeInterval = 2.5
 
-        if !currentLRCLines.isEmpty,
-           let activeInfo = SyncedLyricsParser.activeLineAndWord(at: accurateTime, in: currentLRCLines, leadOffset: 0.35) {
-            textToDisplay = activeInfo.line.text
+        if !currentLRCLines.isEmpty {
+            if let activeInfo = SyncedLyricsParser.activeLineAndWord(at: accurateTime, in: currentLRCLines, leadOffset: 0.35) {
+                textToDisplay = activeInfo.line.text
+                let nextIdx = activeInfo.lineIndex + 1
+                if nextIdx < currentLRCLines.count {
+                    let nextLineTime = currentLRCLines[nextIdx].timestamp - 0.35
+                    nextEventDelay = max(0.1, nextLineTime - accurateTime)
+                } else if state.duration > accurateTime {
+                    nextEventDelay = max(0.1, state.duration - accurateTime)
+                }
+            } else {
+                if let firstLine = currentLRCLines.first {
+                    let firstTime = firstLine.timestamp - 0.35
+                    nextEventDelay = max(0.1, firstTime - accurateTime)
+                }
+                let shortTitle = state.title.count > 30 ? String(state.title.prefix(30)) + "…" : state.title
+                let shortArtist = state.artist.count > 30 ? String(state.artist.prefix(30)) + "…" : state.artist
+                textToDisplay = "\(shortTitle) • \(shortArtist)"
+            }
         } else {
             let shortTitle = state.title.count > 30 ? String(state.title.prefix(30)) + "…" : state.title
             let shortArtist = state.artist.count > 30 ? String(state.artist.prefix(30)) + "…" : state.artist
             textToDisplay = "\(shortTitle) • \(shortArtist)"
+            nextEventDelay = 3.0
         }
 
         if lyricsLabel.stringValue != textToDisplay {
@@ -210,6 +241,8 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
 
             repositionInCenter(contentWidth: targetWidth)
         }
+
+        scheduleNextTick(after: nextEventDelay)
     }
 
     public func showVolumeOverlay(volumePercent: Int, isAppOnly: Bool = false) {

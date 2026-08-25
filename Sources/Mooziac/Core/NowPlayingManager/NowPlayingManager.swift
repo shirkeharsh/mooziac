@@ -243,7 +243,9 @@ class NowPlayingManager: NSObject, WKScriptMessageHandler {
             self.currentArtist = currentArtist
         }
     }
-    
+    public func setPanelVisibility(_ visible: Bool) {
+        evaluateJS("window.mooziacPanelVisible = \(visible ? "true" : "false");")
+    }
 
     func evaluateJS(_ code: String) {
         guard !isSystemSleeping else { return }

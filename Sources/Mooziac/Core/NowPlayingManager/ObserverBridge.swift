@@ -26,6 +26,9 @@ extension NowPlayingManager {
             var cachedTitle = "", cachedArtist = "", cachedArtwork = "", cachedAlbum = "", cachedVideoId = "";
             var lastMetaCheck = 0;
             var lastSongModeAttemptID = "";
+            var lastIsPlaying = null;
+            var lastTime = 0;
+            var lastPostTime = 0;
             
             function updateNowPlaying(force) {
                 try {
@@ -38,9 +41,15 @@ extension NowPlayingManager {
                         playbackRate = video.playbackRate || 1.0;
                     }
                     
+                    var now = Date.now();
                     if (!force && !isPlaying && lastIsPlaying === false && Math.abs(currentTime - lastTime) < 0.1) {
                         return;
                     }
+                    var minInterval = window.mooziacPanelVisible ? 350 : 1000;
+                    if (!force && isPlaying && (now - lastPostTime < minInterval)) {
+                        return;
+                    }
+                    lastPostTime = now;
                     lastIsPlaying = isPlaying;
                     lastTime = currentTime;
                     
@@ -153,6 +162,10 @@ extension NowPlayingManager {
                         }
                     } catch(e) {}
                     
+                    if (cachedArtwork) {
+                        syncSongArtwork(cachedArtwork);
+                    }
+                    
                     window.webkit.messageHandlers.nowPlayingHandler.postMessage({
                         title: cachedTitle || "",
                         artist: cachedArtist || "",
@@ -195,7 +208,7 @@ extension NowPlayingManager {
                 return false;
             };
 
-            function enforceHighAudioQuality() {
+            function optimizePlaybackStreams() {
                 try {
                     var player = document.querySelector('ytmusic-player')?.playerApi || document.getElementById('movie_player');
                     if (player) {
@@ -205,6 +218,36 @@ extension NowPlayingManager {
                         if (typeof player.setOption === 'function') {
                             player.setOption('audio', 'quality', 'AUDIO_QUALITY_HIGH');
                             player.setOption('audio', 'audioQuality', 'AUDIO_QUALITY_HIGH');
+                        }
+                        if (typeof player.setPlaybackQuality === 'function') {
+                            player.setPlaybackQuality('tiny');
+                        }
+                        if (typeof player.setPlaybackQualityRange === 'function') {
+                            player.setPlaybackQualityRange('tiny', 'tiny');
+                        }
+                    }
+                } catch(e) {}
+            }
+
+            function syncSongArtwork(artworkUrl) {
+                try {
+                    if (!artworkUrl) return;
+                    var songImgContainer = document.querySelector('ytmusic-player #song-image') ||
+                                          document.querySelector('#song-image');
+                    if (songImgContainer) {
+                        var img = songImgContainer.querySelector('img#img') || songImgContainer.querySelector('img');
+                        if (!img) {
+                            img = document.createElement('img');
+                            img.id = 'img';
+                            songImgContainer.appendChild(img);
+                        }
+                        if (img && img.src !== artworkUrl) {
+                            img.onerror = function() {
+                                if (cachedVideoId && img.src.indexOf('maxresdefault') !== -1) {
+                                    img.src = "https://i.ytimg.com/vi/" + cachedVideoId + "/hqdefault.jpg";
+                                }
+                            };
+                            img.src = artworkUrl;
                         }
                     }
                 } catch(e) {}
@@ -246,7 +289,7 @@ extension NowPlayingManager {
                         video.ytmBound = true;
                         ['play', 'playing', 'pause', 'ended', 'ratechange', 'seeked', 'loadedmetadata', 'canplay'].forEach(function(evt) {
                             video.addEventListener(evt, function() {
-                                enforceHighAudioQuality();
+                                optimizePlaybackStreams();
                                 enforceSongMode();
                                 updateNowPlaying(true);
                             });
@@ -280,7 +323,7 @@ extension NowPlayingManager {
                                 } catch(e) {}
                             }
                         });
-                        enforceHighAudioQuality();
+                        optimizePlaybackStreams();
                         enforceSongMode();
                     }
                 }
@@ -313,14 +356,8 @@ extension NowPlayingManager {
             bindVideoEvents();
             setInterval(function() {
                 bindVideoEvents();
-            }, 3000);
-            setInterval(bypassAdsAndPopups, 1000);
-            setInterval(function() {
-                var v = document.querySelector('video');
-                if (v && !v.paused && !v.ended) {
-                    updateNowPlaying(false);
-                }
-            }, 1000);
+            }, 4000);
+            setInterval(bypassAdsAndPopups, 1200);
         })();
         """
         

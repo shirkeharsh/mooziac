@@ -148,6 +148,9 @@ extension StatusItemManager {
         let importAudioItem = NSMenuItem(title: "Import Audio Files to Location…", action: #selector(importAudioFilesFromMenu), keyEquivalent: "")
         importAudioItem.target = self
         settingsMenu.addItem(importAudioItem)
+        let importPlaylistMenuItem = NSMenuItem(title: "Import Playlist from Link…", action: #selector(importPlaylistFromMenu), keyEquivalent: "i")
+        importPlaylistMenuItem.target = self
+        settingsMenu.addItem(importPlaylistMenuItem)
         let resetLocationItem = NSMenuItem(title: "Reset to Default Location", action: #selector(resetDownloadLocationFromMenu), keyEquivalent: "")
         resetLocationItem.target = self
         settingsMenu.addItem(resetLocationItem)
@@ -288,5 +291,43 @@ extension StatusItemManager {
     
     @objc private func checkForUpdatesFromMenu() {
         UpdateManager.shared.checkForUpdates(userInitiated: true)
+    }
+
+    @objc private func importPlaylistFromMenu() {
+        let alert = NSAlert()
+        alert.window.level = .statusBar + 1
+        alert.messageText = "Import Playlist from Link"
+        alert.informativeText = "Paste a YouTube Music or YouTube playlist link:"
+        alert.alertStyle = .informational
+
+        let textField = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+        textField.placeholderString = "https://music.youtube.com/playlist?list=..."
+        if let clip = NSPasteboard.general.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
+           clip.contains("list=") || clip.hasPrefix("PL") || clip.hasPrefix("RD") {
+            textField.stringValue = clip
+        }
+        alert.accessoryView = textField
+        alert.addButton(withTitle: "Import")
+        alert.addButton(withTitle: "Cancel")
+        alert.window.initialFirstResponder = textField
+
+        if alert.runModal() == .alertFirstButtonReturn {
+            let url = textField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !url.isEmpty else { return }
+
+            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "⏳ Fetching playlist tracks...")
+            PlaylistManager.shared.importPlaylist(from: url) { [weak self] result in
+                guard let self = self else { return }
+                switch result {
+                case .failure(let error):
+                    CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "⚠️ \(error.localizedDescription)")
+                case .success(let info):
+                    CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "✓ Imported: \"\(info.title)\" (\(info.trackCount) tracks)")
+                    if self.panel.isVisible {
+                        self.mainViewController.dynamicIslandPlayer.refreshPlaylistsSection()
+                    }
+                }
+            }
+        }
     }
 }

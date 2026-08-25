@@ -940,4 +940,207 @@ public final class PlaylistManager: NSObject {
         let secs = total % 60
         return String(format: "%d:%02d", mins, secs)
     }
+
+    // MARK: - Playlist & Song Import via Link
+
+    public static func extractPlaylistID(from input: String) -> String? {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        // If direct playlist ID (e.g. PL... or RD...)
+        if (trimmed.hasPrefix("PL") || trimmed.hasPrefix("VLPL") || trimmed.hasPrefix("RD")) && trimmed.count >= 12 {
+            let clean = trimmed.hasPrefix("VL") ? String(trimmed.dropFirst(2)) : trimmed
+            return clean.components(separatedBy: "&").first?.components(separatedBy: "?").first
+        }
+
+        // Try extracting from URL components
+        if let components = URLComponents(string: trimmed) {
+            if let listParam = components.queryItems?.first(where: { $0.name == "list" })?.value, !listParam.isEmpty {
+                return listParam
+            }
+        }
+
+        // Regex fallback for URL strings
+        let pattern = "[?&]list=([A-Za-z0-9_-]+)"
+        if let regex = try? NSRegularExpression(pattern: pattern) {
+            let nsString = trimmed as NSString
+            let results = regex.matches(in: trimmed, range: NSRange(location: 0, length: nsString.length))
+            if let match = results.first, match.numberOfRanges > 1 {
+                return nsString.substring(with: match.range(at: 1))
+            }
+        }
+
+        return nil
+    }
+
+    public static func extractVideoID(from input: String) -> String? {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        // If direct 11-char video ID
+        if trimmed.count == 11 && trimmed.range(of: "^[A-Za-z0-9_-]{11}$", options: .regularExpression) != nil {
+            return trimmed
+        }
+
+        // Try extracting from URL components
+        if let components = URLComponents(string: trimmed) {
+            if let vParam = components.queryItems?.first(where: { $0.name == "v" })?.value, !vParam.isEmpty {
+                return vParam
+            }
+            if components.host?.contains("youtu.be") == true {
+                let path = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                let candidate = path.components(separatedBy: "?").first?.components(separatedBy: "&").first ?? ""
+                if candidate.count == 11 {
+                    return candidate
+                }
+            }
+            let parts = components.path.split(separator: "/")
+            if let last = parts.last, last.count == 11 {
+                return String(last)
+            }
+        }
+
+        // Regex fallback for v=
+        let pattern = "[?&]v=([A-Za-z0-9_-]{11})"
+        if let regex = try? NSRegularExpression(pattern: pattern) {
+            let nsString = trimmed as NSString
+            let results = regex.matches(in: trimmed, range: NSRange(location: 0, length: nsString.length))
+            if let match = results.first, match.numberOfRanges > 1 {
+                return nsString.substring(with: match.range(at: 1))
+            }
+        }
+
+        return nil
+    }
+
+    public func importPlaylist(from urlOrID: String, completion: @escaping (Result<(playlistID: String, title: String, trackCount: Int), Error>) -> Void) {
+        // Case 1: Playlist URL / ID
+        if let playlistID = Self.extractPlaylistID(from: urlOrID) {
+            YTMClient.shared.fetchPlaylistDetails(playlistId: playlistID) { [weak self] result in
+                guard let self = self else { return }
+                switch result {
+                case .failure(let error):
+                    DispatchQueue.main.async {
+                        completion(.failure(error))
+                    }
+                case .success(let detail):
+                    guard !detail.tracks.isEmpty else {
+                        DispatchQueue.main.async {
+                            completion(.failure(NSError(domain: "PlaylistManager", code: 404, userInfo: [NSLocalizedDescriptionKey: "Playlist is empty, private, or not found"])))
+                        }
+                        return
+                    }
+
+                    let existingPlaylists = LocalDatabaseManager.shared.fetchPlaylists()
+                    let playlistTitle = detail.title.isEmpty ? "Imported Playlist" : detail.title
+                    let targetLocalID: String
+
+                    if let existing = existingPlaylists.first(where: { $0.ytPlaylistId == detail.playlistId }) {
+                        targetLocalID = existing.id
+                    } else if let newID = LocalDatabaseManager.shared.createPlaylist(name: playlistTitle) {
+                        targetLocalID = newID
+                        LocalDatabaseManager.shared.setPlaylistYTMID(id: newID, ytPlaylistId: detail.playlistId)
+                    } else {
+                        DispatchQueue.main.async {
+                            completion(.failure(NSError(domain: "PlaylistManager", code: 500, userInfo: [NSLocalizedDescriptionKey: "Failed to create playlist in database"])))
+                        }
+                        return
+                    }
+
+                    let currentItems = LocalDatabaseManager.shared.fetchPlaylistItems(playlistID: targetLocalID)
+                    var existingVids = Set(currentItems.compactMap { $0.ytVideoId })
+                    var sortOrder = currentItems.count
+                    let now = Date().timeIntervalSince1970
+                    var addedCount = 0
+
+                    for track in detail.tracks {
+                        guard !track.videoId.isEmpty, !existingVids.contains(track.videoId) else { continue }
+                        existingVids.insert(track.videoId)
+                        LocalDatabaseManager.shared.appendPlaylistItem(PlaylistItemRecord(
+                            playlistID: targetLocalID,
+                            sortOrder: sortOrder,
+                            refType: "yt",
+                            refID: track.videoId,
+                            ytVideoId: track.videoId,
+                            title: track.title,
+                            artist: track.artist,
+                            artworkUrl: track.artworkUrl,
+                            duration: track.duration,
+                            isLiked: false,
+                            dateAdded: now
+                        ))
+                        sortOrder += 1
+                        addedCount += 1
+                    }
+
+                    self.invalidateSummary(for: targetLocalID)
+                    self.markSyncedDirtyIfNeeded(playlistID: targetLocalID)
+
+                    DispatchQueue.main.async {
+                        NotificationCenter.default.post(name: NSNotification.Name("Mooziac_LibraryUpdated"), object: nil)
+                        completion(.success((playlistID: targetLocalID, title: playlistTitle, trackCount: sortOrder)))
+                    }
+                }
+            }
+            return
+        }
+
+        // Case 2: Single Song / Video URL or ID
+        if let videoID = Self.extractVideoID(from: urlOrID) {
+            YTMClient.shared.fetchTrackDetails(videoId: videoID) { [weak self] result in
+                guard let self = self else { return }
+                switch result {
+                case .failure(let error):
+                    DispatchQueue.main.async {
+                        completion(.failure(error))
+                    }
+                case .success(let track):
+                    let existingPlaylists = LocalDatabaseManager.shared.fetchPlaylists()
+                    let targetPlaylistName = "Imported Tracks"
+                    let targetLocalID: String
+
+                    if let existing = existingPlaylists.first(where: { $0.name == targetPlaylistName }) {
+                        targetLocalID = existing.id
+                    } else if let newID = LocalDatabaseManager.shared.createPlaylist(name: targetPlaylistName) {
+                        targetLocalID = newID
+                    } else {
+                        DispatchQueue.main.async {
+                            completion(.failure(NSError(domain: "PlaylistManager", code: 500, userInfo: [NSLocalizedDescriptionKey: "Failed to create playlist in database"])))
+                        }
+                        return
+                    }
+
+                    let currentItems = LocalDatabaseManager.shared.fetchPlaylistItems(playlistID: targetLocalID)
+                    let now = Date().timeIntervalSince1970
+
+                    if !currentItems.contains(where: { $0.ytVideoId == track.videoId || $0.refID == track.videoId }) {
+                        LocalDatabaseManager.shared.appendPlaylistItem(PlaylistItemRecord(
+                            playlistID: targetLocalID,
+                            sortOrder: currentItems.count,
+                            refType: "yt",
+                            refID: track.videoId,
+                            ytVideoId: track.videoId,
+                            title: track.title,
+                            artist: track.artist,
+                            artworkUrl: track.artworkUrl,
+                            duration: track.duration,
+                            isLiked: false,
+                            dateAdded: now
+                        ))
+                    }
+
+                    self.invalidateSummary(for: targetLocalID)
+                    self.markSyncedDirtyIfNeeded(playlistID: targetLocalID)
+
+                    DispatchQueue.main.async {
+                        NotificationCenter.default.post(name: NSNotification.Name("Mooziac_LibraryUpdated"), object: nil)
+                        completion(.success((playlistID: targetLocalID, title: track.title, trackCount: currentItems.count + 1)))
+                    }
+                }
+            }
+            return
+        }
+
+        completion(.failure(NSError(domain: "PlaylistManager", code: 400, userInfo: [NSLocalizedDescriptionKey: "Invalid playlist or song link"])))
+    }
 }

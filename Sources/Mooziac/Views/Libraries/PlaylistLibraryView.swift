@@ -2550,7 +2550,6 @@ private class PlaylistItemRowCellView: NSTableCellView {
     }
 
     private var currentArtworkKey: String = ""
-    private static let webImageCache = NSCache<NSString, NSImage>()
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -2775,15 +2774,14 @@ private class PlaylistItemRowCellView: NSTableCellView {
             }
         case .online:
             if !item.artworkUrl.isEmpty, let url = URL(string: item.artworkUrl) {
-                let key = item.artworkUrl as NSString
-                if let cached = Self.webImageCache.object(forKey: key) {
+                if let cached = AppArtworkHelper.shared.getMemoryCachedImage(forKey: item.artworkUrl) {
                     artImageView.image = cached
                 } else {
                     artImageView.image = AppArtworkHelper.defaultArtwork
                     currentArtworkKey = item.artworkUrl
                     URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
                         guard let self = self, let d = data, let img = NSImage(data: d) else { return }
-                        Self.webImageCache.setObject(img, forKey: key)
+                        AppArtworkHelper.shared.setMemoryCachedImage(img, forKey: item.artworkUrl)
                         DispatchQueue.main.async {
                             if self.currentArtworkKey == item.artworkUrl {
                                 self.artImageView.image = img
@@ -3024,7 +3022,6 @@ private class HistoryRowCellView: NSTableCellView {
     }
 
     private var currentArtworkKey: String = ""
-    private static let webImageCache = NSCache<NSString, NSImage>()
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -3220,15 +3217,14 @@ private class HistoryRowCellView: NSTableCellView {
                 }
             }
         } else if !item.artworkUrl.isEmpty, let url = URL(string: item.artworkUrl) {
-            let key = item.artworkUrl as NSString
-            if let cached = Self.webImageCache.object(forKey: key) {
+            if let cached = AppArtworkHelper.shared.getMemoryCachedImage(forKey: item.artworkUrl) {
                 artImageView.image = cached
             } else {
                 artImageView.image = AppArtworkHelper.defaultArtwork
                 currentArtworkKey = item.artworkUrl
                 URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
                     guard let self = self, let d = data, let img = NSImage(data: d) else { return }
-                    Self.webImageCache.setObject(img, forKey: key)
+                    AppArtworkHelper.shared.setMemoryCachedImage(img, forKey: item.artworkUrl)
                     DispatchQueue.main.async {
                         if self.currentArtworkKey == item.artworkUrl {
                             self.artImageView.image = img
@@ -3266,7 +3262,6 @@ private class LikedSongRowCellView: NSTableCellView {
     }
 
     private var currentArtworkKey: String = ""
-    private static let webImageCache = NSCache<NSString, NSImage>()
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -3451,15 +3446,14 @@ private class LikedSongRowCellView: NSTableCellView {
                 }
             }
         } else if !record.artworkUrl.isEmpty, let url = URL(string: record.artworkUrl) {
-            let key = record.artworkUrl as NSString
-            if let cached = Self.webImageCache.object(forKey: key) {
+            if let cached = AppArtworkHelper.shared.getMemoryCachedImage(forKey: record.artworkUrl) {
                 artImageView.image = cached
             } else {
                 artImageView.image = AppArtworkHelper.defaultArtwork
                 currentArtworkKey = record.artworkUrl
                 URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
                     guard let self = self, let d = data, let img = NSImage(data: d) else { return }
-                    Self.webImageCache.setObject(img, forKey: key)
+                    AppArtworkHelper.shared.setMemoryCachedImage(img, forKey: record.artworkUrl)
                     DispatchQueue.main.async {
                         if self.currentArtworkKey == record.artworkUrl {
                             self.artImageView.image = img

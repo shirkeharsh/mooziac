@@ -11,9 +11,20 @@ public final class AppArtworkHelper {
     private let memoryCache = NSCache<NSString, NSImage>()
     private let ioQueue = DispatchQueue(label: "com.mooziac.artwork.io", qos: .userInitiated)
 
+    private var memoryPressureSource: (any DispatchSourceMemoryPressure)?
+
     private init() {
-        memoryCache.countLimit = 100
-        memoryCache.totalCostLimit = 15 * 1024 * 1024 // 15 MB max
+        memoryCache.countLimit = 80
+        memoryCache.totalCostLimit = 12 * 1024 * 1024 // 12 MB max
+
+        // Automatically purge memory cache under system memory pressure
+        let source = DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical], queue: .main)
+        source.setEventHandler { [weak self] in
+            self?.memoryCache.removeAllObjects()
+            self?.cachedCompressedArtwork = nil
+        }
+        source.resume()
+        self.memoryPressureSource = source
     }
 
     public static var defaultArtwork: NSImage {
@@ -113,6 +124,14 @@ public final class AppArtworkHelper {
     }
 
     // MARK: - Fast Memory Cache Lookup
+    public func getMemoryCachedImage(forKey key: String) -> NSImage? {
+        return memoryCache.object(forKey: key as NSString)
+    }
+
+    public func setMemoryCachedImage(_ image: NSImage, forKey key: String) {
+        memoryCache.setObject(image, forKey: key as NSString, cost: approximateMemoryCost(for: image))
+    }
+
     public func getCachedThumbnail(for track: LocalTrack, targetSize: CGFloat = 128) -> NSImage? {
         let key = cacheKey(for: track.fileURL, dateAdded: track.dateAdded, targetSize: targetSize)
         return memoryCache.object(forKey: key as NSString)
@@ -264,14 +283,29 @@ public final class AppArtworkHelper {
         return nil
     }
 
-    // MARK: - Disk Persistence
+    // MARK: - Disk Persistence (Direct ImageIO Zero-Copy)
     private func saveThumbnailToDisk(image: NSImage, key: String) {
+        let diskURL = thumbnailCacheFolderURL.appendingPathComponent("\(key).jpg")
+        
+        var proposedRect = NSRect(origin: .zero, size: image.size)
+        if let cgImage = image.cgImage(forProposedRect: &proposedRect, context: nil, hints: nil) {
+            if let destination = CGImageDestinationCreateWithURL(diskURL as CFURL, "public.jpeg" as CFString, 1, nil) {
+                let options: [CFString: Any] = [
+                    kCGImageDestinationLossyCompressionQuality: 0.85
+                ]
+                CGImageDestinationAddImage(destination, cgImage, options as CFDictionary)
+                if CGImageDestinationFinalize(destination) {
+                    return
+                }
+            }
+        }
+
+        // Fallback if CGImage extraction was unavailable
         guard let tiffData = image.tiffRepresentation,
               let bitmapRep = NSBitmapImageRep(data: tiffData),
               let jpegData = bitmapRep.representation(using: .jpeg, properties: [.compressionFactor: 0.85]) else {
             return
         }
-        let diskURL = thumbnailCacheFolderURL.appendingPathComponent("\(key).jpg")
         try? jpegData.write(to: diskURL, options: .atomic)
     }
 }

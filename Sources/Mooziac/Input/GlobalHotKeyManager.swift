@@ -54,24 +54,32 @@ public final class GlobalHotKeyManager {
         
         guard status == noErr else { return }
         
-        // Register Carbon Hotkeys:
-        // ID 1: Ctrl + Option + Space / Cmd + Shift + Space
-        var playRef1: EventHotKeyRef?
-        RegisterEventHotKey(49, UInt32(controlKey | optionKey), EventHotKeyID(signature: OSType(0x4D4F4F5A), id: 1), GetApplicationEventTarget(), 0, &playRef1)
-        hotKeyRefs.append(playRef1)
+        // Register Carbon Hotkeys (Zero-overhead OS-level interrupt triggers):
+        // ID 1: Play/Pause (Space: 49)
+        // ID 2: Next Track (Right Arrow: 124)
+        // ID 3: Prev Track (Left Arrow: 123)
+        // ID 4: Like Track ('L': 37)
+        let shortcuts: [(UInt32, UInt32, UInt32)] = [
+            (49, UInt32(controlKey | optionKey), 1),
+            (49, UInt32(cmdKey | shiftKey), 1),
+            (124, UInt32(controlKey | optionKey), 2),
+            (124, UInt32(cmdKey | shiftKey), 2),
+            (123, UInt32(controlKey | optionKey), 3),
+            (123, UInt32(cmdKey | shiftKey), 3),
+            (37, UInt32(controlKey | optionKey), 4),
+            (37, UInt32(cmdKey | shiftKey), 4)
+        ]
 
-        var playRef2: EventHotKeyRef?
-        RegisterEventHotKey(49, UInt32(cmdKey | shiftKey), EventHotKeyID(signature: OSType(0x4D4F4F5A), id: 1), GetApplicationEventTarget(), 0, &playRef2)
-        hotKeyRefs.append(playRef2)
+        for (code, flags, id) in shortcuts {
+            var ref: EventHotKeyRef?
+            RegisterEventHotKey(code, flags, EventHotKeyID(signature: OSType(0x4D4F4F5A), id: id), GetApplicationEventTarget(), 0, &ref)
+            if let ref = ref {
+                hotKeyRefs.append(ref)
+            }
+        }
     }
     
     private func registerNSEventMonitors() {
-        if AXIsProcessTrusted() && eventMonitor == nil {
-            eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                self?.handleKeyEvent(event)
-            }
-        }
-        
         if localMonitor == nil {
             localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 if self?.handleKeyEvent(event) == true {
@@ -81,7 +89,7 @@ public final class GlobalHotKeyManager {
             }
         }
         
-        print("[GlobalHotKeyManager] Global shortcuts registered (Control+Option+Space / Cmd+Shift+Space).")
+        print("[GlobalHotKeyManager] Global shortcuts registered via native Carbon events.")
     }
     
     @discardableResult

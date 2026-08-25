@@ -34,20 +34,50 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         
         config.preferences.setValue(false, forKey: "developerExtrasEnabled")
         
-        // Minimal CSS injection (original): hide the raw video element,
-        // hide cinematic background layers, and disable YTM's own blur filters.
+        // Minimal CSS injection: collapse video elements out of layout completely (audio plays uninterrupted),
+        // hide cinematic background layers and video clutter, and format native song artwork.
         // CSS is JSON-encoded below so the injected JS string literal is always valid.
         let cssString = """
-        video, #player-video {
-            visibility: hidden !important;
+        #song-video, #player-video, .html5-video-player, video {
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 1px !important;
+            height: 1px !important;
+            opacity: 0.0001 !important;
+            pointer-events: none !important;
+            overflow: hidden !important;
+            z-index: -1 !important;
         }
         #cinematics, .background-gradient, #background-gradient,
-        paper-ripple, #cinematics-container, ytm-cinematics, .ytmusic-browse-response[background-gradient] {
+        paper-ripple, #cinematics-container, ytm-cinematics, .ytmusic-browse-response[background-gradient],
+        .ytp-ce-element, .ytp-cards-teaser, .ytp-chrome-top, .ytp-gradient-top,
+        .ytp-gradient-bottom, .annotation, .ytp-pause-overlay {
             display: none !important;
             visibility: hidden !important;
         }
         * {
             backdrop-filter: none !important;
+        }
+        #song-image, .song-image {
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            width: 100% !important;
+            height: 100% !important;
+            align-items: center !important;
+            justify-content: center !important;
+            position: relative !important;
+        }
+        #song-image #img, #song-image img, .song-image img {
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            margin: auto !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
+            object-fit: contain !important;
+            border-radius: 8px !important;
         }
         """
         // JSON-encode the CSS so the injected JS string literal is always valid
