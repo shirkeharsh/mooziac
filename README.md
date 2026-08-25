@@ -64,6 +64,22 @@ Heavy desktop apps and open browser tabs eat up battery and clutter your screen.
 
 ---
 
+## 📥 Installation & First-Time Launch
+
+1. Download **[`Mooziac.dmg`](https://github.com/shirkeharsh/mooziac/releases/latest/download/Mooziac.dmg)** (or [`Mooziac.zip`](https://github.com/shirkeharsh/mooziac/releases/latest/download/Mooziac.zip)).
+2. Open `Mooziac.dmg` and drag **Mooziac** into your **Applications** folder.
+
+### 💡 First-Time Launch (macOS Gatekeeper)
+Because Mooziac is distributed independently outside the Mac App Store, macOS will prompt you on first launch:
+
+- **Option A (1-Click UI Approval)**: When the *“Mooziac Not Opened / Apple could not verify”* prompt appears, simply click **[Open Anyway]** (or go to *System Settings ➔ Privacy & Security* and click *Open Anyway*).
+- **Option B (Terminal 1-Liner)**: Run this once to bypass the quarantine flag:
+  ```bash
+  xattr -cr /Applications/Mooziac.app
+  ```
+
+---
+
 ## 🛠️ Building from Source
 
 Mooziac uses the standard **Swift Package Manager**. You only need Xcode Command Line Tools installed.

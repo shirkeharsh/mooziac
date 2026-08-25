@@ -463,6 +463,9 @@
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               <span>Download Mooziac.dmg</span>
             </a>
+            <p style="margin-top: 14px; font-size: 0.82rem; color: var(--text-secondary); line-height: 1.45; text-align: left;">
+              💡 <b>First Launch:</b> If macOS prompts <i>“Apple could not verify Mooziac”</i>, click <b>[Open Anyway]</b> (or run <code>xattr -cr /Applications/Mooziac.app</code> in Terminal).
+            </p>
           </div>
 
           <div class="install-card">
@@ -487,6 +490,17 @@
         </header>
 
         <div class="faq-accordion">
+          <details class="faq-item">
+            <summary class="faq-question">Why does macOS prompt “Apple could not verify Mooziac” or “Move to Bin”?</summary>
+            <div class="faq-answer">
+              Mooziac is an independent open-source app distributed directly on GitHub without a paid Apple Developer certificate. When you download it, macOS Gatekeeper shows a standard security verification prompt.<br><br>
+              <b>To open:</b><br>
+              1. Click <b>[Open Anyway]</b> in the security prompt (or go to <b>System Settings ➔ Privacy & Security</b> and click <i>Open Anyway</i>).<br>
+              2. Or run this one-line command in Terminal: <code>xattr -cr /Applications/Mooziac.app</code>.<br><br>
+              You only need to do this once! macOS remembers your approval permanently.
+            </div>
+          </details>
+
           <details class="faq-item">
             <summary class="faq-question">What is Mooziac?</summary>
             <div class="faq-answer">
