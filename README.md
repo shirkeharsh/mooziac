@@ -1,28 +1,37 @@
-# 🎵 Mooziac — Native macOS Menu Bar Music Player
+<p align="center">
+  <img src="Resources/launch_transparent.png" alt="Mooziac — macOS Music Player" width="280">
+</p>
 
-[![macOS 13.0+](https://img.shields.io/badge/macOS-13.0%2B%20Ventura%20%7C%20Sonoma%20%7C%20Sequoia-black?style=for-the-badge&logo=apple)](https://developer.apple.com/macos/)
-[![Swift 5.9](https://img.shields.io/badge/Swift-5.9-orange?style=for-the-badge&logo=swift)](https://swift.org)
-[![Universal 2](https://img.shields.io/badge/Architecture-Universal%20(Apple%20Silicon%20%2B%20Intel)-brightgreen?style=for-the-badge)](https://developer.apple.com)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
+<p align="center">
+  <strong>A fast, distraction-free YouTube Music & local audio player tucked right into your Mac’s menu bar.</strong>
+</p>
 
-**Mooziac** is an ultra-lightweight, native macOS menu bar app designed for **YouTube Music** and **local audio playback**. Built with Swift and AppKit, it delivers a **Dynamic Island** audio player experience, real-time synchronized lyrics, gesture-based volume/track navigation, zero background battery drain, and complete user privacy.
+<p align="center">
+  <a href="https://mooziac.threeten.site"><img src="https://img.shields.io/badge/Website-mooziac.threeten.site-007AFF?style=flat-square&logo=safari&logoColor=white" alt="Mooziac Website"></a>
+  <a href="https://github.com/shirkeharsh/mooziac/releases/latest"><img src="https://img.shields.io/badge/macOS-13.0+-black?style=flat-square&logo=apple&logoColor=white" alt="macOS 13+ Compatibility"></a>
+  <a href="https://github.com/shirkeharsh/mooziac/releases/latest"><img src="https://img.shields.io/badge/Apple%20Silicon%20+%20Intel-Universal%202-success?style=flat-square" alt="Universal 2 Binary"></a>
+  <a href="https://github.com/shirkeharsh/mooziac/releases/latest"><img src="https://img.shields.io/github/v/release/shirkeharsh/mooziac?style=flat-square&color=orange" alt="Latest Release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-purple?style=flat-square" alt="MIT License"></a>
+</p>
+
+<p align="center">
+  <a href="https://mooziac.threeten.site"><strong>🌐 Official Website</strong></a> •
+  <a href="https://github.com/shirkeharsh/mooziac/releases/latest/download/Mooziac.dmg"><strong>⬇️ Download DMG</strong></a> •
+  <a href="https://github.com/shirkeharsh/mooziac/releases/latest"><strong>📦 Release Notes</strong></a> •
+  <a href="#-building-from-source"><strong>🛠️ Build from Source</strong></a>
+</p>
+
+<br>
+
+<p align="center">
+  <img src="Resources/Animals.png" alt="Mooziac macOS Music Player Interface" width="620">
+</p>
 
 ---
 
-## 📸 Architecture & Design System
+## 🎵 What is Mooziac?
 
-Mooziac is crafted following Apple’s **Human Interface Guidelines (HIG)** and an **8px Spacing Grid System**. It features a glassmorphic Dynamic Island player interface, a custom text-centered glass search field, reactive micro-animations, and ambient track artwork themes.
-
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│ 🎵 Song Title (Bold)                            [❤️]  [🎨]  [⋯]         │
-│    Artist Name (Medium)                                                │
-│                                                                        │
-│ ◀◀  ▶  ▶▶   [ Search songs, artists...                          ]     │
-│                                                                        │
-│ ─── ▂ ▃ ▅ ▆ █ ▇ ▅ ▃ ▂ ─── Waveform Progress Bar ───────────── 01:42 / 03:45 │
-└────────────────────────────────────────────────────────────────────────┘
-```
+**Mooziac** is an ultra-lightweight, open-source **macOS music player** engineered from the ground up as a **native macOS app** using **Swift** and **AppKit**. Instead of running heavy browser tabs or resource-hungry desktop wrappers, Mooziac sits discreetly in your Mac’s menu bar, giving you instant playback controls, **YouTube Music** integration, offline local audio playback, synchronized lyrics, and innovative trackpad edge volume gestures.
 
 ---
 
