@@ -9,7 +9,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-APP_VERSION="0.1.0"
+APP_VERSION="1.0.1"
 APP_BUILD="1"
 APP_NAME="Mooziac.app"
 APP_BUNDLE_ID="app.mooziac.mac"

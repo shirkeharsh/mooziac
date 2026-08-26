@@ -124,16 +124,34 @@ public final class PlaylistManager: NSObject {
 
     @discardableResult
     public func createPlaylist(name: String) -> String? {
-        return LocalDatabaseManager.shared.createPlaylist(name: name)
+        let id = LocalDatabaseManager.shared.createPlaylist(name: name)
+        if let id = id {
+            invalidateSummary(for: id)
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: NSNotification.Name("Mooziac_PlaylistsUpdated"), object: nil)
+                NotificationCenter.default.post(name: NSNotification.Name("Mooziac_LibraryUpdated"), object: nil)
+            }
+        }
+        return id
     }
 
     public func renamePlaylist(id: String, name: String) {
         LocalDatabaseManager.shared.renamePlaylist(id: id, name: name)
         markSyncedDirtyIfNeeded(playlistID: id)
+        invalidateSummary(for: id)
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: NSNotification.Name("Mooziac_PlaylistsUpdated"), object: nil)
+            NotificationCenter.default.post(name: NSNotification.Name("Mooziac_LibraryUpdated"), object: nil)
+        }
     }
 
     public func deletePlaylist(id: String) {
         LocalDatabaseManager.shared.deletePlaylist(id: id)
+        invalidateSummary(for: id)
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: NSNotification.Name("Mooziac_PlaylistsUpdated"), object: nil)
+            NotificationCenter.default.post(name: NSNotification.Name("Mooziac_LibraryUpdated"), object: nil)
+        }
     }
 
     // MARK: - Items

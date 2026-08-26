@@ -114,6 +114,8 @@ extension DynamicIslandPlayerView {
         playlistSectionLabel.isSelectable = false
         playlistSectionLabel.refusesFirstResponder = true
         playlistSectionLabel.isHidden = true
+        let sectionClick = NSClickGestureRecognizer(target: self, action: #selector(handleSectionLabelClicked))
+        playlistSectionLabel.addGestureRecognizer(sectionClick)
 
         libraryNavContainer.translatesAutoresizingMaskIntoConstraints = false
         libraryNavContainer.wantsLayer = true
@@ -290,6 +292,17 @@ extension DynamicIslandPlayerView {
         playlistDetailAddButton.widthAnchor.constraint(equalToConstant: 22).isActive = true
         playlistDetailAddButton.heightAnchor.constraint(equalToConstant: 22).isActive = true
 
+        playlistDetailRenameButton.translatesAutoresizingMaskIntoConstraints = false
+        let renameConfig = NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
+        playlistDetailRenameButton.image = NSImage(systemSymbolName: "pencil", accessibilityDescription: "Rename Playlist")?.withSymbolConfiguration(renameConfig)
+        playlistDetailRenameButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+        playlistDetailRenameButton.toolTip = "Rename Playlist"
+        playlistDetailRenameButton.target = self
+        playlistDetailRenameButton.action = #selector(handleRenamePlaylistFromDetailHeader)
+        playlistDetailRenameButton.isHidden = true
+        playlistDetailRenameButton.widthAnchor.constraint(equalToConstant: 22).isActive = true
+        playlistDetailRenameButton.heightAnchor.constraint(equalToConstant: 22).isActive = true
+
         playlistSearchToggleButton.translatesAutoresizingMaskIntoConstraints = false
         let searchToggleConfig = NSImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
         playlistSearchToggleButton.image = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: "Search Playlists")?.withSymbolConfiguration(searchToggleConfig)
@@ -358,6 +371,7 @@ extension DynamicIslandPlayerView {
             playlistDetailPlayAllButton,
             playlistDetailShuffleButton,
             playlistDetailDownloadAllButton,
+            playlistDetailRenameButton,
             playlistDetailAddButton,
             playlistDetailDeleteButton
         ])
@@ -506,6 +520,7 @@ extension DynamicIslandPlayerView {
         NotificationCenter.default.addObserver(self, selector: #selector(handlePlaylistScrollBoundsDidChange(_:)), name: NSView.boundsDidChangeNotification, object: clipView)
         NotificationCenter.default.addObserver(self, selector: #selector(handleSettingsPlaybackStateChanged(_:)), name: NSNotification.Name("Mooziac_PlaybackStateChanged"), object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handleSettingsDownloadProgress(_:)), name: DownloadManager.progressNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handlePlaylistsUpdated), name: NSNotification.Name("Mooziac_PlaylistsUpdated"), object: nil)
 
         let docView = SettingsFlippedDocView()
         docView.translatesAutoresizingMaskIntoConstraints = false
@@ -875,6 +890,7 @@ extension DynamicIslandPlayerView {
             if playlistAddMode {
                 playlistDetailDeleteButton.isHidden = true
                 playlistDetailAddButton.isHidden = true
+                playlistDetailRenameButton.isHidden = true
                 playlistDetailPlayAllButton.isHidden = true
                 playlistDetailShuffleButton.isHidden = true
                 playlistDetailDownloadAllButton.isHidden = true
@@ -885,6 +901,7 @@ extension DynamicIslandPlayerView {
             } else {
                 playlistDetailDeleteButton.isHidden = false
                 playlistDetailAddButton.isHidden = false
+                playlistDetailRenameButton.isHidden = false
                 playlistDetailPlayAllButton.isHidden = false
                 playlistDetailShuffleButton.isHidden = false
                 playlistDetailDownloadAllButton.isHidden = false
@@ -906,6 +923,7 @@ extension DynamicIslandPlayerView {
             playlistDetailPlayAllButton.isHidden = true
             playlistDetailShuffleButton.isHidden = true
             playlistDetailDownloadAllButton.isHidden = true
+            playlistDetailRenameButton.isHidden = true
             playlistDetailDeleteButton.isHidden = true
             playlistDetailAddButton.isHidden = true
             playlistActionRowStack?.isHidden = false
@@ -1591,6 +1609,7 @@ extension DynamicIslandPlayerView {
             playlistDetailCreateButton.isHidden = true
             playlistDetailDeleteButton.isHidden = true
             playlistDetailAddButton.isHidden = true
+            playlistDetailRenameButton.isHidden = true
             playlistDetailPlayAllButton.isHidden = true
             playlistDetailShuffleButton.isHidden = true
             playlistDetailDownloadAllButton.isHidden = true
@@ -1624,6 +1643,7 @@ extension DynamicIslandPlayerView {
             return
         }
 
+        playlistDetailRenameButton.isHidden = false
         playlistDetailPlayAllButton.isHidden = false
         playlistDetailShuffleButton.isHidden = false
         playlistDetailDownloadAllButton.isHidden = false
@@ -1900,6 +1920,12 @@ extension DynamicIslandPlayerView {
         addCurrentItem.target = self
         addCurrentItem.representedObject = playlist.id
         contextMenu.addItem(addCurrentItem)
+
+        let renameItem = NSMenuItem(title: "Rename Playlist…", action: #selector(handlePlaylistContextRename(_:)), keyEquivalent: "")
+        renameItem.target = self
+        renameItem.representedObject = playlist.id
+        contextMenu.addItem(renameItem)
+
         contextMenu.addItem(NSMenuItem.separator())
 
         let selectItem = NSMenuItem(title: "Select", action: #selector(handlePlaylistContextSelect(_:)), keyEquivalent: "")
@@ -3259,6 +3285,91 @@ extension DynamicIslandPlayerView {
         updateSettingsThemeHighlight()
     }
 
+    @objc private func handleSectionLabelClicked() {
+        if playlistDetailMode != nil {
+            handleRenamePlaylistFromDetailHeader()
+        }
+    }
+
+    @objc private func handleRenamePlaylistFromDetailHeader() {
+        guard let playlist = playlistDetailMode else { return }
+        let alert = NSAlert()
+        alert.window.level = .statusBar + 1
+        alert.messageText = "Rename Playlist"
+        alert.informativeText = "Enter a new name for this playlist:"
+        alert.alertStyle = .informational
+
+        let textField = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+        textField.stringValue = playlist.name
+        textField.placeholderString = "Playlist Name"
+        alert.accessoryView = textField
+        alert.addButton(withTitle: "Rename")
+        alert.addButton(withTitle: "Cancel")
+        alert.window.initialFirstResponder = textField
+        DispatchQueue.main.async {
+            textField.selectText(nil)
+        }
+
+        if alert.runModal() == .alertFirstButtonReturn {
+            let newName = textField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !newName.isEmpty && newName != playlist.name else { return }
+            PlaylistManager.shared.renamePlaylist(id: playlist.id, name: newName)
+            if let updated = PlaylistManager.shared.fetchPlaylists().first(where: { $0.id == playlist.id }) {
+                self.playlistDetailMode = updated
+                self.playlistSectionLabel.stringValue = updated.name.uppercased()
+            }
+            showToastBanner(message: "✓ Renamed to \"\(newName)\"")
+            refreshPlaylistsSection()
+            updateSettingsThemeHighlight()
+        }
+    }
+
+    @objc private func handlePlaylistContextRename(_ sender: NSMenuItem) {
+        guard let playlistID = sender.representedObject as? String,
+              let playlist = PlaylistManager.shared.fetchPlaylists().first(where: { $0.id == playlistID }) else { return }
+        let alert = NSAlert()
+        alert.window.level = .statusBar + 1
+        alert.messageText = "Rename Playlist"
+        alert.informativeText = "Enter a new name for this playlist:"
+        alert.alertStyle = .informational
+
+        let textField = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+        textField.stringValue = playlist.name
+        textField.placeholderString = "Playlist Name"
+        alert.accessoryView = textField
+        alert.addButton(withTitle: "Rename")
+        alert.addButton(withTitle: "Cancel")
+        alert.window.initialFirstResponder = textField
+        DispatchQueue.main.async {
+            textField.selectText(nil)
+        }
+
+        if alert.runModal() == .alertFirstButtonReturn {
+            let newName = textField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !newName.isEmpty && newName != playlist.name else { return }
+            PlaylistManager.shared.renamePlaylist(id: playlist.id, name: newName)
+            if self.playlistDetailMode?.id == playlist.id,
+               let updated = PlaylistManager.shared.fetchPlaylists().first(where: { $0.id == playlist.id }) {
+                self.playlistDetailMode = updated
+                self.playlistSectionLabel.stringValue = updated.name.uppercased()
+            }
+            showToastBanner(message: "✓ Renamed to \"\(newName)\"")
+            refreshPlaylistsSection()
+            updateSettingsThemeHighlight()
+        }
+    }
+
+    @objc private func handlePlaylistsUpdated() {
+        if let currentDetail = playlistDetailMode {
+            if let updated = PlaylistManager.shared.fetchPlaylists().first(where: { $0.id == currentDetail.id }) {
+                self.playlistDetailMode = updated
+                self.playlistSectionLabel.stringValue = updated.name.uppercased()
+            }
+        }
+        refreshPlaylistsSection()
+        updateSettingsThemeHighlight()
+    }
+
     func currentThemeDisplayName() -> String {
         switch PlayerDesign.current {
         case .adaptive: return "Live dynamic artwork backdrop"
@@ -3720,6 +3831,7 @@ extension DynamicIslandPlayerView {
         playlistDetailPlayAllButton.contentTintColor = cyan
         playlistDetailShuffleButton.contentTintColor = cyan
         playlistDetailDownloadAllButton.contentTintColor = cyan
+        playlistDetailRenameButton.contentTintColor = cyan
         playlistDetailAddButton.contentTintColor = cyan
 
         playlistSearchToggleButton.contentTintColor = isPlaylistSearchActive ? cyan : tone.iconColor

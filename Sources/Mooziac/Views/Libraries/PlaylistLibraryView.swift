@@ -41,6 +41,7 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
     private let openFolderHeaderButton = ReactiveIconButton()
     private let downloadCurrentHeaderButton = ReactiveIconButton()
     private let addCurrentTrackButton = ReactiveIconButton()
+    private let renameHeaderButton = ReactiveIconButton()
     private let downloadButton = ReactiveIconButton()
     private let moreMenuButton = ReactiveIconButton()
     private var actionStack = NSStackView()
@@ -162,6 +163,8 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
         titleStack.alignment = .leading
         titleStack.spacing = 1
         titleStack.translatesAutoresizingMaskIntoConstraints = false
+        let titleClickRecognizer = NSClickGestureRecognizer(target: self, action: #selector(handleTitleClicked))
+        titleStack.addGestureRecognizer(titleClickRecognizer)
         topBar.addSubview(titleStack)
 
         setupHeaderIconButton(saveQueueButton, systemName: "square.and.arrow.down", toolTip: "Save Current Queue as Playlist", action: #selector(handleSaveQueueTapped), pointSize: 12.0)
@@ -173,10 +176,13 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
         setupHeaderIconButton(addCurrentTrackButton, systemName: "plus", toolTip: "Add Currently Playing Track to Playlist", action: #selector(handleAddCurrentTrackToDetailPlaylist), pointSize: 13.0)
         addCurrentTrackButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
 
+        setupHeaderIconButton(renameHeaderButton, systemName: "pencil", toolTip: "Rename Playlist", action: #selector(handleRenameCurrentPlaylist), pointSize: 12.0)
+        renameHeaderButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+
         setupHeaderIconButton(downloadButton, systemName: "arrow.down", toolTip: "Download Online Tracks", action: #selector(handleDownloadAllTapped), pointSize: 12.0)
         setupHeaderIconButton(moreMenuButton, systemName: "ellipsis", toolTip: "Options", action: #selector(handleMoreMenuTapped(_:)), pointSize: 12.5)
 
-        actionStack = NSStackView(views: [importHeaderButton, downloadCurrentHeaderButton, openFolderHeaderButton, downloadButton, addCurrentTrackButton, saveQueueButton, moreMenuButton])
+        actionStack = NSStackView(views: [importHeaderButton, downloadCurrentHeaderButton, openFolderHeaderButton, downloadButton, addCurrentTrackButton, renameHeaderButton, saveQueueButton, moreMenuButton])
         actionStack.orientation = .horizontal
         actionStack.spacing = 6
         actionStack.alignment = .centerY
@@ -368,8 +374,33 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
         NotificationCenter.default.addObserver(self, selector: #selector(handleHistoryUpdated), name: HistoryManager.historyUpdatedNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handleDownloadsUpdated), name: NSNotification.Name("Mooziac_LibraryUpdated"), object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handleLikedSongsUpdated), name: LikedSongsManager.likedSongsUpdatedNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handlePlaylistsUpdated), name: NSNotification.Name("Mooziac_PlaylistsUpdated"), object: nil)
         NotificationCenter.default.addObserver(forName: NSNotification.Name("Mooziac_PlaybackStateChanged"), object: nil, queue: .main) { [weak self] _ in
             self?.reloadVisiblePlayingStates()
+        }
+    }
+
+    @objc private func handleTitleClicked() {
+        if case .detail = mode {
+            handleRenameCurrentPlaylist()
+        }
+    }
+
+    @objc private func handlePlaylistsUpdated() {
+        switch mode {
+        case .list:
+            allPlaylists = PlaylistManager.shared.fetchPlaylists()
+            applyFilter()
+            emptyStateView.isHidden = !filteredPlaylists.isEmpty
+            tableView.reloadData()
+        case .detail(let pl):
+            if let updated = PlaylistManager.shared.fetchPlaylists().first(where: { $0.id == pl.id }) {
+                self.mode = .detail(updated)
+            } else {
+                self.mode = .list
+            }
+        default:
+            break
         }
     }
 
@@ -482,6 +513,7 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
                 openFolderHeaderButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
                 downloadCurrentHeaderButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
                 addCurrentTrackButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+                renameHeaderButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
                 downloadButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
                 moreMenuButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
 
@@ -508,6 +540,7 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
                 openFolderHeaderButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
                 downloadCurrentHeaderButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
                 addCurrentTrackButton.contentTintColor = NSColor(red: 0.0, green: 0.80, blue: 1.0, alpha: 1.0)
+                renameHeaderButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
                 downloadButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
                 moreMenuButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
 
@@ -535,6 +568,7 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
                 openFolderHeaderButton.contentTintColor = pitchBlack
                 downloadCurrentHeaderButton.contentTintColor = pitchBlack
                 addCurrentTrackButton.contentTintColor = NSColor.lightThemeSelector
+                renameHeaderButton.contentTintColor = pitchBlack
                 downloadButton.contentTintColor = pitchBlack
                 moreMenuButton.contentTintColor = pitchBlack
 
@@ -619,8 +653,10 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
             openFolderHeaderButton.isHidden = true
             downloadCurrentHeaderButton.isHidden = true
             addCurrentTrackButton.isHidden = true
+            renameHeaderButton.isHidden = true
             downloadButton.isHidden = true
             moreMenuButton.isHidden = true
+            headerTitleLabel.toolTip = nil
 
             bottomBar.isHidden = false
             bottomNewPlaylistButton.isHidden = false
@@ -641,6 +677,7 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
             titleStack.isHidden = false
 
             headerTitleLabel.stringValue = playlist.name.uppercased()
+            headerTitleLabel.toolTip = "Click to rename \"\(playlist.name)\""
             let summary = PlaylistManager.shared.summaryForPlaylist(playlist)
             if !summary.durationText.isEmpty {
                 headerSubtitleLabel.stringValue = "\(summary.countText) • \(summary.durationText)"
@@ -655,6 +692,7 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
             openFolderHeaderButton.isHidden = true
             downloadCurrentHeaderButton.isHidden = true
             addCurrentTrackButton.isHidden = false
+            renameHeaderButton.isHidden = false
             downloadButton.isHidden = allPlaylistItems.isEmpty
             moreMenuButton.isHidden = false
 
@@ -676,6 +714,7 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
             librarySegmentedControl.isHidden = false
             backButton.isHidden = true
             titleStack.isHidden = true
+            headerTitleLabel.toolTip = nil
 
             searchField.placeholderString = "Search liked songs..."
             saveQueueButton.isHidden = true
@@ -683,6 +722,7 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
             openFolderHeaderButton.isHidden = true
             downloadCurrentHeaderButton.isHidden = true
             addCurrentTrackButton.isHidden = true
+            renameHeaderButton.isHidden = true
             downloadButton.isHidden = true
             moreMenuButton.isHidden = true
 
@@ -704,6 +744,7 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
             librarySegmentedControl.isHidden = false
             backButton.isHidden = true
             titleStack.isHidden = true
+            headerTitleLabel.toolTip = nil
 
             searchField.placeholderString = "Search downloaded tracks..."
             saveQueueButton.isHidden = true
@@ -711,6 +752,7 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
             openFolderHeaderButton.isHidden = false
             downloadCurrentHeaderButton.isHidden = false
             addCurrentTrackButton.isHidden = true
+            renameHeaderButton.isHidden = true
             downloadButton.isHidden = true
             moreMenuButton.isHidden = true
 
@@ -731,6 +773,7 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
             librarySegmentedControl.isHidden = false
             backButton.isHidden = true
             titleStack.isHidden = true
+            headerTitleLabel.toolTip = nil
 
             searchField.placeholderString = "Search listening history..."
             saveQueueButton.isHidden = true
@@ -738,6 +781,7 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
             openFolderHeaderButton.isHidden = true
             downloadCurrentHeaderButton.isHidden = true
             addCurrentTrackButton.isHidden = true
+            renameHeaderButton.isHidden = true
             downloadButton.isHidden = true
             moreMenuButton.isHidden = false
 
@@ -975,7 +1019,12 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
         guard case .detail(let playlist) = mode else { return }
         promptForName(title: "Rename Playlist", defaultName: playlist.name, actionTitle: "Rename") { [weak self] name in
             guard let self = self else { return }
-            PlaylistManager.shared.renamePlaylist(id: playlist.id, name: name)
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return }
+            if trimmed != playlist.name {
+                PlaylistManager.shared.renamePlaylist(id: playlist.id, name: trimmed)
+                CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "✓ Renamed to \"\(trimmed)\"")
+            }
             if let updated = PlaylistManager.shared.fetchPlaylists().first(where: { $0.id == playlist.id }) {
                 self.mode = .detail(updated)
             } else {
@@ -1046,7 +1095,8 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
         switch mode {
         case .list:
             guard row < filteredPlaylists.count else { return }
-            confirmAndDeletePlaylist(filteredPlaylists[row])
+            let playlist = filteredPlaylists[row]
+            confirmAndDeletePlaylist(playlist)
         case .detail(let playlist):
             guard row < filteredPlaylistItems.count else { return }
             let item = filteredPlaylistItems[row]
@@ -1087,10 +1137,13 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
         alert.addButton(withTitle: "Cancel")
 
         alert.window.initialFirstResponder = textField
+        DispatchQueue.main.async {
+            textField.selectText(nil)
+        }
 
         if alert.runModal() == .alertFirstButtonReturn {
             let name = textField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            completion(name.isEmpty ? "My Playlist" : name)
+            completion(name.isEmpty ? defaultName : name)
         }
     }
 
@@ -1422,7 +1475,12 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
     @objc private func handleContextRename(_ sender: NSMenuItem) {
         guard let playlist = sender.representedObject as? PlaylistRecord else { return }
         promptForName(title: "Rename Playlist", defaultName: playlist.name, actionTitle: "Rename") { [weak self] name in
-            PlaylistManager.shared.renamePlaylist(id: playlist.id, name: name)
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return }
+            if trimmed != playlist.name {
+                PlaylistManager.shared.renamePlaylist(id: playlist.id, name: trimmed)
+                CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "✓ Renamed to \"\(trimmed)\"")
+            }
             self?.reload()
         }
     }
@@ -1877,6 +1935,18 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
             cell?.configure(playlist: playlist, summary: summary, design: design)
             cell?.onRowClicked = { [weak self] in
                 self?.mode = .detail(playlist)
+            }
+            cell?.onRename = { [weak self] in
+                guard let self = self else { return }
+                self.promptForName(title: "Rename Playlist", defaultName: playlist.name, actionTitle: "Rename") { [weak self] name in
+                    let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmed.isEmpty else { return }
+                    if trimmed != playlist.name {
+                        PlaylistManager.shared.renamePlaylist(id: playlist.id, name: trimmed)
+                        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "✓ Renamed to \"\(trimmed)\"")
+                    }
+                    self?.reload()
+                }
             }
             cell?.onDelete = { [weak self] in
                 self?.confirmAndDeletePlaylist(playlist)
@@ -2376,9 +2446,11 @@ private class PlaylistRowCellView: NSTableCellView {
     let iconImageView = NSImageView()
     let titleLabel = NSTextField(labelWithString: "")
     let countLabel = NSTextField(labelWithString: "")
+    let editButton = ReactiveIconButton()
     let chevronImageView = NSImageView()
 
     var onRowClicked: (() -> Void)?
+    var onRename: (() -> Void)?
     var onDelete: (() -> Void)? {
         get { return swipeContainer.onDelete }
         set { swipeContainer.onDelete = newValue }
@@ -2451,6 +2523,17 @@ private class PlaylistRowCellView: NSTableCellView {
         card.addSubview(titleLabel)
         card.addSubview(countLabel)
 
+        editButton.translatesAutoresizingMaskIntoConstraints = false
+        let editConfig = NSImage.SymbolConfiguration(pointSize: 10.5, weight: .medium)
+        editButton.image = NSImage(systemSymbolName: "pencil", accessibilityDescription: "Rename Playlist")?.withSymbolConfiguration(editConfig)
+        editButton.toolTip = "Rename Playlist"
+        editButton.target = self
+        editButton.action = #selector(handleEditButtonTapped)
+        editButton.isBordered = false
+        editButton.wantsLayer = true
+        editButton.layer?.cornerRadius = 4
+        card.addSubview(editButton)
+
         chevronImageView.translatesAutoresizingMaskIntoConstraints = false
         let chevronConfig = NSImage.SymbolConfiguration(pointSize: 9.5, weight: .semibold)
         chevronImageView.image = NSImage(systemSymbolName: "chevron.right", accessibilityDescription: "Open")?.withSymbolConfiguration(chevronConfig)
@@ -2467,14 +2550,23 @@ private class PlaylistRowCellView: NSTableCellView {
             titleLabel.centerYAnchor.constraint(equalTo: card.centerYAnchor),
             titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: countLabel.leadingAnchor, constant: -8),
 
-            countLabel.trailingAnchor.constraint(equalTo: chevronImageView.leadingAnchor, constant: -8),
+            countLabel.trailingAnchor.constraint(equalTo: editButton.leadingAnchor, constant: -6),
             countLabel.centerYAnchor.constraint(equalTo: card.centerYAnchor),
+
+            editButton.trailingAnchor.constraint(equalTo: chevronImageView.leadingAnchor, constant: -6),
+            editButton.centerYAnchor.constraint(equalTo: card.centerYAnchor),
+            editButton.widthAnchor.constraint(equalToConstant: 20),
+            editButton.heightAnchor.constraint(equalToConstant: 20),
 
             chevronImageView.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -8),
             chevronImageView.centerYAnchor.constraint(equalTo: card.centerYAnchor),
             chevronImageView.widthAnchor.constraint(equalToConstant: 12),
             chevronImageView.heightAnchor.constraint(equalToConstant: 12)
         ])
+    }
+
+    @objc private func handleEditButtonTapped() {
+        onRename?()
     }
 
     override func updateTrackingAreas() {
@@ -2516,6 +2608,7 @@ private class PlaylistRowCellView: NSTableCellView {
             titleLabel.textColor = NSColor(red: 0.10, green: 0.10, blue: 0.10, alpha: 1.0)
             countLabel.textColor = NSColor(white: 0.40, alpha: 1.0)
             iconImageView.contentTintColor = cyan
+            editButton.contentTintColor = NSColor(white: 0.20, alpha: 0.70)
             chevronImageView.contentTintColor = NSColor(white: 0.20, alpha: 0.40)
         } else {
             swipeContainer.contentCardView.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.04).cgColor
@@ -2524,6 +2617,7 @@ private class PlaylistRowCellView: NSTableCellView {
             titleLabel.textColor = NSColor.white
             countLabel.textColor = isDark ? NSColor(white: 0.50, alpha: 1.0) : NSColor(white: 0.60, alpha: 1.0)
             iconImageView.contentTintColor = cyan
+            editButton.contentTintColor = isDark ? NSColor(white: 0.65, alpha: 0.80) : NSColor(white: 0.75, alpha: 0.80)
             chevronImageView.contentTintColor = NSColor(white: 0.80, alpha: 0.40)
         }
     }
