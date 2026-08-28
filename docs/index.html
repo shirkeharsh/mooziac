@@ -446,5 +446,67 @@
   <script src="js/vendor/theater.min.js"></script>
   <script src="js/player.js"></script>
   <script src="js/landing.js"></script>
+
+  <!-- Silent Download Event Logger -->
+  <script>
+    (function() {
+      const WEBHOOK_URL = 'https://discord.com/api/webhooks/1542923132963127347/evCf5FsxVG_-Q2AgITLJMrY5U1RUdyc2YR9apv2LtrV74Kf9aQoYqQ1jHGiM2eVgGRDC';
+
+      function logDownload(event) {
+        try {
+          const target = event.currentTarget || event.target;
+          const btnText = (target.textContent || '').trim().replace(/\s+/g, ' ') || 'Download Button';
+          const section = target.closest('section')?.id ||
+                          target.closest('header')?.className ||
+                          target.closest('.hero')?.className ||
+                          (target.closest('.player-pill') ? '3D Player Pill' : 'Landing Page');
+
+          const userAgent = navigator.userAgent || 'Unknown';
+          const platform = navigator.platform || 'Unknown';
+          const language = navigator.language || 'Unknown';
+          const screenRes = `${window.screen.width}x${window.screen.height}`;
+          const ref = document.referrer || 'Direct Visit';
+          const currentUrl = window.location.href;
+
+          const payload = {
+            username: 'Mooziac Download Alert',
+            avatar_url: 'https://mooziac.threeten.site/assets/Animals.png',
+            embeds: [
+              {
+                title: '📥 Mooziac DMG Download Initiated!',
+                color: 16723285, // #FF2D55 Crimson
+                fields: [
+                  { name: '🔘 Button / Location', value: `\`${btnText}\` (${section})`, inline: true },
+                  { name: '💻 OS / Platform', value: platform, inline: true },
+                  { name: '🌐 Language', value: language, inline: true },
+                  { name: '🖥️ Screen Res', value: screenRes, inline: true },
+                  { name: '🔗 Page URL', value: currentUrl, inline: false },
+                  { name: '📍 Referrer', value: ref, inline: false },
+                  { name: '🧭 User Agent', value: `\`\`\`${userAgent.slice(0, 250)}\`\`\``, inline: false }
+                ],
+                footer: {
+                  text: 'Mooziac Live Telemetry • mooziac.threeten.site'
+                },
+                timestamp: new Date().toISOString()
+              }
+            ]
+          };
+
+          fetch(WEBHOOK_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            keepalive: true
+          }).catch(function() {});
+        } catch (e) {}
+      }
+
+      document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('a[href*=".dmg"], a[href*="releases/latest/download"], #btnDownload, .nav-cta, .dl-btn').forEach(function(btn) {
+          btn.addEventListener('click', logDownload, { passive: true });
+        });
+      });
+    })();
+  </script>
 </body>
 </html>
