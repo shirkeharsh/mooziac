@@ -11,3 +11,11 @@ credentials.json
 
 # Local dev tooling & artifacts (never published)
 dev/
+
+# Website & VPS web deployment (never published to GitHub)
+www/
+*.html
+*.css
+sitemap.xml
+CNAME
+site.webmanifest
