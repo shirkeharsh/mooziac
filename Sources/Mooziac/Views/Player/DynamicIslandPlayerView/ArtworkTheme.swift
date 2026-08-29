@@ -95,15 +95,16 @@ extension DynamicIslandPlayerView {
     func updateAmbientGlow(cgImage: CGImage) {
         let dominantColor = ambientDominantColor(from: cgImage)
         let converted = dominantColor.usingColorSpace(.sRGB) ?? dominantColor
-        let r = max(0, min(1, converted.redComponent * 0.22))
-        let g = max(0, min(1, converted.greenComponent * 0.22))
-        let b = max(0, min(1, converted.blueComponent * 0.22))
+        // Enforce minimum luminance floor so dark album art never produces an unreadable pitch-black card on dark wallpapers
+        let r = max(0.06, min(1, converted.redComponent * 0.24))
+        let g = max(0.06, min(1, converted.greenComponent * 0.24))
+        let b = max(0.08, min(1, converted.blueComponent * 0.26))
         let darkBg = NSColor(srgbRed: r, green: g, blue: b, alpha: 0.96)
         
-        let br = max(0, min(1, converted.redComponent * 0.85))
-        let bg = max(0, min(1, converted.greenComponent * 0.85))
-        let bb = max(0, min(1, converted.blueComponent * 0.85))
-        let borderGlow = NSColor(srgbRed: br, green: bg, blue: bb, alpha: 0.40)
+        let br = max(0.20, min(1, converted.redComponent * 0.85))
+        let bg = max(0.20, min(1, converted.greenComponent * 0.85))
+        let bb = max(0.25, min(1, converted.blueComponent * 0.85))
+        let borderGlow = NSColor(srgbRed: br, green: bg, blue: bb, alpha: 0.45)
 
         self.lastAmbientBgColor = darkBg.cgColor
         self.lastAmbientBorderColor = borderGlow.cgColor
@@ -135,121 +136,131 @@ extension DynamicIslandPlayerView {
             case .adaptive:
                 visualEffectBackdrop.isHidden = true
                 glassSheenLayer.isHidden = true
-                let bg = lastAmbientBgColor ?? NSColor(red: 0.08, green: 0.08, blue: 0.10, alpha: 0.98).cgColor
+                let bg = lastAmbientBgColor ?? NSColor(red: 0.08, green: 0.08, blue: 0.11, alpha: 0.98).cgColor
+                let border = lastAmbientBorderColor ?? NSColor(white: 1.0, alpha: 0.20).cgColor
                 containerPill.layer?.backgroundColor = bg
                 containerPill.layer?.borderWidth = 1.0
-                containerPill.layer?.borderColor = NSColor(white: 1.0, alpha: 0.15).cgColor
+                containerPill.layer?.borderColor = border
                 waveformProgressView.accentColor = lastAmbientAccentColor ?? NSColor(red: 0.40, green: 0.72, blue: 1.0, alpha: 1.0)
                 
                 titleLabel.font = NSFont.systemFont(ofSize: 13, weight: .bold)
                 artistLabel.font = NSFont.systemFont(ofSize: 11, weight: .medium)
                 timeLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular)
                 
-                titleLabel.textColor = NSColor.white
-                artistLabel.textColor = NSColor(white: 0.65, alpha: 1.0)
-                timeLabel.textColor = NSColor(white: 0.60, alpha: 1.0)
+                titleLabel.textColor = SystemAppearanceHelper.primaryTextColor(for: .adaptive)
+                artistLabel.textColor = SystemAppearanceHelper.secondaryTextColor(for: .adaptive)
+                timeLabel.textColor = SystemAppearanceHelper.tertiaryTextColor(for: .adaptive)
                 
+                let btnTint = SystemAppearanceHelper.controlButtonTint(for: .adaptive)
                 playPauseButton.contentTintColor = NSColor.white
-                previousButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
-                nextButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
-                addToPlaylistButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
-                repeatButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
-                likeButton.contentTintColor = isLiked ? NSColor.red : NSColor(white: 0.80, alpha: 1.0)
-                searchIconButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
-                fullScreenButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
-                browserButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
-                resetPositionButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
+                previousButton.contentTintColor = btnTint
+                nextButton.contentTintColor = btnTint
+                addToPlaylistButton.contentTintColor = btnTint
+                repeatButton.contentTintColor = (repeatMode != .off) ? NSColor.white : btnTint
+                likeButton.contentTintColor = isLiked ? NSColor.red : btnTint
+                searchIconButton.contentTintColor = btnTint
+                fullScreenButton.contentTintColor = btnTint
+                browserButton.contentTintColor = btnTint
+                resetPositionButton.contentTintColor = btnTint
 
             case .native:
+                // macOS Native Vibrancy / Clear Mode (Optimized for macOS 27 beta & dark/light wallpapers)
                 visualEffectBackdrop.isHidden = false
-                visualEffectBackdrop.material = .underWindowBackground
-                visualEffectBackdrop.blendingMode = .behindWindow
+                visualEffectBackdrop.material = .popover
+                visualEffectBackdrop.blendingMode = .withinWindow
                 visualEffectBackdrop.state = .active
+                
                 glassSheenLayer.isHidden = false
                 glassSheenLayer.frame = containerPill.bounds
-                containerPill.layer?.backgroundColor = NSColor(white: 0.0, alpha: 0.02).cgColor
+                
+                // Contrast-safe backing plate prevents transparency washout over dark/black wallpapers
+                containerPill.layer?.backgroundColor = SystemAppearanceHelper.clearModeBackingColor.cgColor
                 containerPill.layer?.borderWidth = 1.0
-                containerPill.layer?.borderColor = NSColor(white: 1.0, alpha: 0.24).cgColor
+                containerPill.layer?.borderColor = SystemAppearanceHelper.clearModeBorderColor.cgColor
                 
                 titleLabel.font = NSFont.systemFont(ofSize: 13, weight: .bold)
                 artistLabel.font = NSFont.systemFont(ofSize: 11, weight: .medium)
                 timeLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular)
                 
-                titleLabel.textColor = NSColor.white
-                artistLabel.textColor = NSColor(white: 0.76, alpha: 1.0)
-                timeLabel.textColor = NSColor(white: 0.70, alpha: 1.0)
+                titleLabel.textColor = SystemAppearanceHelper.primaryTextColor(for: .native)
+                artistLabel.textColor = SystemAppearanceHelper.secondaryTextColor(for: .native)
+                timeLabel.textColor = SystemAppearanceHelper.tertiaryTextColor(for: .native)
                 
-                waveformProgressView.accentColor = NSColor.white
+                waveformProgressView.accentColor = SystemAppearanceHelper.isDarkSystemAppearance ? NSColor.white : NSColor(red: 0.10, green: 0.10, blue: 0.12, alpha: 1.0)
                 
-                playPauseButton.contentTintColor = NSColor.white
-                previousButton.contentTintColor = NSColor(white: 0.88, alpha: 1.0)
-                nextButton.contentTintColor = NSColor(white: 0.88, alpha: 1.0)
-                addToPlaylistButton.contentTintColor = NSColor(white: 0.88, alpha: 1.0)
-                repeatButton.contentTintColor = (repeatMode != .off) ? NSColor.white : NSColor(white: 0.88, alpha: 1.0)
-                likeButton.contentTintColor = isLiked ? NSColor(red: 1.0, green: 0.28, blue: 0.38, alpha: 1.0) : NSColor(white: 0.88, alpha: 1.0)
-                searchIconButton.contentTintColor = NSColor(white: 0.88, alpha: 1.0)
-                fullScreenButton.contentTintColor = NSColor(white: 0.88, alpha: 1.0)
-                browserButton.contentTintColor = NSColor(white: 0.88, alpha: 1.0)
-                resetPositionButton.contentTintColor = NSColor(white: 0.88, alpha: 1.0)
+                let clearBtnTint = SystemAppearanceHelper.controlButtonTint(for: .native)
+                playPauseButton.contentTintColor = SystemAppearanceHelper.primaryTextColor(for: .native)
+                previousButton.contentTintColor = clearBtnTint
+                nextButton.contentTintColor = clearBtnTint
+                addToPlaylistButton.contentTintColor = clearBtnTint
+                repeatButton.contentTintColor = (repeatMode != .off) ? SystemAppearanceHelper.primaryTextColor(for: .native) : clearBtnTint
+                likeButton.contentTintColor = isLiked ? NSColor(red: 1.0, green: 0.28, blue: 0.38, alpha: 1.0) : clearBtnTint
+                searchIconButton.contentTintColor = clearBtnTint
+                fullScreenButton.contentTintColor = clearBtnTint
+                browserButton.contentTintColor = clearBtnTint
+                resetPositionButton.contentTintColor = clearBtnTint
 
             case .darkMode:
                 visualEffectBackdrop.isHidden = true
                 glassSheenLayer.isHidden = true
-                containerPill.layer?.backgroundColor = NSColor(red: 0.04, green: 0.04, blue: 0.05, alpha: 0.98).cgColor
+                containerPill.layer?.backgroundColor = SystemAppearanceHelper.darkModeBackingColor.cgColor
                 containerPill.layer?.borderWidth = 1.0
-                containerPill.layer?.borderColor = NSColor(white: 1.0, alpha: 0.12).cgColor
+                containerPill.layer?.borderColor = SystemAppearanceHelper.darkModeBorderColor.cgColor
                 waveformProgressView.accentColor = NSColor.white
                 
                 titleLabel.font = NSFont.systemFont(ofSize: 13, weight: .bold)
                 artistLabel.font = NSFont.systemFont(ofSize: 11, weight: .medium)
                 timeLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular)
                 
-                titleLabel.textColor = NSColor.white
-                artistLabel.textColor = NSColor(white: 0.60, alpha: 1.0)
-                timeLabel.textColor = NSColor(white: 0.55, alpha: 1.0)
+                titleLabel.textColor = SystemAppearanceHelper.primaryTextColor(for: .darkMode)
+                artistLabel.textColor = SystemAppearanceHelper.secondaryTextColor(for: .darkMode)
+                timeLabel.textColor = SystemAppearanceHelper.tertiaryTextColor(for: .darkMode)
                 
+                let darkBtnTint = SystemAppearanceHelper.controlButtonTint(for: .darkMode)
                 playPauseButton.contentTintColor = NSColor.white
-                previousButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
-                nextButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
-                addToPlaylistButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
-                repeatButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
-                likeButton.contentTintColor = isLiked ? NSColor.red : NSColor(white: 0.85, alpha: 1.0)
-                searchIconButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
-                fullScreenButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
-                browserButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
-                resetPositionButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
+                previousButton.contentTintColor = darkBtnTint
+                nextButton.contentTintColor = darkBtnTint
+                addToPlaylistButton.contentTintColor = darkBtnTint
+                repeatButton.contentTintColor = (repeatMode != .off) ? NSColor.white : darkBtnTint
+                likeButton.contentTintColor = isLiked ? NSColor.red : darkBtnTint
+                searchIconButton.contentTintColor = darkBtnTint
+                fullScreenButton.contentTintColor = darkBtnTint
+                browserButton.contentTintColor = darkBtnTint
+                resetPositionButton.contentTintColor = darkBtnTint
                 
             case .glassMode:
                 visualEffectBackdrop.isHidden = true
                 glassSheenLayer.isHidden = true
-                // Premium Light Mode #EFF2F0
+                // Premium Light Mode #EFF2F0 with high-contrast text
                 containerPill.layer?.backgroundColor = NSColor(red: 0.93725, green: 0.94902, blue: 0.94118, alpha: 0.98).cgColor
                 containerPill.layer?.borderWidth = 1.0
-                containerPill.layer?.borderColor = NSColor(red: 0.80, green: 0.82, blue: 0.81, alpha: 0.85).cgColor
+                containerPill.layer?.borderColor = NSColor(red: 0.78, green: 0.80, blue: 0.79, alpha: 0.90).cgColor
                 
                 titleLabel.font = NSFont.systemFont(ofSize: 13, weight: .heavy)
                 artistLabel.font = NSFont.systemFont(ofSize: 11, weight: .bold)
                 timeLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .semibold)
                 
-                let pitchBlack = NSColor.black
-                let deepBlack = NSColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 1.0)
+                let pitchBlack = SystemAppearanceHelper.primaryTextColor(for: .glassMode)
+                let deepBlack = SystemAppearanceHelper.secondaryTextColor(for: .glassMode)
+                let tertiaryBlack = SystemAppearanceHelper.tertiaryTextColor(for: .glassMode)
                 
                 waveformProgressView.accentColor = pitchBlack
                 
                 titleLabel.textColor = pitchBlack
                 artistLabel.textColor = deepBlack
-                timeLabel.textColor = deepBlack
+                timeLabel.textColor = tertiaryBlack
                 
+                let glassBtnTint = SystemAppearanceHelper.controlButtonTint(for: .glassMode)
                 playPauseButton.contentTintColor = pitchBlack
-                previousButton.contentTintColor = pitchBlack
-                nextButton.contentTintColor = pitchBlack
-                addToPlaylistButton.contentTintColor = pitchBlack
-                repeatButton.contentTintColor = pitchBlack
-                likeButton.contentTintColor = isLiked ? NSColor(red: 0.98, green: 0.25, blue: 0.35, alpha: 1.0) : pitchBlack
-                searchIconButton.contentTintColor = pitchBlack
-                fullScreenButton.contentTintColor = pitchBlack
-                browserButton.contentTintColor = pitchBlack
-                resetPositionButton.contentTintColor = pitchBlack
+                previousButton.contentTintColor = glassBtnTint
+                nextButton.contentTintColor = glassBtnTint
+                addToPlaylistButton.contentTintColor = glassBtnTint
+                repeatButton.contentTintColor = (repeatMode != .off) ? pitchBlack : glassBtnTint
+                likeButton.contentTintColor = isLiked ? NSColor(red: 0.98, green: 0.25, blue: 0.35, alpha: 1.0) : glassBtnTint
+                searchIconButton.contentTintColor = glassBtnTint
+                fullScreenButton.contentTintColor = glassBtnTint
+                browserButton.contentTintColor = glassBtnTint
+                resetPositionButton.contentTintColor = glassBtnTint
             }
         }
 

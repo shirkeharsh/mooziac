@@ -309,33 +309,43 @@ public class OfflineLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSou
             context.duration = 0.35
 
             switch design {
-            case .adaptive, .native:
-                let bg = DynamicIslandPlayerView.sharedAmbientBgColor ?? NSColor(red: 0.08, green: 0.08, blue: 0.10, alpha: 0.98).cgColor
+            case .native:
+                layer?.backgroundColor = SystemAppearanceHelper.clearModeBackingColor.cgColor
+                layer?.borderWidth = 1.0
+                layer?.borderColor = SystemAppearanceHelper.clearModeBorderColor.cgColor
+
+                headerTitleLabel.textColor = SystemAppearanceHelper.primaryTextColor(for: .native)
+                backButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+                importButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .native)
+                openFolderButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .native)
+
+            case .adaptive:
+                let bg = DynamicIslandPlayerView.sharedAmbientBgColor ?? NSColor(red: 0.08, green: 0.08, blue: 0.11, alpha: 0.98).cgColor
                 layer?.backgroundColor = bg
                 layer?.borderWidth = 1.0
-                layer?.borderColor = NSColor(white: 1.0, alpha: 0.15).cgColor
+                layer?.borderColor = NSColor(white: 1.0, alpha: 0.20).cgColor
 
                 headerTitleLabel.textColor = NSColor.white
                 backButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
-                importButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
-                openFolderButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
+                importButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .adaptive)
+                openFolderButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .adaptive)
 
             case .darkMode:
-                layer?.backgroundColor = NSColor(red: 0.04, green: 0.04, blue: 0.05, alpha: 0.98).cgColor
+                layer?.backgroundColor = SystemAppearanceHelper.darkModeBackingColor.cgColor
                 layer?.borderWidth = 1.0
-                layer?.borderColor = NSColor(white: 1.0, alpha: 0.12).cgColor
+                layer?.borderColor = SystemAppearanceHelper.darkModeBorderColor.cgColor
 
                 headerTitleLabel.textColor = NSColor.white
-                backButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
-                importButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
-                openFolderButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
+                backButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+                importButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .darkMode)
+                openFolderButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .darkMode)
 
             case .glassMode:
                 layer?.backgroundColor = NSColor(red: 0.93725, green: 0.94902, blue: 0.94118, alpha: 0.98).cgColor
                 layer?.borderWidth = 1.0
-                layer?.borderColor = NSColor(red: 0.80, green: 0.82, blue: 0.81, alpha: 0.85).cgColor
+                layer?.borderColor = NSColor(red: 0.78, green: 0.80, blue: 0.79, alpha: 0.90).cgColor
 
-                let pitchBlack = NSColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 1.0)
+                let pitchBlack = SystemAppearanceHelper.primaryTextColor(for: .glassMode)
                 headerTitleLabel.textColor = pitchBlack
                 backButton.contentTintColor = pitchBlack
                 importButton.contentTintColor = pitchBlack
@@ -343,9 +353,9 @@ public class OfflineLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSou
             }
 
             searchField.applyTheme(design)
-            emptyStateLabel.textColor = (design == .glassMode) ? NSColor(white: 0.15, alpha: 1.0) : NSColor(white: 0.85, alpha: 1.0)
-            emptyStateSubLabel.textColor = (design == .glassMode) ? NSColor(white: 0.40, alpha: 1.0) : NSColor(white: 0.55, alpha: 1.0)
-            emptyStateIcon.contentTintColor = (design == .glassMode) ? NSColor(white: 0.35, alpha: 1.0) : NSColor(white: 0.50, alpha: 1.0)
+            emptyStateLabel.textColor = (design == .glassMode) ? NSColor(white: 0.15, alpha: 1.0) : NSColor(white: 0.88, alpha: 1.0)
+            emptyStateSubLabel.textColor = (design == .glassMode) ? NSColor(white: 0.35, alpha: 1.0) : NSColor(white: 0.65, alpha: 1.0)
+            emptyStateIcon.contentTintColor = (design == .glassMode) ? NSColor(white: 0.30, alpha: 1.0) : NSColor(white: 0.60, alpha: 1.0)
         }
 
         tableView.reloadData()

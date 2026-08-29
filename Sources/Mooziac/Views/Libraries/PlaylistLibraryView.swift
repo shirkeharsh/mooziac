@@ -501,21 +501,48 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.35
             switch design {
-            case .adaptive, .native:
-                layer?.backgroundColor = DynamicIslandPlayerView.sharedAmbientBgColor ?? NSColor(red: 0.08, green: 0.08, blue: 0.10, alpha: 0.98).cgColor
+            case .native:
+                layer?.backgroundColor = SystemAppearanceHelper.clearModeBackingColor.cgColor
                 layer?.borderWidth = 1.0
-                layer?.borderColor = NSColor(white: 1.0, alpha: 0.15).cgColor
-                headerTitleLabel.textColor = NSColor.white
-                headerSubtitleLabel.textColor = NSColor(white: 0.65, alpha: 1.0)
+                layer?.borderColor = SystemAppearanceHelper.clearModeBorderColor.cgColor
+                headerTitleLabel.textColor = SystemAppearanceHelper.primaryTextColor(for: .native)
+                headerSubtitleLabel.textColor = SystemAppearanceHelper.secondaryTextColor(for: .native)
                 backButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
-                saveQueueButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
+                saveQueueButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .native)
                 importHeaderButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
-                openFolderHeaderButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
-                downloadCurrentHeaderButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
+                openFolderHeaderButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .native)
+                downloadCurrentHeaderButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .native)
                 addCurrentTrackButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
-                renameHeaderButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
-                downloadButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
-                moreMenuButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
+                renameHeaderButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .native)
+                downloadButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .native)
+                moreMenuButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .native)
+
+                bottomBar.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.06).cgColor
+                bottomBar.layer?.borderColor = NSColor(white: 1.0, alpha: 0.12).cgColor
+                bottomBar.layer?.borderWidth = 1.0
+
+                tableContainer.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.03).cgColor
+                tableContainer.layer?.borderColor = NSColor(white: 1.0, alpha: 0.18).cgColor
+
+                bottomNewPlaylistButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+                bottomAddCurrentTrackButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+                bottomImportButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+
+            case .adaptive:
+                layer?.backgroundColor = (DynamicIslandPlayerView.sharedAmbientBgColor ?? NSColor(red: 0.08, green: 0.08, blue: 0.11, alpha: 0.98).cgColor)
+                layer?.borderWidth = 1.0
+                layer?.borderColor = NSColor(white: 1.0, alpha: 0.20).cgColor
+                headerTitleLabel.textColor = NSColor.white
+                headerSubtitleLabel.textColor = SystemAppearanceHelper.secondaryTextColor(for: .adaptive)
+                backButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+                saveQueueButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .adaptive)
+                importHeaderButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+                openFolderHeaderButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .adaptive)
+                downloadCurrentHeaderButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .adaptive)
+                addCurrentTrackButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+                renameHeaderButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .adaptive)
+                downloadButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .adaptive)
+                moreMenuButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .adaptive)
 
                 bottomBar.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.06).cgColor
                 bottomBar.layer?.borderColor = NSColor(white: 1.0, alpha: 0.10).cgColor
@@ -529,11 +556,11 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
                 bottomImportButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
 
             case .darkMode:
-                layer?.backgroundColor = NSColor(red: 0.04, green: 0.04, blue: 0.05, alpha: 0.98).cgColor
+                layer?.backgroundColor = SystemAppearanceHelper.darkModeBackingColor.cgColor
                 layer?.borderWidth = 1.0
-                layer?.borderColor = NSColor(white: 1.0, alpha: 0.12).cgColor
+                layer?.borderColor = SystemAppearanceHelper.darkModeBorderColor.cgColor
                 headerTitleLabel.textColor = NSColor.white
-                headerSubtitleLabel.textColor = NSColor(white: 0.60, alpha: 1.0)
+                headerSubtitleLabel.textColor = SystemAppearanceHelper.secondaryTextColor(for: .darkMode)
                 backButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
                 saveQueueButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
                 importHeaderButton.contentTintColor = NSColor(red: 0.0, green: 0.80, blue: 1.0, alpha: 1.0)
@@ -558,10 +585,10 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
             case .glassMode:
                 layer?.backgroundColor = NSColor(red: 0.93725, green: 0.94902, blue: 0.94118, alpha: 0.98).cgColor
                 layer?.borderWidth = 1.0
-                layer?.borderColor = NSColor(red: 0.80, green: 0.82, blue: 0.81, alpha: 0.85).cgColor
-                let pitchBlack = NSColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 1.0)
+                layer?.borderColor = NSColor(red: 0.78, green: 0.80, blue: 0.79, alpha: 0.90).cgColor
+                let pitchBlack = SystemAppearanceHelper.primaryTextColor(for: .glassMode)
                 headerTitleLabel.textColor = pitchBlack
-                headerSubtitleLabel.textColor = NSColor(white: 0.40, alpha: 1.0)
+                headerSubtitleLabel.textColor = SystemAppearanceHelper.secondaryTextColor(for: .glassMode)
                 backButton.contentTintColor = pitchBlack
                 saveQueueButton.contentTintColor = pitchBlack
                 importHeaderButton.contentTintColor = NSColor.lightThemeSelector

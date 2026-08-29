@@ -9,12 +9,12 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-APP_VERSION="1.0.1"
-APP_BUILD="1"
+APP_VERSION="1.0.4"
+APP_BUILD="4"
 APP_NAME="Mooziac.app"
 APP_BUNDLE_ID="app.mooziac.mac"
 APP_COPYRIGHT="Copyright © 2026 ThreeTen. All rights reserved."
-APP_DESCRIPTION="Mooziac — modern music player for macOS with trackpad gestures and YouTube Music sync."
+APP_DESCRIPTION="Mooziac — Modern Music Player for macOS with edge trackpad controls & YouTube Music WebKit sync."
 VOLUME_NAME="Mooziac"
 ZIP_NAME="Mooziac.zip"
 
@@ -48,20 +48,16 @@ echo "=========================================="
 
 echo "[1/7] Terminating old running processes..."
 killall "Mooziac" 2>/dev/null || true
-killall "YTMMenuBar" 2>/dev/null || true
 pkill -9 -f "Mooziac" 2>/dev/null || true
-pkill -9 -f "YTMMenuBar" 2>/dev/null || true
-sleep 1
+sleep 0.5
 
 # Clean previous build artifacts
-rm -rf "$DIST_DIR"
+rm -rf "$STAGING_DIR" "$TEMP_DMG"
 mkdir -p "$DIST_DIR"
-touch "$DIST_DIR/.metadata_never_index"
 mkdir -p "$STAGING_DIR"
-touch "$STAGING_DIR/.metadata_never_index"
 
-# Ensure DMG background exists
-if [ -f "scripts/generate_dmg_background.swift" ] && [ ! -f "Resources/dmg_background.png" ]; then
+# Ensure DMG background exists and is up to date
+if [ -f "scripts/generate_dmg_background.swift" ]; then
     echo "    Generating DMG background artwork..."
     swift scripts/generate_dmg_background.swift > /dev/null 2>&1 || true
 fi
@@ -72,15 +68,20 @@ UNIVERSAL_BIN="$DIST_DIR/Mooziac_universal"
 ARM_BIN=".build/arm64-apple-macosx/release/Mooziac"
 INTEL_BIN=".build/x86_64-apple-macosx/release/Mooziac"
 
-if swift build --triple arm64-apple-macosx -c release 2>/dev/null && swift build --triple x86_64-apple-macosx -c release 2>/dev/null; then
+if swift build --triple arm64-apple-macosx -c release --product Mooziac 2>/dev/null && swift build --triple x86_64-apple-macosx -c release --product Mooziac 2>/dev/null; then
     echo "    Merging arm64 and x86_64 into Universal 2 binary via lipo..."
     lipo -create -output "$UNIVERSAL_BIN" "$ARM_BIN" "$INTEL_BIN"
     BIN_PATH="$UNIVERSAL_BIN"
 else
-    echo "    Universal build not supported in current toolchain; building native release binary..."
-    swift build -c release
+    echo "    Compiling release binary for native architecture..."
+    swift build -c release --product Mooziac
     BIN_DIR=$(swift build -c release --show-bin-path)
     BIN_PATH="$BIN_DIR/Mooziac"
+fi
+
+if [ ! -f "$BIN_PATH" ]; then
+    echo "❌ Error: Mooziac binary not found at $BIN_PATH"
+    exit 1
 fi
 
 echo "[3/7] Assembling $APP_NAME bundle..."
@@ -94,7 +95,7 @@ mkdir -p "$RESOURCES_DIR"
 cp "$BIN_PATH" "$MACOS_DIR/Mooziac"
 
 # Copy runtime assets from Resources/
-for asset in AppIcon.icns MOOZIAC_transparent.png launch_transparent.png MOOZIAC.png MenuBarIcon.png MenuBarIcon@2x.png trackpad.html macbook_panel.jpg; do
+for asset in AppIcon.icns MOOZIAC_transparent.png launch_transparent.png MOOZIAC.png MenuBarIcon.png MenuBarIcon@2x.png trackpad.html macbook_panel.jpg dmg_background.png; do
     if [ -f "Resources/$asset" ]; then
         cp "Resources/$asset" "$RESOURCES_DIR/$asset"
     fi
@@ -165,12 +166,8 @@ SIGN_STATUS="Ad-hoc signed (Hardened Runtime)"
 SIGN_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | awk '/Apple Development|Developer ID Application/ {print $2}' | head -1)
 if [ -n "$SIGN_IDENTITY" ]; then
     echo "    Signing with certificate: $SIGN_IDENTITY"
-    if ! codesign --force --deep --options runtime $ENTITLEMENTS_FLAG --sign "$SIGN_IDENTITY" --identifier "$APP_BUNDLE_ID" "$TARGET_APP" 2>/dev/null; then
-        echo "    Certificate signing unavailable. Falling back to ad-hoc signing..."
-        codesign --force --deep --options runtime $ENTITLEMENTS_FLAG --sign - --identifier "$APP_BUNDLE_ID" "$TARGET_APP"
-    else
-        SIGN_STATUS="Valid signature ($SIGN_IDENTITY)"
-    fi
+    codesign --force --deep --options runtime $ENTITLEMENTS_FLAG --sign "$SIGN_IDENTITY" --identifier "$APP_BUNDLE_ID" "$TARGET_APP"
+    SIGN_STATUS="Valid signature ($SIGN_IDENTITY)"
 else
     echo "    Ad-hoc signing with Hardened Runtime..."
     codesign --force --deep --options runtime $ENTITLEMENTS_FLAG --sign - --identifier "$APP_BUNDLE_ID" "$TARGET_APP"
@@ -180,6 +177,7 @@ codesign --verify --deep --strict "$TARGET_APP" 2>/dev/null || true
 
 echo "[5/7] Creating ZIP distribution..."
 cd "$STAGING_DIR"
+rm -f "$DIST_DIR/$ZIP_NAME"
 zip -r -y -q "$DIST_DIR/$ZIP_NAME" "$APP_NAME"
 cd "$SCRIPT_DIR"
 
@@ -193,9 +191,11 @@ if [ -f "Resources/AppIcon.icns" ]; then
     cp "Resources/AppIcon.icns" "$STAGING_DIR/.VolumeIcon.icns"
 fi
 
+rm -f "$STAGING_DIR/Applications"
 ln -s /Applications "$STAGING_DIR/Applications"
 
 # Create temporary read-write DMG
+rm -f "$TEMP_DMG" "$FINAL_DMG"
 hdiutil create -srcfolder "$STAGING_DIR" -volname "$VOLUME_NAME" -fs HFS+ -fsargs "-c c=64,a=16,e=16" -format UDRW -size 150m "$TEMP_DMG" > /dev/null
 
 hdiutil detach "/Volumes/$VOLUME_NAME" -force 2>/dev/null || true
@@ -207,35 +207,41 @@ osascript << EOF || true
 tell application "Finder"
     tell disk "$VOLUME_NAME"
         open
+        delay 1
         set current view of container window to icon view
-        set toolbar visible of container window to false
-        set statusbar visible of container window to false
-        set the bounds of container window to {400, 150, 1040, 550}
+        try
+            set toolbar visible of container window to false
+        end try
+        try
+            set statusbar visible of container window to false
+        end try
+        try
+            set pathbar visible of container window to false
+        end try
+        set the bounds of container window to {360, 140, 1040, 652}
         
         set theViewOptions to the icon view options of container window
         set arrangement of theViewOptions to not arranged
         set icon size of theViewOptions to 120
-        if exists file ".background:dmg_background.png" then
-            set background picture of theViewOptions to file ".background:dmg_background.png"
-        end if
+        set text size of theViewOptions to 12
+        set label position of theViewOptions to bottom
+        set background picture of theViewOptions to file ".background:dmg_background.png"
         
-        set position of item "$APP_NAME" of container window to {160, 200}
-        set position of item "Applications" of container window to {480, 200}
+        set position of item "$APP_NAME" of container window to {180, 135}
+        set position of item "Applications" of container window to {500, 135}
         
         update without registering applications
-        delay 1
-        close
+        delay 2
     end tell
 end tell
 EOF
 
 # Set volume icon and hidden attributes
 if [ -f "Resources/AppIcon.icns" ]; then
-    cp "Resources/AppIcon.icns" "/Volumes/$VOLUME_NAME/.VolumeIcon.icns"
+    cp "Resources/AppIcon.icns" "/Volumes/$VOLUME_NAME/.VolumeIcon.icns" 2>/dev/null || true
     SetFile -c icnC "/Volumes/$VOLUME_NAME/.VolumeIcon.icns" 2>/dev/null || true
     SetFile -a C "/Volumes/$VOLUME_NAME" 2>/dev/null || true
     SetFile -a V "/Volumes/$VOLUME_NAME/.VolumeIcon.icns" 2>/dev/null || true
-    swift -e "import AppKit; if let img = NSImage(byReferencingFile: \"Resources/AppIcon.icns\") { NSWorkspace.shared.setIcon(img, forFile: \"/Volumes/$VOLUME_NAME\", options: []) }" 2>/dev/null || true
 fi
 
 if [ -d "/Volumes/$VOLUME_NAME/.background" ]; then
@@ -243,55 +249,18 @@ if [ -d "/Volumes/$VOLUME_NAME/.background" ]; then
 fi
 
 sync
+sleep 1
+sync
 hdiutil detach "/Volumes/$VOLUME_NAME" -force > /dev/null || true
 
 # Convert to final compressed read-only DMG
 hdiutil convert "$TEMP_DMG" -format UDZO -imagekey zlib-level=9 -o "$FINAL_DMG" > /dev/null
 rm -f "$TEMP_DMG"
 
-# Apply DMG file icon & Spotlight metadata
-if [ -f "Resources/AppIcon.icns" ]; then
-    swift -e "import AppKit; if let img = NSImage(byReferencingFile: \"Resources/AppIcon.icns\") { NSWorkspace.shared.setIcon(img, forFile: \"$FINAL_DMG\", options: []) }" 2>/dev/null || true
-fi
-
-osascript -e "tell application \"Finder\" to set comment of (POSIX file \"$FINAL_DMG\" as alias) to \"$DMG_COMMENT\"" 2>/dev/null || true
-
-swift - << SWIFTEOF 2>/dev/null || true
-import Foundation
-
-let dmgPath = "$FINAL_DMG"
-
-func setXattr(key: String, value: Any) {
-    if let data = try? PropertyListSerialization.data(fromPropertyList: value, format: .binary, options: 0) {
-        data.withUnsafeBytes { ptr in
-            _ = setxattr(dmgPath, "com.apple.metadata:" + key, ptr.baseAddress, data.count, 0, 0)
-        }
-    }
-}
-
-setXattr(key: "kMDItemTitle", value: "Mooziac Installer")
-setXattr(key: "kMDItemHeadline", value: "Mooziac $APP_VERSION — Modern Music Player for macOS")
-setXattr(key: "kMDItemDescription", value: "$APP_DESCRIPTION")
-setXattr(key: "kMDItemCopyright", value: "$APP_COPYRIGHT")
-setXattr(key: "kMDItemVersion", value: "$APP_VERSION")
-setXattr(key: "kMDItemAuthors", value: ["ThreeTen"])
-setXattr(key: "kMDItemKeywords", value: ["Mooziac", "Music Player", "YouTube Music", "macOS", "Audio", "Installer"])
-setXattr(key: "kMDItemFinderComment", value: """
-$DMG_COMMENT
-""")
-SWIFTEOF
-
 echo "[7/7] Installing to ~/Applications & Launching..."
 mkdir -p "$HOME/Applications"
 rm -rf "$LOCAL_APP_DEST"
 cp -R "$TARGET_APP" "$LOCAL_APP_DEST"
-
-# Unregister staging app and register destination app with LaunchServices
-LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
-if [ -x "$LSREGISTER" ]; then
-    "$LSREGISTER" -u "$TARGET_APP" 2>/dev/null || true
-    "$LSREGISTER" -f "$LOCAL_APP_DEST" 2>/dev/null || true
-fi
 
 if [ "$LAUNCH_AFTER_BUILD" = true ]; then
     echo "    Launching $LOCAL_APP_DEST..."
@@ -312,4 +281,3 @@ echo "  • Local App:      $LOCAL_APP_DEST"
 echo "  • DMG Installer:  $FINAL_DMG ($DMG_SIZE)"
 echo "  • ZIP Archive:    $DIST_DIR/$ZIP_NAME ($ZIP_SIZE)"
 echo "=========================================="
-echo "👉 To publish to GitHub, run: ./release.sh"

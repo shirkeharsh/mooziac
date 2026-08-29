@@ -3729,9 +3729,7 @@ extension DynamicIslandPlayerView {
         case .glassMode:
             return .light
         case .adaptive, .native:
-            let appearance = NSApp.effectiveAppearance
-            let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            return dark ? .dark : .light
+            return SystemAppearanceHelper.isDarkSystemAppearance ? .dark : .light
         }
     }
 

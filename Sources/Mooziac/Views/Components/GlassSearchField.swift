@@ -181,20 +181,20 @@ public class GlassSearchField: NSSearchField {
             return
         }
         if design == .glassMode {
-            textColor = NSColor.black
+            textColor = NSColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 1.0)
             layer?.backgroundColor = NSColor(white: 0.0, alpha: 0.06).cgColor
-            layer?.borderColor = NSColor(white: 0.0, alpha: 0.12).cgColor
+            layer?.borderColor = NSColor(white: 0.0, alpha: 0.16).cgColor
             let placeholderAttrs: [NSAttributedString.Key: Any] = [
-                .foregroundColor: NSColor(white: 0.35, alpha: 0.85),
+                .foregroundColor: NSColor(white: 0.30, alpha: 0.90),
                 .font: NSFont.systemFont(ofSize: 11.0, weight: .medium)
             ]
             placeholderAttributedString = NSAttributedString(string: placeholderString ?? "Search", attributes: placeholderAttrs)
         } else {
             textColor = NSColor.white
-            layer?.backgroundColor = NSColor(white: 0.12, alpha: 0.35).cgColor
-            layer?.borderColor = NSColor(white: 1.0, alpha: 0.10).cgColor
+            layer?.backgroundColor = NSColor(white: 0.16, alpha: 0.45).cgColor
+            layer?.borderColor = NSColor(white: 1.0, alpha: 0.18).cgColor
             let placeholderAttrs: [NSAttributedString.Key: Any] = [
-                .foregroundColor: NSColor(white: 0.50, alpha: 0.85),
+                .foregroundColor: NSColor(white: 0.70, alpha: 0.85),
                 .font: NSFont.systemFont(ofSize: 11.0, weight: .medium)
             ]
             placeholderAttributedString = NSAttributedString(string: placeholderString ?? "Search", attributes: placeholderAttrs)
@@ -203,7 +203,7 @@ public class GlassSearchField: NSSearchField {
     
     public override var placeholderString: String? {
         didSet {
-            let color = (PlayerDesign.current == .glassMode) ? NSColor(white: 0.35, alpha: 0.85) : NSColor(white: 0.50, alpha: 0.85)
+            let color = (PlayerDesign.current == .glassMode) ? NSColor(white: 0.30, alpha: 0.90) : NSColor(white: 0.70, alpha: 0.85)
             let attrs: [NSAttributedString.Key: Any] = [
                 .foregroundColor: color,
                 .font: NSFont.systemFont(ofSize: 11.0, weight: .medium)

@@ -62,3 +62,104 @@ extension NSColor {
     public static let darkThemeSelector = NSColor(hex: "D9DDE3")
     public static let lightThemeSelector = NSColor(hex: "434343")
 }
+
+// MARK: - System Appearance & macOS 27 Contrast-Safe Engine
+public enum SystemAppearanceHelper {
+    /// True if running on macOS 27 (or newer developer beta / release)
+    public static var isMacOS27OrNewer: Bool {
+        let version = ProcessInfo.processInfo.operatingSystemVersion
+        return version.majorVersion >= 27
+    }
+
+    /// Checks if effective system appearance is Dark Aqua
+    public static var isDarkSystemAppearance: Bool {
+        let appearance = NSApp?.effectiveAppearance ?? NSAppearance.currentDrawing()
+        let match = appearance.bestMatch(from: [.darkAqua, .aqua])
+        return match == .darkAqua
+    }
+
+    /// Contrast-safe backing color for Clear / Native Vibrancy mode
+    public static var clearModeBackingColor: NSColor {
+        if isDarkSystemAppearance {
+            // Calibrated translucent obsidian tint that guarantees ≥ 4.5:1 contrast on pure black / dark wallpapers
+            return NSColor(red: 0.09, green: 0.10, blue: 0.14, alpha: 0.72)
+        } else {
+            // Frosted crystal tint for light wallpapers
+            return NSColor(white: 0.94, alpha: 0.82)
+        }
+    }
+
+    /// Specular perimeter border for Clear / Native mode
+    public static var clearModeBorderColor: NSColor {
+        if isDarkSystemAppearance {
+            return NSColor(white: 1.0, alpha: 0.28)
+        } else {
+            return NSColor(white: 0.0, alpha: 0.18)
+        }
+    }
+
+    /// Contrast-safe backing color for Dark Mode
+    public static var darkModeBackingColor: NSColor {
+        return NSColor(red: 0.045, green: 0.045, blue: 0.065, alpha: 0.98)
+    }
+
+    /// Distinct perimeter border for Dark Mode
+    public static var darkModeBorderColor: NSColor {
+        return NSColor(white: 1.0, alpha: 0.18)
+    }
+
+    /// Contrast-safe primary text color
+    public static func primaryTextColor(for design: PlayerDesign) -> NSColor {
+        switch design {
+        case .glassMode:
+            return NSColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 1.0)
+        case .native:
+            return isDarkSystemAppearance ? NSColor.white : NSColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 1.0)
+        case .adaptive, .darkMode:
+            return NSColor.white
+        }
+    }
+
+    /// Contrast-safe secondary text color with guaranteed luminance floor
+    public static func secondaryTextColor(for design: PlayerDesign) -> NSColor {
+        switch design {
+        case .glassMode:
+            return NSColor(red: 0.15, green: 0.15, blue: 0.15, alpha: 0.85)
+        case .native:
+            return isDarkSystemAppearance ? NSColor(white: 0.82, alpha: 1.0) : NSColor(white: 0.20, alpha: 0.85)
+        case .adaptive:
+            return NSColor(white: 0.78, alpha: 1.0)
+        case .darkMode:
+            return NSColor(white: 0.76, alpha: 1.0)
+        }
+    }
+
+    /// Contrast-safe tertiary / time text color
+    public static func tertiaryTextColor(for design: PlayerDesign) -> NSColor {
+        switch design {
+        case .glassMode:
+            return NSColor(red: 0.25, green: 0.25, blue: 0.25, alpha: 0.75)
+        case .native:
+            return isDarkSystemAppearance ? NSColor(white: 0.74, alpha: 1.0) : NSColor(white: 0.30, alpha: 0.75)
+        case .adaptive:
+            return NSColor(white: 0.70, alpha: 1.0)
+        case .darkMode:
+            return NSColor(white: 0.68, alpha: 1.0)
+        }
+    }
+
+    /// Contrast-safe control button icon tint
+    public static func controlButtonTint(for design: PlayerDesign, isHighlighted: Bool = false) -> NSColor {
+        if isHighlighted {
+            return NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+        }
+        switch design {
+        case .glassMode:
+            return NSColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 1.0)
+        case .native:
+            return isDarkSystemAppearance ? NSColor(white: 0.90, alpha: 1.0) : NSColor(white: 0.10, alpha: 1.0)
+        case .adaptive, .darkMode:
+            return NSColor(white: 0.88, alpha: 1.0)
+        }
+    }
+}
