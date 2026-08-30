@@ -612,30 +612,30 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
 
             case .liquidFluid:
                 layer?.backgroundColor = SystemAppearanceHelper.liquidFluidBackingColor.cgColor
-                layer?.borderWidth = 1.2
+                layer?.borderWidth = 1.0
                 layer?.borderColor = SystemAppearanceHelper.liquidFluidBorderColor.cgColor
-                headerTitleLabel.textColor = NSColor.white
+                headerTitleLabel.textColor = SystemAppearanceHelper.primaryTextColor(for: .liquidFluid)
                 headerSubtitleLabel.textColor = SystemAppearanceHelper.secondaryTextColor(for: .liquidFluid)
-                backButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+                backButton.contentTintColor = SystemAppearanceHelper.primaryTextColor(for: .liquidFluid)
                 saveQueueButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .liquidFluid)
-                importHeaderButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+                importHeaderButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .liquidFluid)
                 openFolderHeaderButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .liquidFluid)
                 downloadCurrentHeaderButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .liquidFluid)
-                addCurrentTrackButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+                addCurrentTrackButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .liquidFluid)
                 renameHeaderButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .liquidFluid)
                 downloadButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .liquidFluid)
                 moreMenuButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .liquidFluid)
 
-                bottomBar.layer?.backgroundColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 0.08).cgColor
-                bottomBar.layer?.borderColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 0.20).cgColor
+                bottomBar.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.04).cgColor
+                bottomBar.layer?.borderColor = NSColor(white: 1.0, alpha: 0.10).cgColor
                 bottomBar.layer?.borderWidth = 1.0
 
                 tableContainer.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.02).cgColor
-                tableContainer.layer?.borderColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 0.15).cgColor
+                tableContainer.layer?.borderColor = NSColor(white: 1.0, alpha: 0.12).cgColor
 
-                bottomNewPlaylistButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
-                bottomAddCurrentTrackButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
-                bottomImportButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+                bottomNewPlaylistButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .liquidFluid)
+                bottomAddCurrentTrackButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .liquidFluid)
+                bottomImportButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .liquidFluid)
             }
             searchField.applyTheme(design)
         }

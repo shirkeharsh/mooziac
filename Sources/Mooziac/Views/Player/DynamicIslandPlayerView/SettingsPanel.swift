@@ -3376,7 +3376,7 @@ extension DynamicIslandPlayerView {
         case .darkMode: return "Deep pitch-black dark contrast"
         case .glassMode: return "Translucent frosted glass panel"
         case .native: return "macOS native menu vibrancy"
-        case .liquidFluid: return "Cyber neon liquid fluid glow"
+        case .liquidFluid: return "Watery pure transparent liquid glass"
         }
     }
 
@@ -3447,7 +3447,7 @@ extension DynamicIslandPlayerView {
                 CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Theme: macOS Vibrancy")
             case 4:
                 PlayerDesign.current = .liquidFluid
-                CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Theme: Liquid Fluid Glow")
+                CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Theme: Watery Transparent")
             default:
                 break
             }
@@ -3492,7 +3492,7 @@ extension DynamicIslandPlayerView {
             CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Theme: macOS Vibrancy")
         case .native:
             PlayerDesign.current = .liquidFluid
-            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Theme: Liquid Fluid Glow")
+            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Theme: Watery Transparent")
         case .liquidFluid:
             PlayerDesign.current = .adaptive
             CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Theme: Adaptive")

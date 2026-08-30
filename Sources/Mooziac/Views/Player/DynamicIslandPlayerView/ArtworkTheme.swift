@@ -114,11 +114,6 @@ extension DynamicIslandPlayerView {
         DynamicIslandPlayerView.sharedAmbientAccentColor = dominantColor
         NotificationCenter.default.post(name: NSNotification.Name("YTM_ambientThemeChanged"), object: nil)
 
-        if PlayerDesign.current == .liquidFluid {
-            updateLiquidFluidColors(dominantColor: dominantColor)
-            return
-        }
-
         guard PlayerDesign.current == .adaptive else { return }
 
         NSAnimationContext.runAnimationGroup { context in
@@ -266,14 +261,19 @@ extension DynamicIslandPlayerView {
                 resetPositionButton.contentTintColor = glassBtnTint
 
             case .liquidFluid:
-                visualEffectBackdrop.isHidden = true
+                // Watery Pure Transparent Liquid Glass Mode
+                visualEffectBackdrop.isHidden = false
+                visualEffectBackdrop.material = .hudWindow
+                visualEffectBackdrop.blendingMode = .withinWindow
+                visualEffectBackdrop.state = .active
+                
                 glassSheenLayer.isHidden = false
                 glassSheenLayer.frame = containerPill.bounds
-                liquidFluidMeshLayer.isHidden = false
-                liquidFluidMeshLayer.frame = containerPill.bounds
+                liquidFluidMeshLayer.isHidden = true
+                stopLiquidFluidAnimation()
                 
                 containerPill.layer?.backgroundColor = SystemAppearanceHelper.liquidFluidBackingColor.cgColor
-                containerPill.layer?.borderWidth = 1.2
+                containerPill.layer?.borderWidth = 1.0
                 containerPill.layer?.borderColor = SystemAppearanceHelper.liquidFluidBorderColor.cgColor
                 
                 titleLabel.font = NSFont.systemFont(ofSize: 13, weight: .bold)
@@ -284,25 +284,19 @@ extension DynamicIslandPlayerView {
                 artistLabel.textColor = SystemAppearanceHelper.secondaryTextColor(for: .liquidFluid)
                 timeLabel.textColor = SystemAppearanceHelper.tertiaryTextColor(for: .liquidFluid)
                 
-                waveformProgressView.accentColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+                waveformProgressView.accentColor = SystemAppearanceHelper.isDarkSystemAppearance ? NSColor.white : NSColor(red: 0.10, green: 0.10, blue: 0.12, alpha: 1.0)
                 
                 let fluidBtnTint = SystemAppearanceHelper.controlButtonTint(for: .liquidFluid)
-                playPauseButton.contentTintColor = NSColor.white
+                playPauseButton.contentTintColor = SystemAppearanceHelper.primaryTextColor(for: .liquidFluid)
                 previousButton.contentTintColor = fluidBtnTint
                 nextButton.contentTintColor = fluidBtnTint
                 addToPlaylistButton.contentTintColor = fluidBtnTint
-                repeatButton.contentTintColor = (repeatMode != .off) ? NSColor.white : fluidBtnTint
-                likeButton.contentTintColor = isLiked ? NSColor(red: 1.0, green: 0.28, blue: 0.45, alpha: 1.0) : fluidBtnTint
+                repeatButton.contentTintColor = (repeatMode != .off) ? SystemAppearanceHelper.primaryTextColor(for: .liquidFluid) : fluidBtnTint
+                likeButton.contentTintColor = isLiked ? NSColor(red: 1.0, green: 0.28, blue: 0.38, alpha: 1.0) : fluidBtnTint
                 searchIconButton.contentTintColor = fluidBtnTint
                 fullScreenButton.contentTintColor = fluidBtnTint
                 browserButton.contentTintColor = fluidBtnTint
                 resetPositionButton.contentTintColor = fluidBtnTint
-                
-                if let dominant = lastAmbientAccentColor {
-                    updateLiquidFluidColors(dominantColor: dominant)
-                } else {
-                    startLiquidFluidAnimation()
-                }
             }
         }
 
@@ -321,87 +315,14 @@ extension DynamicIslandPlayerView {
     }
 
     func setupLiquidFluidLayer() {
-        liquidFluidMeshLayer.cornerRadius = 20
-        liquidFluidMeshLayer.masksToBounds = true
-        liquidFluidMeshLayer.startPoint = CGPoint(x: 0.0, y: 0.0)
-        liquidFluidMeshLayer.endPoint = CGPoint(x: 1.0, y: 1.0)
-        liquidFluidMeshLayer.colors = [
-            NSColor(red: 0.03, green: 0.08, blue: 0.24, alpha: 0.85).cgColor,
-            NSColor(red: 0.04, green: 0.35, blue: 0.65, alpha: 0.70).cgColor,
-            NSColor(red: 0.25, green: 0.10, blue: 0.50, alpha: 0.65).cgColor,
-            NSColor(red: 0.00, green: 0.45, blue: 0.65, alpha: 0.80).cgColor
-        ]
-        liquidFluidMeshLayer.locations = [0.0, 0.35, 0.70, 1.0]
-    }
-
-    func updateLiquidFluidColors(dominantColor: NSColor) {
-        let converted = dominantColor.usingColorSpace(.sRGB) ?? dominantColor
-        let r = converted.redComponent
-        let g = converted.greenComponent
-        let b = converted.blueComponent
-
-        let baseBg = NSColor(srgbRed: max(0.04, r * 0.18), green: max(0.04, g * 0.18), blue: max(0.06, b * 0.22), alpha: 0.96)
-        let c1 = NSColor(srgbRed: min(1.0, max(0.08, r * 0.30)), green: min(1.0, max(0.08, g * 0.30)), blue: min(1.0, max(0.12, b * 0.38)), alpha: 0.85)
-        let c2 = dominantColor.withAlphaComponent(0.70)
-        let c3 = (dominantColor.blended(withFraction: 0.35, of: .systemPurple) ?? dominantColor).withAlphaComponent(0.65)
-        let c4 = (dominantColor.blended(withFraction: 0.45, of: .cyan) ?? dominantColor).withAlphaComponent(0.80)
-
-        let borderGlow = NSColor(srgbRed: max(0.20, min(1.0, r * 0.90)), green: max(0.20, min(1.0, g * 0.90)), blue: max(0.25, min(1.0, b * 0.90)), alpha: 0.50)
-
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.6
-            self.containerPill.layer?.backgroundColor = baseBg.cgColor
-            self.containerPill.layer?.borderColor = borderGlow.cgColor
-            self.waveformProgressView.accentColor = dominantColor
-        }
-
-        startLiquidFluidAnimation(palette1: [c1.cgColor, c2.cgColor, c3.cgColor, c4.cgColor],
-                                  palette2: [c2.cgColor, c4.cgColor, c1.cgColor, c3.cgColor])
+        liquidFluidMeshLayer.isHidden = true
     }
 
     func startLiquidFluidAnimation(palette1: [CGColor]? = nil, palette2: [CGColor]? = nil) {
-        guard PlayerDesign.current == .liquidFluid, !liquidFluidMeshLayer.isHidden else { return }
-
-        let p1 = palette1 ?? [
-            NSColor(red: 0.03, green: 0.08, blue: 0.24, alpha: 0.85).cgColor,
-            NSColor(red: 0.04, green: 0.35, blue: 0.65, alpha: 0.70).cgColor,
-            NSColor(red: 0.25, green: 0.10, blue: 0.50, alpha: 0.65).cgColor,
-            NSColor(red: 0.00, green: 0.45, blue: 0.65, alpha: 0.80).cgColor
-        ]
-        let p2 = palette2 ?? [
-            NSColor(red: 0.02, green: 0.15, blue: 0.32, alpha: 0.85).cgColor,
-            NSColor(red: 0.22, green: 0.08, blue: 0.48, alpha: 0.70).cgColor,
-            NSColor(red: 0.00, green: 0.40, blue: 0.62, alpha: 0.65).cgColor,
-            NSColor(red: 0.03, green: 0.08, blue: 0.26, alpha: 0.80).cgColor
-        ]
-
-        liquidFluidMeshLayer.removeAnimation(forKey: "liquidFluidShimmer")
-        liquidFluidMeshLayer.removeAnimation(forKey: "liquidFluidPoint")
-
-        let colorAnim = CABasicAnimation(keyPath: "colors")
-        colorAnim.fromValue = p1
-        colorAnim.toValue = p2
-        colorAnim.duration = 5.5
-        colorAnim.autoreverses = true
-        colorAnim.repeatCount = .infinity
-        colorAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        colorAnim.isRemovedOnCompletion = false
-
-        let pointAnim = CABasicAnimation(keyPath: "startPoint")
-        pointAnim.fromValue = CGPoint(x: 0.0, y: 0.0)
-        pointAnim.toValue = CGPoint(x: 0.35, y: 0.85)
-        pointAnim.duration = 7.5
-        pointAnim.autoreverses = true
-        pointAnim.repeatCount = .infinity
-        pointAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        pointAnim.isRemovedOnCompletion = false
-
-        liquidFluidMeshLayer.add(colorAnim, forKey: "liquidFluidShimmer")
-        liquidFluidMeshLayer.add(pointAnim, forKey: "liquidFluidPoint")
+        // No-op: Pure transparent watery glass uses natural screen optical refraction
     }
 
     func stopLiquidFluidAnimation() {
-        liquidFluidMeshLayer.removeAnimation(forKey: "liquidFluidShimmer")
-        liquidFluidMeshLayer.removeAnimation(forKey: "liquidFluidPoint")
+        liquidFluidMeshLayer.removeAllAnimations()
     }
 }

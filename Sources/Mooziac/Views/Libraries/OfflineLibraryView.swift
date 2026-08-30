@@ -353,11 +353,11 @@ public class OfflineLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSou
 
             case .liquidFluid:
                 layer?.backgroundColor = SystemAppearanceHelper.liquidFluidBackingColor.cgColor
-                layer?.borderWidth = 1.2
+                layer?.borderWidth = 1.0
                 layer?.borderColor = SystemAppearanceHelper.liquidFluidBorderColor.cgColor
 
-                headerTitleLabel.textColor = NSColor.white
-                backButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+                headerTitleLabel.textColor = SystemAppearanceHelper.primaryTextColor(for: .liquidFluid)
+                backButton.contentTintColor = SystemAppearanceHelper.primaryTextColor(for: .liquidFluid)
                 importButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .liquidFluid)
                 openFolderButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .liquidFluid)
             }
