@@ -18,7 +18,9 @@ dev/
 mooziac_brain/
 brain
 ReelProduction/
-"Project Blueprint"/
+Project Blueprint/
+.github/ISSUE_TEMPLATE/
+.github/pull_request_template.md
 *.pyc
 __pycache__/
 
