@@ -39,6 +39,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     let resetPositionButton = ReactiveIconButton()
     let visualEffectBackdrop = NSVisualEffectView()
     let glassSheenLayer = CAGradientLayer()
+    let liquidFluidMeshLayer = CAGradientLayer()
     var isLiked: Bool = false
     var isRepeatActive: Bool = false
     var repeatMode: RepeatMode = .off
@@ -178,7 +179,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
             switch PlayerDesign.current {
             case .glassMode:
                 repeatButton.contentTintColor = NSColor(red: 0.082, green: 0.082, blue: 0.082, alpha: 1.0)
-            case .adaptive, .darkMode:
+            case .adaptive, .darkMode, .liquidFluid:
                 repeatButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
             case .native:
                 repeatButton.contentTintColor = NSColor(white: 0.88, alpha: 1.0)
@@ -359,6 +360,9 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         glassSheenLayer.masksToBounds = true
         glassSheenLayer.isHidden = true
         containerPill.layer?.addSublayer(glassSheenLayer)
+
+        setupLiquidFluidLayer()
+        containerPill.layer?.insertSublayer(liquidFluidMeshLayer, at: 0)
         
         artworkImageView.translatesAutoresizingMaskIntoConstraints = false
         artworkImageView.wantsLayer = true
@@ -1142,7 +1146,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
             switch PlayerDesign.current {
             case .glassMode:
                 browserButton.contentTintColor = NSColor(red: 0.082, green: 0.082, blue: 0.082, alpha: 1.0)
-            case .adaptive:
+            case .adaptive, .liquidFluid:
                 browserButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
             case .darkMode:
                 browserButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
@@ -1161,7 +1165,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
             switch PlayerDesign.current {
             case .glassMode:
                 addToPlaylistButton.contentTintColor = NSColor(red: 0.082, green: 0.082, blue: 0.082, alpha: 1.0)
-            case .adaptive:
+            case .adaptive, .liquidFluid:
                 addToPlaylistButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
             case .darkMode:
                 addToPlaylistButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
@@ -1242,6 +1246,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     override func layout() {
         super.layout()
         glassSheenLayer.frame = containerPill.bounds
+        liquidFluidMeshLayer.frame = containerPill.bounds
     }
 }
 

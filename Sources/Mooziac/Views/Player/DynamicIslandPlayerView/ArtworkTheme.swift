@@ -226,8 +226,6 @@ extension DynamicIslandPlayerView {
                 searchIconButton.contentTintColor = darkBtnTint
                 fullScreenButton.contentTintColor = darkBtnTint
                 browserButton.contentTintColor = darkBtnTint
-                resetPositionButton.contentTintColor = darkBtnTint
-                
             case .glassMode:
                 visualEffectBackdrop.isHidden = true
                 glassSheenLayer.isHidden = true
@@ -261,7 +259,47 @@ extension DynamicIslandPlayerView {
                 fullScreenButton.contentTintColor = glassBtnTint
                 browserButton.contentTintColor = glassBtnTint
                 resetPositionButton.contentTintColor = glassBtnTint
+
+            case .liquidFluid:
+                visualEffectBackdrop.isHidden = true
+                glassSheenLayer.isHidden = false
+                glassSheenLayer.frame = containerPill.bounds
+                liquidFluidMeshLayer.isHidden = false
+                liquidFluidMeshLayer.frame = containerPill.bounds
+                
+                containerPill.layer?.backgroundColor = SystemAppearanceHelper.liquidFluidBackingColor.cgColor
+                containerPill.layer?.borderWidth = 1.2
+                containerPill.layer?.borderColor = SystemAppearanceHelper.liquidFluidBorderColor.cgColor
+                
+                titleLabel.font = NSFont.systemFont(ofSize: 13, weight: .bold)
+                artistLabel.font = NSFont.systemFont(ofSize: 11, weight: .medium)
+                timeLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular)
+                
+                titleLabel.textColor = SystemAppearanceHelper.primaryTextColor(for: .liquidFluid)
+                artistLabel.textColor = SystemAppearanceHelper.secondaryTextColor(for: .liquidFluid)
+                timeLabel.textColor = SystemAppearanceHelper.tertiaryTextColor(for: .liquidFluid)
+                
+                waveformProgressView.accentColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+                
+                let fluidBtnTint = SystemAppearanceHelper.controlButtonTint(for: .liquidFluid)
+                playPauseButton.contentTintColor = NSColor.white
+                previousButton.contentTintColor = fluidBtnTint
+                nextButton.contentTintColor = fluidBtnTint
+                addToPlaylistButton.contentTintColor = fluidBtnTint
+                repeatButton.contentTintColor = (repeatMode != .off) ? NSColor.white : fluidBtnTint
+                likeButton.contentTintColor = isLiked ? NSColor(red: 1.0, green: 0.28, blue: 0.45, alpha: 1.0) : fluidBtnTint
+                searchIconButton.contentTintColor = fluidBtnTint
+                fullScreenButton.contentTintColor = fluidBtnTint
+                browserButton.contentTintColor = fluidBtnTint
+                resetPositionButton.contentTintColor = fluidBtnTint
+                
+                startLiquidFluidAnimation()
             }
+        }
+
+        if design != .liquidFluid {
+            liquidFluidMeshLayer.isHidden = true
+            stopLiquidFluidAnimation()
         }
 
         downloadButton.updateVisuals()
@@ -271,5 +309,60 @@ extension DynamicIslandPlayerView {
         updateBrowserButtonColor()
         updateAddToPlaylistButtonColor()
         updateRepeatButtonColor()
+    }
+
+    func setupLiquidFluidLayer() {
+        liquidFluidMeshLayer.cornerRadius = 20
+        liquidFluidMeshLayer.masksToBounds = true
+        liquidFluidMeshLayer.startPoint = CGPoint(x: 0.0, y: 0.0)
+        liquidFluidMeshLayer.endPoint = CGPoint(x: 1.0, y: 1.0)
+        liquidFluidMeshLayer.colors = [
+            NSColor(red: 0.03, green: 0.08, blue: 0.24, alpha: 0.85).cgColor,
+            NSColor(red: 0.04, green: 0.35, blue: 0.65, alpha: 0.70).cgColor,
+            NSColor(red: 0.25, green: 0.10, blue: 0.50, alpha: 0.65).cgColor,
+            NSColor(red: 0.00, green: 0.45, blue: 0.65, alpha: 0.80).cgColor
+        ]
+        liquidFluidMeshLayer.locations = [0.0, 0.35, 0.70, 1.0]
+    }
+
+    func startLiquidFluidAnimation() {
+        guard PlayerDesign.current == .liquidFluid, !liquidFluidMeshLayer.isHidden else { return }
+        guard liquidFluidMeshLayer.animation(forKey: "liquidFluidShimmer") == nil else { return }
+
+        let colorAnim = CABasicAnimation(keyPath: "colors")
+        colorAnim.fromValue = [
+            NSColor(red: 0.03, green: 0.08, blue: 0.24, alpha: 0.85).cgColor,
+            NSColor(red: 0.04, green: 0.35, blue: 0.65, alpha: 0.70).cgColor,
+            NSColor(red: 0.25, green: 0.10, blue: 0.50, alpha: 0.65).cgColor,
+            NSColor(red: 0.00, green: 0.45, blue: 0.65, alpha: 0.80).cgColor
+        ]
+        colorAnim.toValue = [
+            NSColor(red: 0.02, green: 0.15, blue: 0.32, alpha: 0.85).cgColor,
+            NSColor(red: 0.22, green: 0.08, blue: 0.48, alpha: 0.70).cgColor,
+            NSColor(red: 0.00, green: 0.40, blue: 0.62, alpha: 0.65).cgColor,
+            NSColor(red: 0.03, green: 0.08, blue: 0.26, alpha: 0.80).cgColor
+        ]
+        colorAnim.duration = 5.5
+        colorAnim.autoreverses = true
+        colorAnim.repeatCount = .infinity
+        colorAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        colorAnim.isRemovedOnCompletion = false
+
+        let pointAnim = CABasicAnimation(keyPath: "startPoint")
+        pointAnim.fromValue = CGPoint(x: 0.0, y: 0.0)
+        pointAnim.toValue = CGPoint(x: 0.3, y: 0.8)
+        pointAnim.duration = 7.5
+        pointAnim.autoreverses = true
+        pointAnim.repeatCount = .infinity
+        pointAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        pointAnim.isRemovedOnCompletion = false
+
+        liquidFluidMeshLayer.add(colorAnim, forKey: "liquidFluidShimmer")
+        liquidFluidMeshLayer.add(pointAnim, forKey: "liquidFluidPoint")
+    }
+
+    func stopLiquidFluidAnimation() {
+        liquidFluidMeshLayer.removeAnimation(forKey: "liquidFluidShimmer")
+        liquidFluidMeshLayer.removeAnimation(forKey: "liquidFluidPoint")
     }
 }

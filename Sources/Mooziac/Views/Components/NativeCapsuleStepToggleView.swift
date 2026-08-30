@@ -51,16 +51,19 @@ public final class NativeCapsuleStepToggleView: NSControl {
         let isDark = (PlayerDesign.current == .darkMode)
         let isGlass = (PlayerDesign.current == .glassMode)
         let isNative = (PlayerDesign.current == .native)
+        let isLiquid = (PlayerDesign.current == .liquidFluid)
         
         let activeColor: CGColor
-        if isNative {
+        if isLiquid {
+            activeColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0).cgColor
+        } else if isNative {
             activeColor = NSColor.white.cgColor
         } else if isDark {
             activeColor = NSColor.darkThemeSelector.cgColor
         } else if isGlass {
             activeColor = NSColor.lightThemeSelector.cgColor
         } else {
-            activeColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0).cgColor
+            activeColor = NSColor(red: 0.40, green: 0.72, blue: 1.0, alpha: 1.0).cgColor
         }
         let targetTrackColor = activeColor
         

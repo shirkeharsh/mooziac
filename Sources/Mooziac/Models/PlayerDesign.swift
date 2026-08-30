@@ -5,6 +5,7 @@ public enum PlayerDesign: String, CaseIterable {
     case darkMode = "OLED Dark Mode"
     case glassMode = "Pure Crystal Glass Mode"
     case native = "macOS Native Vibrancy"
+    case liquidFluid = "Liquid Fluid Glow"
 
     public var isGlass: Bool {
         return self == .glassMode
@@ -12,6 +13,10 @@ public enum PlayerDesign: String, CaseIterable {
 
     public var isNativeVibrancy: Bool {
         return self == .native
+    }
+
+    public var isLiquidFluid: Bool {
+        return self == .liquidFluid
     }
 
     public static var current: PlayerDesign {

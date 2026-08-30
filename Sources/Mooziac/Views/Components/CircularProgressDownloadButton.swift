@@ -95,7 +95,7 @@ private func idleIconColor() -> NSColor {
             switch PlayerDesign.current {
             case .glassMode:
                 return NSColor(red: 0.082, green: 0.082, blue: 0.082, alpha: 1.0)
-            case .adaptive, .native:
+            case .adaptive, .native, .liquidFluid:
                 return NSColor(white: 0.80, alpha: 1.0)
             case .darkMode:
                 return NSColor(white: 0.85, alpha: 1.0)
@@ -104,7 +104,7 @@ private func idleIconColor() -> NSColor {
 
         private func isDarkTheme() -> Bool {
             switch PlayerDesign.current {
-            case .darkMode: return true
+            case .darkMode, .liquidFluid: return true
             case .glassMode: return false
             case .adaptive, .native:
                 return NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua

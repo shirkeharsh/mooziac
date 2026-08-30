@@ -350,6 +350,16 @@ public class OfflineLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSou
                 backButton.contentTintColor = pitchBlack
                 importButton.contentTintColor = pitchBlack
                 openFolderButton.contentTintColor = pitchBlack
+
+            case .liquidFluid:
+                layer?.backgroundColor = SystemAppearanceHelper.liquidFluidBackingColor.cgColor
+                layer?.borderWidth = 1.2
+                layer?.borderColor = SystemAppearanceHelper.liquidFluidBorderColor.cgColor
+
+                headerTitleLabel.textColor = NSColor.white
+                backButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+                importButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .liquidFluid)
+                openFolderButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .liquidFluid)
             }
 
             searchField.applyTheme(design)

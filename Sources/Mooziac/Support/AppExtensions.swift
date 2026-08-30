@@ -108,6 +108,16 @@ public enum SystemAppearanceHelper {
         return NSColor(white: 1.0, alpha: 0.18)
     }
 
+    /// Contrast-safe cosmic backing color for Liquid Fluid Mode
+    public static var liquidFluidBackingColor: NSColor {
+        return NSColor(red: 0.043, green: 0.055, blue: 0.095, alpha: 0.96)
+    }
+
+    /// Luminous cyan neon perimeter border for Liquid Fluid Mode
+    public static var liquidFluidBorderColor: NSColor {
+        return NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 0.45)
+    }
+
     /// Contrast-safe primary text color
     public static func primaryTextColor(for design: PlayerDesign) -> NSColor {
         switch design {
@@ -115,7 +125,7 @@ public enum SystemAppearanceHelper {
             return NSColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 1.0)
         case .native:
             return isDarkSystemAppearance ? NSColor.white : NSColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 1.0)
-        case .adaptive, .darkMode:
+        case .adaptive, .darkMode, .liquidFluid:
             return NSColor.white
         }
     }
@@ -131,6 +141,8 @@ public enum SystemAppearanceHelper {
             return NSColor(white: 0.78, alpha: 1.0)
         case .darkMode:
             return NSColor(white: 0.76, alpha: 1.0)
+        case .liquidFluid:
+            return NSColor(red: 0.65, green: 0.72, blue: 0.98, alpha: 0.95)
         }
     }
 
@@ -145,6 +157,8 @@ public enum SystemAppearanceHelper {
             return NSColor(white: 0.70, alpha: 1.0)
         case .darkMode:
             return NSColor(white: 0.68, alpha: 1.0)
+        case .liquidFluid:
+            return NSColor(red: 0.49, green: 0.83, blue: 0.99, alpha: 0.85)
         }
     }
 
@@ -160,6 +174,8 @@ public enum SystemAppearanceHelper {
             return isDarkSystemAppearance ? NSColor(white: 0.90, alpha: 1.0) : NSColor(white: 0.10, alpha: 1.0)
         case .adaptive, .darkMode:
             return NSColor(white: 0.88, alpha: 1.0)
+        case .liquidFluid:
+            return NSColor(white: 0.92, alpha: 0.85)
         }
     }
 }

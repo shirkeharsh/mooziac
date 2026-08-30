@@ -3376,6 +3376,7 @@ extension DynamicIslandPlayerView {
         case .darkMode: return "Deep pitch-black dark contrast"
         case .glassMode: return "Translucent frosted glass panel"
         case .native: return "macOS native menu vibrancy"
+        case .liquidFluid: return "Cyber neon liquid fluid glow"
         }
     }
 
@@ -3420,13 +3421,14 @@ extension DynamicIslandPlayerView {
         titleLbl.setContentCompressionResistancePriority(.required, for: .vertical)
         descLbl.setContentCompressionResistancePriority(.required, for: .vertical)
 
-        themeToggle.totalSteps = 4
+        themeToggle.totalSteps = 5
         let currentThemeStep: Int
         switch PlayerDesign.current {
         case .adaptive: currentThemeStep = 0
         case .darkMode: currentThemeStep = 1
         case .glassMode: currentThemeStep = 2
         case .native: currentThemeStep = 3
+        case .liquidFluid: currentThemeStep = 4
         }
         themeToggle.stepIndex = currentThemeStep
         themeToggle.onStep = { [weak self] step in
@@ -3443,6 +3445,9 @@ extension DynamicIslandPlayerView {
             case 3:
                 PlayerDesign.current = .native
                 CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Theme: macOS Vibrancy")
+            case 4:
+                PlayerDesign.current = .liquidFluid
+                CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Theme: Liquid Fluid Glow")
             default:
                 break
             }
@@ -3486,6 +3491,9 @@ extension DynamicIslandPlayerView {
             PlayerDesign.current = .native
             CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Theme: macOS Vibrancy")
         case .native:
+            PlayerDesign.current = .liquidFluid
+            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Theme: Liquid Fluid Glow")
+        case .liquidFluid:
             PlayerDesign.current = .adaptive
             CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Theme: Adaptive")
         }
@@ -3724,7 +3732,7 @@ extension DynamicIslandPlayerView {
 
     func currentSettingsTone() -> SettingsTone {
         switch PlayerDesign.current {
-        case .darkMode:
+        case .darkMode, .liquidFluid:
             return .dark
         case .glassMode:
             return .light
@@ -3756,6 +3764,7 @@ extension DynamicIslandPlayerView {
         case .darkMode: currentThemeStep = 1
         case .glassMode: currentThemeStep = 2
         case .native: currentThemeStep = 3
+        case .liquidFluid: currentThemeStep = 4
         }
         themeToggle.stepIndex = currentThemeStep
         let allStyles = ProgressStyle.allCases
