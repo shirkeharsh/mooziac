@@ -3,17 +3,20 @@ import Foundation
 
 public final class VisualMatrixSnapshotGenerator {
     public static func run() {
-        print("\n📸 [Mooziac Snapshot Suite] Starting full visual permutation matrix sweep...")
+        print("\n📸 [Mooziac Snapshot Suite] Purging old snapshots and starting comprehensive matrix sweep...")
         
         let outputDir = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Desktop/Mooziac_Screenshots")
         
+        // 1. Delete old screenshots folder
+        try? FileManager.default.removeItem(at: outputDir)
         try? FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
         
         let mockArtwork1 = createMockArtworkImage(title: "Ghost", subtitle: "Justin Bieber", colorA: NSColor.systemTeal, colorB: NSColor.systemIndigo)
         let mockArtwork2 = createMockArtworkImage(title: "Blinding Lights", subtitle: "The Weeknd", colorA: NSColor.systemRed, colorB: NSColor.systemOrange)
+        let mockArtwork3 = createMockArtworkImage(title: "Midnight City", subtitle: "M83", colorA: NSColor.systemPurple, colorB: NSColor.systemPink)
         
-        var generatedFiles: [(filename: String, theme: String, style: String, panel: String, appearance: String, path: String)] = []
+        var generatedFiles: [(filename: String, theme: String, style: String, panel: String, playback: String, liked: String, appearance: String, path: String)] = []
         
         let themes: [(design: PlayerDesign, name: String)] = [
             (.adaptive, "01_Adaptive_Ambient"),
@@ -48,70 +51,116 @@ public final class VisualMatrixSnapshotGenerator {
                 for styleItem in progressStyles {
                     ProgressStyle.current = styleItem.style
                     
-                    // 1. Compact Player (Playing)
-                    let (compactPlayingView, window1) = createConfiguredPlayerView(
+                    // State A: Playing + Liked + Repeat ON (Mid-track)
+                    let (vPlayingLiked, w1) = createConfiguredPlayerView(
                         theme: themeItem.design,
                         style: styleItem.style,
                         artwork: mockArtwork1,
                         title: "Ghost",
                         artist: "Justin Bieber",
-                        progress: 0.68,
+                        progress: 0.65,
                         isPlaying: true,
+                        isLiked: true,
+                        repeatMode: .one,
                         appearance: appMode.appearance
                     )
-                    let filename1 = "\(themeItem.name)_\(styleItem.name)_Compact_Playing_\(appMode.name).png"
-                    let path1 = themeDir.appendingPathComponent(filename1)
-                    if saveViewSnapshot(compactPlayingView, to: path1) {
-                        generatedFiles.append((filename1, themeItem.name, styleItem.name, "Compact Playing", appMode.name, path1.path))
+                    let fileA = "\(themeItem.name)_\(styleItem.name)_Playing_Liked_RepeatOn_\(appMode.name).png"
+                    let pathA = themeDir.appendingPathComponent(fileA)
+                    if saveViewSnapshot(vPlayingLiked, to: pathA) {
+                        generatedFiles.append((fileA, themeItem.name, styleItem.name, "Playing (Liked, Repeat On)", "Playing", "Liked", appMode.name, pathA.path))
                         count += 1
                     }
-                    window1.close()
+                    w1.close()
                     
-                    // 2. Compact Player (Paused with different art)
-                    let (compactPausedView, window2) = createConfiguredPlayerView(
+                    // State B: Playing + Unliked + Repeat OFF (Early-track)
+                    let (vPlayingUnliked, w2) = createConfiguredPlayerView(
+                        theme: themeItem.design,
+                        style: styleItem.style,
+                        artwork: mockArtwork3,
+                        title: "Midnight City",
+                        artist: "M83",
+                        progress: 0.22,
+                        isPlaying: true,
+                        isLiked: false,
+                        repeatMode: .off,
+                        appearance: appMode.appearance
+                    )
+                    let fileB = "\(themeItem.name)_\(styleItem.name)_Playing_Unliked_RepeatOff_\(appMode.name).png"
+                    let pathB = themeDir.appendingPathComponent(fileB)
+                    if saveViewSnapshot(vPlayingUnliked, to: pathB) {
+                        generatedFiles.append((fileB, themeItem.name, styleItem.name, "Playing (Unliked, Repeat Off)", "Playing", "Unliked", appMode.name, pathB.path))
+                        count += 1
+                    }
+                    w2.close()
+                    
+                    // State C: Paused + Liked (Late-track)
+                    let (vPausedLiked, w3) = createConfiguredPlayerView(
                         theme: themeItem.design,
                         style: styleItem.style,
                         artwork: mockArtwork2,
                         title: "Blinding Lights",
                         artist: "The Weeknd",
-                        progress: 0.35,
+                        progress: 0.88,
                         isPlaying: false,
+                        isLiked: true,
+                        repeatMode: .off,
                         appearance: appMode.appearance
                     )
-                    let filename2 = "\(themeItem.name)_\(styleItem.name)_Compact_Paused_\(appMode.name).png"
-                    let path2 = themeDir.appendingPathComponent(filename2)
-                    if saveViewSnapshot(compactPausedView, to: path2) {
-                        generatedFiles.append((filename2, themeItem.name, styleItem.name, "Compact Paused", appMode.name, path2.path))
+                    let fileC = "\(themeItem.name)_\(styleItem.name)_Paused_Liked_\(appMode.name).png"
+                    let pathC = themeDir.appendingPathComponent(fileC)
+                    if saveViewSnapshot(vPausedLiked, to: pathC) {
+                        generatedFiles.append((fileC, themeItem.name, styleItem.name, "Paused (Liked)", "Paused", "Liked", appMode.name, pathC.path))
                         count += 1
                     }
-                    window2.close()
+                    w3.close()
+                    
+                    // State D: Paused + Unliked (Start of track)
+                    let (vPausedUnliked, w4) = createConfiguredPlayerView(
+                        theme: themeItem.design,
+                        style: styleItem.style,
+                        artwork: mockArtwork1,
+                        title: "Ghost",
+                        artist: "Justin Bieber",
+                        progress: 0.0,
+                        isPlaying: false,
+                        isLiked: false,
+                        repeatMode: .off,
+                        appearance: appMode.appearance
+                    )
+                    let fileD = "\(themeItem.name)_\(styleItem.name)_Paused_Unliked_\(appMode.name).png"
+                    let pathD = themeDir.appendingPathComponent(fileD)
+                    if saveViewSnapshot(vPausedUnliked, to: pathD) {
+                        generatedFiles.append((fileD, themeItem.name, styleItem.name, "Paused (Unliked)", "Paused", "Unliked", appMode.name, pathD.path))
+                        count += 1
+                    }
+                    w4.close()
                 }
                 
-                // 3. Playlists Library Drawer
-                let (playlistView, window3) = createPlaylistLibrarySnapshotView(theme: themeItem.design, appearance: appMode.appearance)
-                let filename3 = "\(themeItem.name)_Drawer_Playlists_\(appMode.name).png"
-                let path3 = themeDir.appendingPathComponent(filename3)
-                if saveViewSnapshot(playlistView, to: path3) {
-                    generatedFiles.append((filename3, themeItem.name, "All Styles", "Playlist Library", appMode.name, path3.path))
+                // Panel 1: Playlists Library Drawer
+                let (playlistView, w5) = createPlaylistLibrarySnapshotView(theme: themeItem.design, appearance: appMode.appearance)
+                let fileE = "\(themeItem.name)_Drawer_Playlists_\(appMode.name).png"
+                let pathE = themeDir.appendingPathComponent(fileE)
+                if saveViewSnapshot(playlistView, to: pathE) {
+                    generatedFiles.append((fileE, themeItem.name, "All Styles", "Playlist Library", "Static", "N/A", appMode.name, pathE.path))
                     count += 1
                 }
-                window3.close()
+                w5.close()
                 
-                // 4. Offline Downloads Drawer
-                let (offlineView, window4) = createOfflineLibrarySnapshotView(theme: themeItem.design, appearance: appMode.appearance)
-                let filename4 = "\(themeItem.name)_Drawer_Offline_Downloads_\(appMode.name).png"
-                let path4 = themeDir.appendingPathComponent(filename4)
-                if saveViewSnapshot(offlineView, to: path4) {
-                    generatedFiles.append((filename4, themeItem.name, "All Styles", "Offline Library", appMode.name, path4.path))
+                // Panel 2: Offline Downloads Drawer
+                let (offlineView, w6) = createOfflineLibrarySnapshotView(theme: themeItem.design, appearance: appMode.appearance)
+                let fileF = "\(themeItem.name)_Drawer_Offline_Downloads_\(appMode.name).png"
+                let pathF = themeDir.appendingPathComponent(fileF)
+                if saveViewSnapshot(offlineView, to: pathF) {
+                    generatedFiles.append((fileF, themeItem.name, "All Styles", "Offline Library", "Static", "N/A", appMode.name, pathF.path))
                     count += 1
                 }
-                window4.close()
+                w6.close()
             }
         }
         
         generateInteractiveHTMLGallery(generatedFiles: generatedFiles, outputDir: outputDir)
         
-        print("✅ [Mooziac Snapshot Suite] Successfully generated \(count) high-res screenshots!")
+        print("✅ [Mooziac Snapshot Suite] Successfully generated \(count) high-res permutations!")
         print("📁 Saved to: \(outputDir.path)")
         print("🌐 Interactive HTML Gallery: \(outputDir.appendingPathComponent("gallery.html").path)\n")
     }
@@ -126,6 +175,8 @@ public final class VisualMatrixSnapshotGenerator {
         artist: String,
         progress: Double,
         isPlaying: Bool,
+        isLiked: Bool,
+        repeatMode: RepeatMode,
         appearance: NSAppearance?
     ) -> (NSView, NSWindow) {
         let window = NSWindow(
@@ -152,7 +203,15 @@ public final class VisualMatrixSnapshotGenerator {
         playerView.timeLabel.stringValue = "02:18 / 03:45"
         playerView.waveformProgressView.progress = progress
         playerView.waveformProgressView.isPlaying = isPlaying
-        playerView.playPauseButton.image = NSImage(systemSymbolName: isPlaying ? "pause.fill" : "play.fill", accessibilityDescription: nil)
+        
+        let playIconName = isPlaying ? "pause.fill" : "play.fill"
+        playerView.playPauseButton.image = NSImage(systemSymbolName: playIconName, accessibilityDescription: nil)
+        
+        playerView.isLiked = isLiked
+        let likeIconName = isLiked ? "heart.fill" : "heart"
+        playerView.likeButton.image = NSImage(systemSymbolName: likeIconName, accessibilityDescription: nil)
+        
+        playerView.repeatMode = repeatMode
         
         playerView.applyTheme()
         window.displayIfNeeded()
@@ -242,14 +301,14 @@ public final class VisualMatrixSnapshotGenerator {
     // MARK: - Interactive HTML Gallery Generator
     
     private static func generateInteractiveHTMLGallery(
-        generatedFiles: [(filename: String, theme: String, style: String, panel: String, appearance: String, path: String)],
+        generatedFiles: [(filename: String, theme: String, style: String, panel: String, playback: String, liked: String, appearance: String, path: String)],
         outputDir: URL
     ) {
         var cardHTML = ""
         for file in generatedFiles {
             let relativePath = file.path.replacingOccurrences(of: outputDir.path + "/", with: "")
             cardHTML += """
-            <div class="card" data-theme="\(file.theme)" data-style="\(file.style)" data-panel="\(file.panel)" data-app="\(file.appearance)">
+            <div class="card" data-theme="\(file.theme)" data-style="\(file.style)" data-panel="\(file.panel)" data-playback="\(file.playback)" data-liked="\(file.liked)" data-app="\(file.appearance)">
                 <div class="preview-box">
                     <img src="\(relativePath)" alt="\(file.filename)" loading="lazy" onclick="openZoom(this.src, '\(file.filename)')">
                 </div>
@@ -258,6 +317,8 @@ public final class VisualMatrixSnapshotGenerator {
                     <div class="tags">
                         <span class="tag theme">\(file.theme.replacingOccurrences(of: "_", with: " "))</span>
                         <span class="tag style">\(file.style)</span>
+                        <span class="tag playback">\(file.playback)</span>
+                        <span class="tag liked">\(file.liked)</span>
                         <span class="tag app">\(file.appearance)</span>
                     </div>
                 </div>
@@ -265,12 +326,14 @@ public final class VisualMatrixSnapshotGenerator {
             """
         }
         
+        let totalCount = generatedFiles.count
+        
         let html = """
         <!DOCTYPE html>
         <html lang="en">
         <head>
             <meta charset="UTF-8">
-            <title>Mooziac UI Visual Matrix Gallery</title>
+            <title>Mooziac UI Visual Matrix Gallery (\(totalCount) Permutations)</title>
             <style>
                 :root {
                     --bg: #0B0D13;
@@ -282,25 +345,30 @@ public final class VisualMatrixSnapshotGenerator {
                 }
                 * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; }
                 body { background: var(--bg); color: var(--text); padding: 32px; min-height: 100vh; }
-                header { margin-bottom: 32px; display: flex; justify-content: space-between; align-items: center; }
+                header { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; }
                 h1 { font-size: 28px; font-weight: 700; background: linear-gradient(135deg, #FFF, #8E9BAE); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
                 .subtitle { font-size: 14px; color: var(--subtext); margin-top: 4px; }
+                .badge { background: rgba(0, 133, 255, 0.2); color: #4DA8FF; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; border: 1px solid rgba(0,133,255,0.4); }
                 
-                .filters { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 28px; background: rgba(255, 255, 255, 0.04); padding: 16px; border-radius: 12px; border: 1px solid var(--border); }
+                .filter-sections { display: flex; flex-direction: column; gap: 12px; margin-bottom: 28px; background: rgba(255, 255, 255, 0.04); padding: 20px; border-radius: 14px; border: 1px solid var(--border); }
+                .filter-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+                .filter-label { font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--subtext); min-width: 100px; }
                 .filter-btn { background: rgba(255,255,255,0.08); border: 1px solid var(--border); color: var(--text); padding: 6px 14px; border-radius: 20px; font-size: 13px; cursor: pointer; transition: all 0.2s; }
                 .filter-btn:hover, .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #FFF; }
                 
-                .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 24px; }
+                .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 24px; }
                 .card { background: var(--card-bg); border-radius: 14px; border: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; transition: transform 0.2s, box-shadow 0.2s; }
                 .card:hover { transform: translateY(-4px); box-shadow: 0 12px 30px rgba(0,0,0,0.5); }
                 .preview-box { background: repeating-conic-gradient(#1a1d26 0% 25%, #12141c 0% 50%) 50% / 20px 20px; padding: 24px; display: flex; justify-content: center; align-items: center; min-height: 180px; }
-                .preview-box img { max-width: 100%; max-height: 260px; object-fit: contain; cursor: zoom-in; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.6)); border-radius: 18px; }
+                .preview-box img { max-width: 100%; max-height: 280px; object-fit: contain; cursor: zoom-in; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.6)); border-radius: 18px; }
                 .info { padding: 16px; }
-                .title { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+                .title { font-size: 15px; font-weight: 600; margin-bottom: 10px; }
                 .tags { display: flex; flex-wrap: wrap; gap: 6px; }
                 .tag { font-size: 11px; padding: 3px 8px; border-radius: 6px; font-weight: 500; }
                 .tag.theme { background: rgba(0, 133, 255, 0.2); color: #4DA8FF; }
                 .tag.style { background: rgba(168, 85, 247, 0.2); color: #C084FC; }
+                .tag.playback { background: rgba(34, 197, 94, 0.2); color: #4ADE80; }
+                .tag.liked { background: rgba(239, 68, 68, 0.2); color: #F87171; }
                 .tag.app { background: rgba(255, 255, 255, 0.1); color: #CBD5E1; }
 
                 /* Zoom Modal */
@@ -312,16 +380,32 @@ public final class VisualMatrixSnapshotGenerator {
             <header>
                 <div>
                     <h1>Mooziac Visual Regression & Permutation Matrix</h1>
-                    <div class="subtitle">Complete visual verification across 4 Themes, 4 Scrubber Styles, Panels & Appearances</div>
+                    <div class="subtitle">Complete visual verification across 4 Themes, 4 Scrubber Styles, Playback States, Liked, & Appearances</div>
                 </div>
+                <div class="badge">\(totalCount) Snapshots</div>
             </header>
 
-            <div class="filters" id="filters">
-                <button class="filter-btn active" onclick="filterGrid('all')">Show All</button>
-                <button class="filter-btn" onclick="filterGrid('01_Adaptive_Ambient')">Theme: Adaptive</button>
-                <button class="filter-btn" onclick="filterGrid('02_OLED_Dark')">Theme: OLED Dark</button>
-                <button class="filter-btn" onclick="filterGrid('03_Crystal_Glass')">Theme: Crystal Glass</button>
-                <button class="filter-btn" onclick="filterGrid('04_Liquid_Glass')">Theme: Liquid Glass</button>
+            <div class="filter-sections">
+                <div class="filter-row">
+                    <span class="filter-label">Themes:</span>
+                    <button class="filter-btn active" onclick="setFilter('theme', 'all', this)">All Themes</button>
+                    <button class="filter-btn" onclick="setFilter('theme', '01_Adaptive_Ambient', this)">Adaptive</button>
+                    <button class="filter-btn" onclick="setFilter('theme', '02_OLED_Dark', this)">OLED Dark</button>
+                    <button class="filter-btn" onclick="setFilter('theme', '03_Crystal_Glass', this)">Crystal Glass</button>
+                    <button class="filter-btn" onclick="setFilter('theme', '04_Liquid_Glass', this)">Liquid Glass</button>
+                </div>
+                <div class="filter-row">
+                    <span class="filter-label">Playback:</span>
+                    <button class="filter-btn active" onclick="setFilter('playback', 'all', this)">All States</button>
+                    <button class="filter-btn" onclick="setFilter('playback', 'Playing', this)">Playing Only</button>
+                    <button class="filter-btn" onclick="setFilter('playback', 'Paused', this)">Paused Only</button>
+                </div>
+                <div class="filter-row">
+                    <span class="filter-label">Liked:</span>
+                    <button class="filter-btn active" onclick="setFilter('liked', 'all', this)">All</button>
+                    <button class="filter-btn" onclick="setFilter('liked', 'Liked', this)">Liked ❤️</button>
+                    <button class="filter-btn" onclick="setFilter('liked', 'Unliked', this)">Unliked 🤍</button>
+                </div>
             </div>
 
             <div class="grid" id="grid">
@@ -333,17 +417,29 @@ public final class VisualMatrixSnapshotGenerator {
             </div>
 
             <script>
-                function filterGrid(theme) {
-                    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-                    event.target.classList.add('active');
+                const activeFilters = { theme: 'all', playback: 'all', liked: 'all' };
+
+                function setFilter(type, value, btn) {
+                    activeFilters[type] = value;
+                    btn.parentElement.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    applyAllFilters();
+                }
+
+                function applyAllFilters() {
                     document.querySelectorAll('.card').forEach(card => {
-                        if (theme === 'all' || card.dataset.theme.includes(theme)) {
+                        const matchTheme = (activeFilters.theme === 'all' || card.dataset.theme.includes(activeFilters.theme));
+                        const matchPlayback = (activeFilters.playback === 'all' || card.dataset.playback === activeFilters.playback);
+                        const matchLiked = (activeFilters.liked === 'all' || card.dataset.liked === activeFilters.liked);
+
+                        if (matchTheme && matchPlayback && matchLiked) {
                             card.style.display = 'flex';
                         } else {
                             card.style.display = 'none';
                         }
                     });
                 }
+
                 function openZoom(src, title) {
                     const m = document.getElementById('modal');
                     const img = document.getElementById('modalImg');
