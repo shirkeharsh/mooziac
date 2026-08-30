@@ -18,7 +18,7 @@ enum SettingsTone {
 
     var secondaryText: NSColor {
         switch self {
-        case .dark: return NSColor(white: 0.60, alpha: 1.0)
+        case .dark: return NSColor(white: 0.88, alpha: 1.0)
         case .light: return NSColor(srgbRed: 0.11, green: 0.11, blue: 0.11, alpha: 0.56)
         }
     }

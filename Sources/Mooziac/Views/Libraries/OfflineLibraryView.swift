@@ -29,6 +29,7 @@ public class OfflineLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSou
     private let downloadStatusBar = NSView()
     private let downloadStatusLabel = NSTextField(labelWithString: "")
     private let downloadSpinner = NSProgressIndicator()
+    private let visualEffectBackdrop = NSVisualEffectView()
 
     private var displayedTracks: [LocalTrack] = []
     private var currentSearchQuery: String = ""
@@ -53,6 +54,24 @@ public class OfflineLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSou
         wantsLayer = true
         layer?.cornerRadius = 16
         layer?.masksToBounds = true
+
+        // Visual Effect Backdrop for liquid glass theme
+        visualEffectBackdrop.translatesAutoresizingMaskIntoConstraints = false
+        visualEffectBackdrop.material = .hudWindow
+        visualEffectBackdrop.blendingMode = .behindWindow
+        visualEffectBackdrop.state = .active
+        visualEffectBackdrop.wantsLayer = true
+        visualEffectBackdrop.layer?.cornerRadius = 16
+        visualEffectBackdrop.layer?.masksToBounds = true
+        visualEffectBackdrop.isHidden = true
+        addSubview(visualEffectBackdrop, positioned: .below, relativeTo: nil)
+
+        NSLayoutConstraint.activate([
+            visualEffectBackdrop.topAnchor.constraint(equalTo: topAnchor),
+            visualEffectBackdrop.leadingAnchor.constraint(equalTo: leadingAnchor),
+            visualEffectBackdrop.trailingAnchor.constraint(equalTo: trailingAnchor),
+            visualEffectBackdrop.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
 
         // Enable Drag & Drop
         registerForDraggedTypes([.fileURL])
@@ -310,6 +329,7 @@ public class OfflineLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSou
 
             switch design {
             case .native:
+                visualEffectBackdrop.isHidden = true
                 layer?.backgroundColor = SystemAppearanceHelper.clearModeBackingColor.cgColor
                 layer?.borderWidth = 1.0
                 layer?.borderColor = SystemAppearanceHelper.clearModeBorderColor.cgColor
@@ -320,6 +340,7 @@ public class OfflineLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSou
                 openFolderButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .native)
 
             case .adaptive:
+                visualEffectBackdrop.isHidden = true
                 let bg = DynamicIslandPlayerView.sharedAmbientBgColor ?? NSColor(red: 0.08, green: 0.08, blue: 0.11, alpha: 0.98).cgColor
                 layer?.backgroundColor = bg
                 layer?.borderWidth = 1.0
@@ -331,6 +352,7 @@ public class OfflineLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSou
                 openFolderButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .adaptive)
 
             case .darkMode:
+                visualEffectBackdrop.isHidden = true
                 layer?.backgroundColor = SystemAppearanceHelper.darkModeBackingColor.cgColor
                 layer?.borderWidth = 1.0
                 layer?.borderColor = SystemAppearanceHelper.darkModeBorderColor.cgColor
@@ -341,6 +363,7 @@ public class OfflineLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSou
                 openFolderButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .darkMode)
 
             case .glassMode:
+                visualEffectBackdrop.isHidden = true
                 layer?.backgroundColor = NSColor(red: 0.93725, green: 0.94902, blue: 0.94118, alpha: 0.98).cgColor
                 layer?.borderWidth = 1.0
                 layer?.borderColor = NSColor(red: 0.78, green: 0.80, blue: 0.79, alpha: 0.90).cgColor
@@ -352,14 +375,19 @@ public class OfflineLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSou
                 openFolderButton.contentTintColor = pitchBlack
 
             case .liquidFluid:
-                layer?.backgroundColor = SystemAppearanceHelper.liquidFluidBackingColor.cgColor
-                layer?.borderWidth = 1.0
-                layer?.borderColor = SystemAppearanceHelper.liquidFluidBorderColor.cgColor
+                visualEffectBackdrop.isHidden = false
+                visualEffectBackdrop.material = .hudWindow
+                visualEffectBackdrop.blendingMode = .behindWindow
+                visualEffectBackdrop.state = .active
 
-                headerTitleLabel.textColor = SystemAppearanceHelper.primaryTextColor(for: .liquidFluid)
-                backButton.contentTintColor = SystemAppearanceHelper.primaryTextColor(for: .liquidFluid)
-                importButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .liquidFluid)
-                openFolderButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .liquidFluid)
+                layer?.backgroundColor = NSColor.clear.cgColor
+                layer?.borderWidth = 1.0
+                layer?.borderColor = NSColor(white: 1.0, alpha: 0.32).cgColor
+
+                headerTitleLabel.textColor = NSColor.white
+                backButton.contentTintColor = NSColor.white
+                importButton.contentTintColor = NSColor(white: 0.90, alpha: 1.0)
+                openFolderButton.contentTintColor = NSColor(white: 0.90, alpha: 1.0)
             }
 
             searchField.applyTheme(design)
@@ -766,13 +794,27 @@ private class OfflineTrackCellView: NSTableCellView {
     override func mouseEntered(with event: NSEvent) {
         guard !swipeContainer.isSwipedOpen else { return }
         let isGlass = (PlayerDesign.current == .glassMode)
-        swipeContainer.contentCardView.layer?.backgroundColor = isGlass ? NSColor(white: 0.0, alpha: 0.05).cgColor : NSColor(white: 1.0, alpha: 0.08).cgColor
+        let isLiquid = (PlayerDesign.current == .liquidFluid)
+        if isGlass {
+            swipeContainer.contentCardView.layer?.backgroundColor = NSColor(white: 0.0, alpha: 0.05).cgColor
+        } else if isLiquid {
+            swipeContainer.contentCardView.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.24).cgColor
+        } else {
+            swipeContainer.contentCardView.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.08).cgColor
+        }
     }
 
     override func mouseExited(with event: NSEvent) {
         guard !swipeContainer.isSwipedOpen else { return }
         let isGlass = (PlayerDesign.current == .glassMode)
-        swipeContainer.contentCardView.layer?.backgroundColor = isGlass ? NSColor(white: 0.0, alpha: 0.02).cgColor : NSColor(white: 1.0, alpha: 0.04).cgColor
+        let isLiquid = (PlayerDesign.current == .liquidFluid)
+        if isGlass {
+            swipeContainer.contentCardView.layer?.backgroundColor = NSColor(white: 0.0, alpha: 0.02).cgColor
+        } else if isLiquid {
+            swipeContainer.contentCardView.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.16).cgColor
+        } else {
+            swipeContainer.contentCardView.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.04).cgColor
+        }
     }
 
     public func configure(track: LocalTrack, isPlaying: Bool, design: PlayerDesign) {
@@ -801,6 +843,7 @@ private class OfflineTrackCellView: NSTableCellView {
         }
 
         let isGlass = (design == .glassMode)
+        let isLiquid = (design == .liquidFluid)
         let isDark = (design == .darkMode)
 
         if isPlaying {
@@ -816,6 +859,12 @@ private class OfflineTrackCellView: NSTableCellView {
             swipeContainer.contentCardView.layer?.borderColor = NSColor(white: 0.0, alpha: 0.08).cgColor
             artistLabel.textColor = NSColor(white: 0.30, alpha: 1.0)
             durationLabel.textColor = NSColor(white: 0.40, alpha: 1.0)
+        } else if isLiquid {
+            swipeContainer.contentCardView.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.16).cgColor
+            swipeContainer.contentCardView.layer?.borderWidth = 1.0
+            swipeContainer.contentCardView.layer?.borderColor = NSColor(white: 1.0, alpha: 0.20).cgColor
+            artistLabel.textColor = NSColor(white: 0.88, alpha: 1.0)
+            durationLabel.textColor = NSColor(white: 0.82, alpha: 1.0)
         } else {
             swipeContainer.contentCardView.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.04).cgColor
             swipeContainer.contentCardView.layer?.borderWidth = 1.0

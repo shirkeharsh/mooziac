@@ -1718,8 +1718,8 @@ extension DynamicIslandPlayerView {
         row.wantsLayer = true
         row.layer?.cornerRadius = 14
         row.layer?.borderWidth = 1.0
-        row.layer?.borderColor = tone.dividerColor.cgColor
-        row.layer?.backgroundColor = (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06)).cgColor
+        row.layer?.borderColor = (PlayerDesign.current == .liquidFluid ? NSColor(white: 1.0, alpha: 0.20) : tone.dividerColor).cgColor
+        row.layer?.backgroundColor = (PlayerDesign.current == .liquidFluid ? NSColor(white: 1.0, alpha: 0.16) : (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06))).cgColor
 
         swipeContainer.onRowClicked = { [weak self] in
             guard let self = self else { return }
@@ -4007,8 +4007,8 @@ private class DownloadRowView: NSView {
         wantsLayer = true
         layer?.cornerRadius = 14
         layer?.borderWidth = 1.0
-        layer?.borderColor = tone.dividerColor.cgColor
-        layer?.backgroundColor = (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06)).cgColor
+        layer?.borderColor = (PlayerDesign.current == .liquidFluid ? NSColor(white: 1.0, alpha: 0.20) : tone.dividerColor).cgColor
+        layer?.backgroundColor = (PlayerDesign.current == .liquidFluid ? NSColor(white: 1.0, alpha: 0.16) : (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06))).cgColor
         translatesAutoresizingMaskIntoConstraints = false
 
         // Play Button
@@ -4312,8 +4312,8 @@ private class DetailItemRowView: NSView {
         wantsLayer = true
         layer?.cornerRadius = 14
         layer?.borderWidth = 1.0
-        layer?.borderColor = tone.dividerColor.cgColor
-        layer?.backgroundColor = (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06)).cgColor
+        layer?.borderColor = (PlayerDesign.current == .liquidFluid ? NSColor(white: 1.0, alpha: 0.20) : tone.dividerColor).cgColor
+        layer?.backgroundColor = (PlayerDesign.current == .liquidFluid ? NSColor(white: 1.0, alpha: 0.16) : (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06))).cgColor
         translatesAutoresizingMaskIntoConstraints = false
 
         // Play Button
@@ -4502,8 +4502,8 @@ private class HistoryRowView: NSView {
         wantsLayer = true
         layer?.cornerRadius = 14
         layer?.borderWidth = 1.0
-        layer?.borderColor = tone.dividerColor.cgColor
-        layer?.backgroundColor = (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06)).cgColor
+        layer?.borderColor = (PlayerDesign.current == .liquidFluid ? NSColor(white: 1.0, alpha: 0.20) : tone.dividerColor).cgColor
+        layer?.backgroundColor = (PlayerDesign.current == .liquidFluid ? NSColor(white: 1.0, alpha: 0.16) : (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06))).cgColor
         translatesAutoresizingMaskIntoConstraints = false
 
         // Play Button
@@ -4668,9 +4668,9 @@ private class LikedSongRowView: NSView {
             playBtn.contentTintColor = accent
             playBtn.toolTip = isPlaybackActive ? "Pause" : "Resume"
         } else {
-            layer?.borderColor = tone.dividerColor.cgColor
+            layer?.borderColor = (PlayerDesign.current == .liquidFluid ? NSColor(white: 1.0, alpha: 0.20) : tone.dividerColor).cgColor
             layer?.borderWidth = 1.0
-            layer?.backgroundColor = (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06)).cgColor
+            layer?.backgroundColor = (PlayerDesign.current == .liquidFluid ? NSColor(white: 1.0, alpha: 0.16) : (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06))).cgColor
             titleLbl.textColor = tone.primaryText
             titleLbl.font = NSFont.systemFont(ofSize: 11.5, weight: .medium)
 
@@ -4685,8 +4685,8 @@ private class LikedSongRowView: NSView {
         wantsLayer = true
         layer?.cornerRadius = 14
         layer?.borderWidth = 1.0
-        layer?.borderColor = tone.dividerColor.cgColor
-        layer?.backgroundColor = (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06)).cgColor
+        layer?.borderColor = (PlayerDesign.current == .liquidFluid ? NSColor(white: 1.0, alpha: 0.20) : tone.dividerColor).cgColor
+        layer?.backgroundColor = (PlayerDesign.current == .liquidFluid ? NSColor(white: 1.0, alpha: 0.16) : (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06))).cgColor
         translatesAutoresizingMaskIntoConstraints = false
 
         playBtn.translatesAutoresizingMaskIntoConstraints = false
