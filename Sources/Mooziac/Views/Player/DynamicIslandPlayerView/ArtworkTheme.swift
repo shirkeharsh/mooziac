@@ -8,6 +8,9 @@ extension DynamicIslandPlayerView {
 
         if let cached = AppArtworkHelper.shared.getMemoryCachedImage(forKey: urlStr) {
             applyArtworkAnimation { [weak self] in self?.artworkImageView.image = cached }
+            if let cg = cached.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                self.updateAmbientGlow(cgImage: cg)
+            }
             return
         }
 
@@ -114,14 +117,19 @@ extension DynamicIslandPlayerView {
         DynamicIslandPlayerView.sharedAmbientAccentColor = dominantColor
         NotificationCenter.default.post(name: NSNotification.Name("YTM_ambientThemeChanged"), object: nil)
 
-        guard PlayerDesign.current == .adaptive else { return }
-
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.5
-            self.containerPill.layer?.backgroundColor = darkBg.cgColor
-            self.containerPill.layer?.borderWidth = 1.0
-            self.containerPill.layer?.borderColor = borderGlow.cgColor
-            self.waveformProgressView.accentColor = dominantColor
+        if PlayerDesign.current == .adaptive {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.5
+                self.containerPill.layer?.backgroundColor = darkBg.cgColor
+                self.containerPill.layer?.borderWidth = 1.0
+                self.containerPill.layer?.borderColor = borderGlow.cgColor
+                self.waveformProgressView.accentColor = dominantColor
+            }
+        } else if PlayerDesign.current == .liquidFluid {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.5
+                self.waveformProgressView.accentColor = dominantColor
+            }
         }
     }
     
@@ -276,8 +284,8 @@ extension DynamicIslandPlayerView {
                 artistLabel.textColor = NSColor(white: 0.86, alpha: 1.0)
                 timeLabel.textColor = NSColor(white: 0.78, alpha: 1.0)
                 
-                // Apple Electric Blue progress accent
-                waveformProgressView.accentColor = NSColor(red: 0.0, green: 0.52, blue: 1.0, alpha: 1.0)
+                // Dynamic song artwork accent color for progress bar in Theme 4
+                waveformProgressView.accentColor = lastAmbientAccentColor ?? NSColor(red: 0.0, green: 0.52, blue: 1.0, alpha: 1.0)
                 
                 let fluidBtnTint = NSColor(white: 0.92, alpha: 0.95)
                 playPauseButton.contentTintColor = NSColor.white

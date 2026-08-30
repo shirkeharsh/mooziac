@@ -709,6 +709,9 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
                 if self.artworkImageView.image != art {
                     self.artworkImageView.image = art
                     self.artworkImageView.layer?.borderColor = NSColor(white: 1.0, alpha: 0.15).cgColor
+                    if let cg = art.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                        self.updateAmbientGlow(cgImage: cg)
+                    }
                 }
             } else if self.artworkImageView.image != AppArtworkHelper.defaultArtwork {
                 self.artworkImageView.image = AppArtworkHelper.defaultArtwork
