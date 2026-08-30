@@ -10,14 +10,6 @@ let package = Package(
         .executable(
             name: "Mooziac",
             targets: ["Mooziac"]
-        ),
-        .executable(
-            name: "BrainWatcher",
-            targets: ["BrainWatcher"]
-        ),
-        .executable(
-            name: "MooziacStudio",
-            targets: ["MooziacStudio"]
         )
     ],
     dependencies: [],
@@ -25,14 +17,6 @@ let package = Package(
         .executableTarget(
             name: "Mooziac",
             path: "Sources/Mooziac"
-        ),
-        .executableTarget(
-            name: "BrainWatcher",
-            path: "Sources/BrainWatcher"
-        ),
-        .executableTarget(
-            name: "MooziacStudio",
-            path: "Sources/MooziacStudio"
         )
     ]
 )

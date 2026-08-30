@@ -22,3 +22,25 @@ ReelProduction/
 *.pyc
 __pycache__/
 
+# Internal dev & project documentation
+AGY.md
+FILE_SUMMARIES.md
+SYSTEM_DESIGN.md
+downloadreport.md
+nextupdatesync.md
+publish.md
+mooziac.sh
+build_brain_watcher.sh
+build_studio.sh
+Sources/BrainWatcher/
+Sources/MooziacStudio/
+Github/
+github-release-repo/
+mooziac/
+docs/reports/
+docs/notes/
+scripts/
+webplayer/
+www/
+
+

@@ -1,6 +1,0 @@
-# Mooziac Studio — Actionable Task & Work List
-
-- [x] Fix Issue #1: On screen rendering problem… (@bledu)
-- [x] Verify trackpad edge volume sensitivity curve
-- [x] Check Discord RPC presence updates on song transition
-- [ ] Sync YouTube Music liking events with local SQLite database
