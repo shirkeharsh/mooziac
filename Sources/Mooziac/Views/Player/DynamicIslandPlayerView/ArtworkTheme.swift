@@ -114,6 +114,11 @@ extension DynamicIslandPlayerView {
         DynamicIslandPlayerView.sharedAmbientAccentColor = dominantColor
         NotificationCenter.default.post(name: NSNotification.Name("YTM_ambientThemeChanged"), object: nil)
 
+        if PlayerDesign.current == .liquidFluid {
+            updateLiquidFluidColors(dominantColor: dominantColor)
+            return
+        }
+
         guard PlayerDesign.current == .adaptive else { return }
 
         NSAnimationContext.runAnimationGroup { context in
@@ -293,7 +298,11 @@ extension DynamicIslandPlayerView {
                 browserButton.contentTintColor = fluidBtnTint
                 resetPositionButton.contentTintColor = fluidBtnTint
                 
-                startLiquidFluidAnimation()
+                if let dominant = lastAmbientAccentColor {
+                    updateLiquidFluidColors(dominantColor: dominant)
+                } else {
+                    startLiquidFluidAnimation()
+                }
             }
         }
 
@@ -325,23 +334,53 @@ extension DynamicIslandPlayerView {
         liquidFluidMeshLayer.locations = [0.0, 0.35, 0.70, 1.0]
     }
 
-    func startLiquidFluidAnimation() {
-        guard PlayerDesign.current == .liquidFluid, !liquidFluidMeshLayer.isHidden else { return }
-        guard liquidFluidMeshLayer.animation(forKey: "liquidFluidShimmer") == nil else { return }
+    func updateLiquidFluidColors(dominantColor: NSColor) {
+        let converted = dominantColor.usingColorSpace(.sRGB) ?? dominantColor
+        let r = converted.redComponent
+        let g = converted.greenComponent
+        let b = converted.blueComponent
 
-        let colorAnim = CABasicAnimation(keyPath: "colors")
-        colorAnim.fromValue = [
+        let baseBg = NSColor(srgbRed: max(0.04, r * 0.18), green: max(0.04, g * 0.18), blue: max(0.06, b * 0.22), alpha: 0.96)
+        let c1 = NSColor(srgbRed: min(1.0, max(0.08, r * 0.30)), green: min(1.0, max(0.08, g * 0.30)), blue: min(1.0, max(0.12, b * 0.38)), alpha: 0.85)
+        let c2 = dominantColor.withAlphaComponent(0.70)
+        let c3 = (dominantColor.blended(withFraction: 0.35, of: .systemPurple) ?? dominantColor).withAlphaComponent(0.65)
+        let c4 = (dominantColor.blended(withFraction: 0.45, of: .cyan) ?? dominantColor).withAlphaComponent(0.80)
+
+        let borderGlow = NSColor(srgbRed: max(0.20, min(1.0, r * 0.90)), green: max(0.20, min(1.0, g * 0.90)), blue: max(0.25, min(1.0, b * 0.90)), alpha: 0.50)
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.6
+            self.containerPill.layer?.backgroundColor = baseBg.cgColor
+            self.containerPill.layer?.borderColor = borderGlow.cgColor
+            self.waveformProgressView.accentColor = dominantColor
+        }
+
+        startLiquidFluidAnimation(palette1: [c1.cgColor, c2.cgColor, c3.cgColor, c4.cgColor],
+                                  palette2: [c2.cgColor, c4.cgColor, c1.cgColor, c3.cgColor])
+    }
+
+    func startLiquidFluidAnimation(palette1: [CGColor]? = nil, palette2: [CGColor]? = nil) {
+        guard PlayerDesign.current == .liquidFluid, !liquidFluidMeshLayer.isHidden else { return }
+
+        let p1 = palette1 ?? [
             NSColor(red: 0.03, green: 0.08, blue: 0.24, alpha: 0.85).cgColor,
             NSColor(red: 0.04, green: 0.35, blue: 0.65, alpha: 0.70).cgColor,
             NSColor(red: 0.25, green: 0.10, blue: 0.50, alpha: 0.65).cgColor,
             NSColor(red: 0.00, green: 0.45, blue: 0.65, alpha: 0.80).cgColor
         ]
-        colorAnim.toValue = [
+        let p2 = palette2 ?? [
             NSColor(red: 0.02, green: 0.15, blue: 0.32, alpha: 0.85).cgColor,
             NSColor(red: 0.22, green: 0.08, blue: 0.48, alpha: 0.70).cgColor,
             NSColor(red: 0.00, green: 0.40, blue: 0.62, alpha: 0.65).cgColor,
             NSColor(red: 0.03, green: 0.08, blue: 0.26, alpha: 0.80).cgColor
         ]
+
+        liquidFluidMeshLayer.removeAnimation(forKey: "liquidFluidShimmer")
+        liquidFluidMeshLayer.removeAnimation(forKey: "liquidFluidPoint")
+
+        let colorAnim = CABasicAnimation(keyPath: "colors")
+        colorAnim.fromValue = p1
+        colorAnim.toValue = p2
         colorAnim.duration = 5.5
         colorAnim.autoreverses = true
         colorAnim.repeatCount = .infinity
@@ -350,7 +389,7 @@ extension DynamicIslandPlayerView {
 
         let pointAnim = CABasicAnimation(keyPath: "startPoint")
         pointAnim.fromValue = CGPoint(x: 0.0, y: 0.0)
-        pointAnim.toValue = CGPoint(x: 0.3, y: 0.8)
+        pointAnim.toValue = CGPoint(x: 0.35, y: 0.85)
         pointAnim.duration = 7.5
         pointAnim.autoreverses = true
         pointAnim.repeatCount = .infinity
