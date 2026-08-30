@@ -329,13 +329,17 @@ public class OfflineLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSou
 
             switch design {
             case .native:
-                visualEffectBackdrop.isHidden = true
+                visualEffectBackdrop.isHidden = false
+                visualEffectBackdrop.material = .hudWindow
+                visualEffectBackdrop.blendingMode = .behindWindow
+                visualEffectBackdrop.state = .active
+
                 layer?.backgroundColor = SystemAppearanceHelper.clearModeBackingColor.cgColor
                 layer?.borderWidth = 1.0
                 layer?.borderColor = SystemAppearanceHelper.clearModeBorderColor.cgColor
 
                 headerTitleLabel.textColor = SystemAppearanceHelper.primaryTextColor(for: .native)
-                backButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+                backButton.contentTintColor = SystemAppearanceHelper.primaryTextColor(for: .native)
                 importButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .native)
                 openFolderButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .native)
 

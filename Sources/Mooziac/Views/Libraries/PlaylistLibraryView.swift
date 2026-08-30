@@ -521,32 +521,36 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
             context.duration = 0.35
             switch design {
             case .native:
-                visualEffectBackdrop.isHidden = true
+                visualEffectBackdrop.isHidden = false
+                visualEffectBackdrop.material = .hudWindow
+                visualEffectBackdrop.blendingMode = .behindWindow
+                visualEffectBackdrop.state = .active
+
                 layer?.backgroundColor = SystemAppearanceHelper.clearModeBackingColor.cgColor
                 layer?.borderWidth = 1.0
                 layer?.borderColor = SystemAppearanceHelper.clearModeBorderColor.cgColor
                 headerTitleLabel.textColor = SystemAppearanceHelper.primaryTextColor(for: .native)
                 headerSubtitleLabel.textColor = SystemAppearanceHelper.secondaryTextColor(for: .native)
-                backButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+                backButton.contentTintColor = SystemAppearanceHelper.primaryTextColor(for: .native)
                 saveQueueButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .native)
-                importHeaderButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+                importHeaderButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .native)
                 openFolderHeaderButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .native)
                 downloadCurrentHeaderButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .native)
-                addCurrentTrackButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+                addCurrentTrackButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .native)
                 renameHeaderButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .native)
                 downloadButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .native)
                 moreMenuButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .native)
 
-                bottomBar.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.06).cgColor
-                bottomBar.layer?.borderColor = NSColor(white: 1.0, alpha: 0.12).cgColor
+                bottomBar.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.10).cgColor
+                bottomBar.layer?.borderColor = NSColor(white: 1.0, alpha: 0.16).cgColor
                 bottomBar.layer?.borderWidth = 1.0
 
-                tableContainer.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.03).cgColor
-                tableContainer.layer?.borderColor = NSColor(white: 1.0, alpha: 0.18).cgColor
+                tableContainer.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.04).cgColor
+                tableContainer.layer?.borderColor = NSColor(white: 1.0, alpha: 0.16).cgColor
 
-                bottomNewPlaylistButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
-                bottomAddCurrentTrackButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
-                bottomImportButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+                bottomNewPlaylistButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .native)
+                bottomAddCurrentTrackButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .native)
+                bottomImportButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .native)
 
             case .adaptive:
                 visualEffectBackdrop.isHidden = true

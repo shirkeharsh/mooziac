@@ -274,33 +274,28 @@ public final class LocalLibraryManager: NSObject {
 
         if FileManager.default.fileExists(atPath: fileURL.path) {
             let asset = AVURLAsset(url: fileURL)
+            let durationSeconds = CMTimeGetSeconds(asset.duration)
 
-            do {
-                let durationSeconds = CMTimeGetSeconds(asset.duration)
+            if !durationSeconds.isNaN &&
+               !durationSeconds.isInfinite {
+                duration = durationSeconds
+            }
 
-                if !durationSeconds.isNaN &&
-                   !durationSeconds.isInfinite {
-                    duration = durationSeconds
+            let metadata = asset.commonMetadata
+
+            for item in metadata {
+                guard let commonKey = item.commonKey else { continue }
+
+                switch commonKey {
+                case .commonKeyTitle:
+                    title = item.stringValue ?? ""
+                case .commonKeyArtist:
+                    artist = item.stringValue ?? ""
+                case .commonKeyAlbumName:
+                    album = item.stringValue ?? ""
+                default:
+                    break
                 }
-
-                let metadata = asset.commonMetadata
-
-                for item in metadata {
-                    guard let commonKey = item.commonKey else { continue }
-
-                    switch commonKey {
-                    case .commonKeyTitle:
-                        title = item.stringValue ?? ""
-                    case .commonKeyArtist:
-                        artist = item.stringValue ?? ""
-                    case .commonKeyAlbumName:
-                        album = item.stringValue ?? ""
-                    default:
-                        break
-                    }
-                }
-            } catch {
-                // fall through to filename fallback below
             }
         }
 

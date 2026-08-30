@@ -164,16 +164,23 @@ extension DynamicIslandPlayerView {
                 resetPositionButton.contentTintColor = btnTint
 
             case .native:
-                // macOS Native Vibrancy / Clear Mode (Optimized for macOS 27 beta & dark/light wallpapers)
+                // macOS Control Center Liquid Glass: WindowServer optical blur, convex meniscus sheen, transparent plate
                 visualEffectBackdrop.isHidden = false
-                visualEffectBackdrop.material = .popover
-                visualEffectBackdrop.blendingMode = .withinWindow
+                visualEffectBackdrop.material = .hudWindow
+                visualEffectBackdrop.blendingMode = .behindWindow
                 visualEffectBackdrop.state = .active
                 
                 glassSheenLayer.isHidden = false
                 glassSheenLayer.frame = containerPill.bounds
+                glassSheenLayer.colors = [
+                    NSColor(white: 1.0, alpha: SystemAppearanceHelper.isDarkSystemAppearance ? 0.35 : 0.45).cgColor,
+                    NSColor(white: 1.0, alpha: 0.10).cgColor,
+                    NSColor(white: 1.0, alpha: 0.00).cgColor,
+                    NSColor(white: 1.0, alpha: 0.14).cgColor
+                ]
+                glassSheenLayer.locations = [0.0, 0.20, 0.80, 1.0]
                 
-                // Contrast-safe backing plate prevents transparency washout over dark/black wallpapers
+                // Translucent Control Center glass backing
                 containerPill.layer?.backgroundColor = SystemAppearanceHelper.clearModeBackingColor.cgColor
                 containerPill.layer?.borderWidth = 1.0
                 containerPill.layer?.borderColor = SystemAppearanceHelper.clearModeBorderColor.cgColor

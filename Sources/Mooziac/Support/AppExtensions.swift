@@ -78,23 +78,21 @@ public enum SystemAppearanceHelper {
         return match == .darkAqua
     }
 
-    /// Contrast-safe backing color for Clear / Native Vibrancy mode
+    /// Apple Control Center Native Liquid Glass Backing
     public static var clearModeBackingColor: NSColor {
         if isDarkSystemAppearance {
-            // Calibrated translucent obsidian tint that guarantees ≥ 4.5:1 contrast on pure black / dark wallpapers
-            return NSColor(red: 0.09, green: 0.10, blue: 0.14, alpha: 0.72)
+            return NSColor(white: 1.0, alpha: 0.08)
         } else {
-            // Frosted crystal tint for light wallpapers
-            return NSColor(white: 0.94, alpha: 0.82)
+            return NSColor(white: 1.0, alpha: 0.22)
         }
     }
 
-    /// Specular perimeter border for Clear / Native mode
+    /// Specular perimeter border for Native Glass mode
     public static var clearModeBorderColor: NSColor {
         if isDarkSystemAppearance {
-            return NSColor(white: 1.0, alpha: 0.28)
+            return NSColor(white: 1.0, alpha: 0.32)
         } else {
-            return NSColor(white: 0.0, alpha: 0.18)
+            return NSColor(white: 1.0, alpha: 0.45)
         }
     }
 
