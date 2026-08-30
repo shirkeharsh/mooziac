@@ -261,37 +261,45 @@ extension DynamicIslandPlayerView {
                 resetPositionButton.contentTintColor = glassBtnTint
 
             case .liquidFluid:
-                // Watery Pure Transparent Liquid Glass Mode
+                // Apple True Liquid Glass Mode: Behind-window optical blur, convex meniscus sheen, transparent body
                 visualEffectBackdrop.isHidden = false
                 visualEffectBackdrop.material = .hudWindow
-                visualEffectBackdrop.blendingMode = .withinWindow
+                visualEffectBackdrop.blendingMode = .behindWindow
                 visualEffectBackdrop.state = .active
                 
                 glassSheenLayer.isHidden = false
                 glassSheenLayer.frame = containerPill.bounds
+                glassSheenLayer.colors = [
+                    NSColor(white: 1.0, alpha: 0.38).cgColor,
+                    NSColor(white: 1.0, alpha: 0.10).cgColor,
+                    NSColor(white: 1.0, alpha: 0.00).cgColor,
+                    NSColor(white: 1.0, alpha: 0.16).cgColor
+                ]
+                glassSheenLayer.locations = [0.0, 0.18, 0.82, 1.0]
+                
                 liquidFluidMeshLayer.isHidden = true
                 stopLiquidFluidAnimation()
                 
-                containerPill.layer?.backgroundColor = SystemAppearanceHelper.liquidFluidBackingColor.cgColor
+                containerPill.layer?.backgroundColor = NSColor.clear.cgColor
                 containerPill.layer?.borderWidth = 1.0
-                containerPill.layer?.borderColor = SystemAppearanceHelper.liquidFluidBorderColor.cgColor
+                containerPill.layer?.borderColor = NSColor(white: 1.0, alpha: 0.32).cgColor
                 
                 titleLabel.font = NSFont.systemFont(ofSize: 13, weight: .bold)
                 artistLabel.font = NSFont.systemFont(ofSize: 11, weight: .medium)
                 timeLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular)
                 
-                titleLabel.textColor = SystemAppearanceHelper.primaryTextColor(for: .liquidFluid)
-                artistLabel.textColor = SystemAppearanceHelper.secondaryTextColor(for: .liquidFluid)
-                timeLabel.textColor = SystemAppearanceHelper.tertiaryTextColor(for: .liquidFluid)
+                titleLabel.textColor = NSColor.white
+                artistLabel.textColor = NSColor(white: 0.88, alpha: 1.0)
+                timeLabel.textColor = NSColor(white: 0.80, alpha: 1.0)
                 
-                waveformProgressView.accentColor = SystemAppearanceHelper.isDarkSystemAppearance ? NSColor.white : NSColor(red: 0.10, green: 0.10, blue: 0.12, alpha: 1.0)
+                waveformProgressView.accentColor = NSColor.white
                 
-                let fluidBtnTint = SystemAppearanceHelper.controlButtonTint(for: .liquidFluid)
-                playPauseButton.contentTintColor = SystemAppearanceHelper.primaryTextColor(for: .liquidFluid)
+                let fluidBtnTint = NSColor(white: 0.90, alpha: 0.90)
+                playPauseButton.contentTintColor = NSColor.white
                 previousButton.contentTintColor = fluidBtnTint
                 nextButton.contentTintColor = fluidBtnTint
                 addToPlaylistButton.contentTintColor = fluidBtnTint
-                repeatButton.contentTintColor = (repeatMode != .off) ? SystemAppearanceHelper.primaryTextColor(for: .liquidFluid) : fluidBtnTint
+                repeatButton.contentTintColor = (repeatMode != .off) ? NSColor.white : fluidBtnTint
                 likeButton.contentTintColor = isLiked ? NSColor(red: 1.0, green: 0.28, blue: 0.38, alpha: 1.0) : fluidBtnTint
                 searchIconButton.contentTintColor = fluidBtnTint
                 fullScreenButton.contentTintColor = fluidBtnTint
