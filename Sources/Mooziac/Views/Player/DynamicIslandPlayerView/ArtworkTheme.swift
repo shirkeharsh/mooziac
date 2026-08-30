@@ -136,6 +136,7 @@ extension DynamicIslandPlayerView {
             case .adaptive:
                 visualEffectBackdrop.isHidden = true
                 glassSheenLayer.isHidden = true
+                cylindricalLensLayer.isHidden = true
                 let bg = lastAmbientBgColor ?? NSColor(red: 0.08, green: 0.08, blue: 0.11, alpha: 0.98).cgColor
                 let border = lastAmbientBorderColor ?? NSColor(white: 1.0, alpha: 0.20).cgColor
                 containerPill.layer?.backgroundColor = bg
@@ -167,6 +168,7 @@ extension DynamicIslandPlayerView {
             case .darkMode:
                 visualEffectBackdrop.isHidden = true
                 glassSheenLayer.isHidden = true
+                cylindricalLensLayer.isHidden = true
                 containerPill.layer?.backgroundColor = SystemAppearanceHelper.darkModeBackingColor.cgColor
                 containerPill.layer?.borderWidth = 1.0
                 containerPill.layer?.borderColor = SystemAppearanceHelper.darkModeBorderColor.cgColor
@@ -190,9 +192,12 @@ extension DynamicIslandPlayerView {
                 searchIconButton.contentTintColor = darkBtnTint
                 fullScreenButton.contentTintColor = darkBtnTint
                 browserButton.contentTintColor = darkBtnTint
+                resetPositionButton.contentTintColor = darkBtnTint
+
             case .glassMode:
                 visualEffectBackdrop.isHidden = true
                 glassSheenLayer.isHidden = true
+                cylindricalLensLayer.isHidden = true
                 // Premium Light Mode #EFF2F0 with high-contrast text
                 containerPill.layer?.backgroundColor = NSColor(red: 0.93725, green: 0.94902, blue: 0.94118, alpha: 0.98).cgColor
                 containerPill.layer?.borderWidth = 1.0
@@ -225,45 +230,61 @@ extension DynamicIslandPlayerView {
                 resetPositionButton.contentTintColor = glassBtnTint
 
             case .liquidFluid:
-                // Apple True Liquid Glass Mode: Behind-window optical blur, convex meniscus sheen, transparent body
+                // Apple Control Center Optical Liquid Glass: Behind-window blur, 3D meniscus acrylic rim, cylindrical lens flare
                 visualEffectBackdrop.isHidden = false
                 visualEffectBackdrop.material = .hudWindow
                 visualEffectBackdrop.blendingMode = .behindWindow
                 visualEffectBackdrop.state = .active
                 
+                // Convex meniscus rim with top glint & bottom internal bounce reflection
                 glassSheenLayer.isHidden = false
                 glassSheenLayer.frame = containerPill.bounds
                 glassSheenLayer.colors = [
-                    NSColor(white: 1.0, alpha: 0.38).cgColor,
-                    NSColor(white: 1.0, alpha: 0.10).cgColor,
+                    NSColor(white: 1.0, alpha: 0.65).cgColor,
+                    NSColor(white: 1.0, alpha: 0.16).cgColor,
                     NSColor(white: 1.0, alpha: 0.00).cgColor,
-                    NSColor(white: 1.0, alpha: 0.16).cgColor
+                    NSColor(white: 1.0, alpha: 0.28).cgColor
                 ]
-                glassSheenLayer.locations = [0.0, 0.18, 0.82, 1.0]
+                glassSheenLayer.locations = [0.0, 0.14, 0.86, 1.0]
+
+                // Horizontal cylindrical lens refraction flare (the exact horizontal streak in Apple's player)
+                cylindricalLensLayer.isHidden = false
+                cylindricalLensLayer.frame = containerPill.bounds
+                cylindricalLensLayer.colors = [
+                    NSColor(white: 1.0, alpha: 0.00).cgColor,
+                    NSColor(white: 1.0, alpha: 0.12).cgColor,
+                    NSColor(white: 1.0, alpha: 0.38).cgColor,
+                    NSColor(white: 1.0, alpha: 0.14).cgColor,
+                    NSColor(white: 0.0, alpha: 0.12).cgColor,
+                    NSColor(white: 1.0, alpha: 0.00).cgColor
+                ]
+                cylindricalLensLayer.locations = [0.0, 0.18, 0.36, 0.44, 0.50, 1.0]
                 
                 liquidFluidMeshLayer.isHidden = true
                 stopLiquidFluidAnimation()
                 
-                containerPill.layer?.backgroundColor = NSColor.clear.cgColor
-                containerPill.layer?.borderWidth = 1.0
-                containerPill.layer?.borderColor = NSColor(white: 1.0, alpha: 0.32).cgColor
+                // Smoky obsidian liquid glass backing plate (gives rich black contrast so text and art pop)
+                containerPill.layer?.backgroundColor = SystemAppearanceHelper.liquidFluidBackingColor.cgColor
+                containerPill.layer?.borderWidth = 1.5
+                containerPill.layer?.borderColor = SystemAppearanceHelper.liquidFluidBorderColor.cgColor
                 
                 titleLabel.font = NSFont.systemFont(ofSize: 13, weight: .bold)
                 artistLabel.font = NSFont.systemFont(ofSize: 11, weight: .medium)
                 timeLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular)
                 
                 titleLabel.textColor = NSColor.white
-                artistLabel.textColor = NSColor(white: 0.88, alpha: 1.0)
-                timeLabel.textColor = NSColor(white: 0.80, alpha: 1.0)
+                artistLabel.textColor = NSColor(white: 0.86, alpha: 1.0)
+                timeLabel.textColor = NSColor(white: 0.78, alpha: 1.0)
                 
-                waveformProgressView.accentColor = NSColor.white
+                // Apple Electric Blue progress accent
+                waveformProgressView.accentColor = NSColor(red: 0.0, green: 0.52, blue: 1.0, alpha: 1.0)
                 
-                let fluidBtnTint = NSColor(white: 0.90, alpha: 0.90)
+                let fluidBtnTint = NSColor(white: 0.92, alpha: 0.95)
                 playPauseButton.contentTintColor = NSColor.white
                 previousButton.contentTintColor = fluidBtnTint
                 nextButton.contentTintColor = fluidBtnTint
                 addToPlaylistButton.contentTintColor = fluidBtnTint
-                repeatButton.contentTintColor = (repeatMode != .off) ? NSColor.white : fluidBtnTint
+                repeatButton.contentTintColor = (repeatMode != .off) ? NSColor(red: 0.0, green: 0.52, blue: 1.0, alpha: 1.0) : fluidBtnTint
                 likeButton.contentTintColor = isLiked ? NSColor(red: 1.0, green: 0.28, blue: 0.38, alpha: 1.0) : fluidBtnTint
                 searchIconButton.contentTintColor = fluidBtnTint
                 fullScreenButton.contentTintColor = fluidBtnTint
@@ -273,6 +294,7 @@ extension DynamicIslandPlayerView {
         }
 
         if design != .liquidFluid {
+            cylindricalLensLayer.isHidden = true
             liquidFluidMeshLayer.isHidden = true
             stopLiquidFluidAnimation()
         }

@@ -39,6 +39,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     let resetPositionButton = ReactiveIconButton()
     let visualEffectBackdrop = NSVisualEffectView()
     let glassSheenLayer = CAGradientLayer()
+    let cylindricalLensLayer = CAGradientLayer()
     let liquidFluidMeshLayer = CAGradientLayer()
     var isLiked: Bool = false
     var isRepeatActive: Bool = false
@@ -358,6 +359,11 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         glassSheenLayer.masksToBounds = true
         glassSheenLayer.isHidden = true
         containerPill.layer?.addSublayer(glassSheenLayer)
+
+        cylindricalLensLayer.cornerRadius = 20
+        cylindricalLensLayer.masksToBounds = true
+        cylindricalLensLayer.isHidden = true
+        containerPill.layer?.addSublayer(cylindricalLensLayer)
 
         setupLiquidFluidLayer()
         containerPill.layer?.insertSublayer(liquidFluidMeshLayer, at: 0)
@@ -1240,6 +1246,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     override func layout() {
         super.layout()
         glassSheenLayer.frame = containerPill.bounds
+        cylindricalLensLayer.frame = containerPill.bounds
         liquidFluidMeshLayer.frame = containerPill.bounds
     }
 }

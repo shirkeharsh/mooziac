@@ -611,9 +611,9 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
                 visualEffectBackdrop.blendingMode = .behindWindow
                 visualEffectBackdrop.state = .active
 
-                layer?.backgroundColor = NSColor.clear.cgColor
-                layer?.borderWidth = 1.0
-                layer?.borderColor = NSColor(white: 1.0, alpha: 0.32).cgColor
+                layer?.backgroundColor = SystemAppearanceHelper.liquidFluidBackingColor.cgColor
+                layer?.borderWidth = 1.5
+                layer?.borderColor = SystemAppearanceHelper.liquidFluidBorderColor.cgColor
                 headerTitleLabel.textColor = NSColor.white
                 headerSubtitleLabel.textColor = NSColor(white: 0.88, alpha: 1.0)
                 backButton.contentTintColor = NSColor.white

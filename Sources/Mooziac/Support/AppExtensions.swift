@@ -88,14 +88,14 @@ public enum SystemAppearanceHelper {
         return NSColor(white: 1.0, alpha: 0.18)
     }
 
-    /// Contrast-safe pure transparent backing color for Watery Mode
+    /// Apple Control Center Smoky Obsidian Liquid Backing
     public static var liquidFluidBackingColor: NSColor {
-        return NSColor.clear
+        return NSColor(red: 0.08, green: 0.09, blue: 0.13, alpha: 0.46)
     }
 
-    /// Pure watery specular perimeter border
+    /// Molded acrylic specular perimeter border
     public static var liquidFluidBorderColor: NSColor {
-        return NSColor(white: 1.0, alpha: 0.32)
+        return NSColor(white: 1.0, alpha: 0.45)
     }
 
     /// Contrast-safe primary text color
