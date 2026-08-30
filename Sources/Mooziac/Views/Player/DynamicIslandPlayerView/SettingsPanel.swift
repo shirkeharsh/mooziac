@@ -3375,7 +3375,6 @@ extension DynamicIslandPlayerView {
         case .adaptive: return "Live dynamic artwork backdrop"
         case .darkMode: return "Deep pitch-black dark contrast"
         case .glassMode: return "Translucent frosted glass panel"
-        case .native: return "macOS native menu vibrancy"
         case .liquidFluid: return "Watery pure transparent liquid glass"
         }
     }
@@ -3421,14 +3420,13 @@ extension DynamicIslandPlayerView {
         titleLbl.setContentCompressionResistancePriority(.required, for: .vertical)
         descLbl.setContentCompressionResistancePriority(.required, for: .vertical)
 
-        themeToggle.totalSteps = 5
+        themeToggle.totalSteps = 4
         let currentThemeStep: Int
         switch PlayerDesign.current {
         case .adaptive: currentThemeStep = 0
         case .darkMode: currentThemeStep = 1
         case .glassMode: currentThemeStep = 2
-        case .native: currentThemeStep = 3
-        case .liquidFluid: currentThemeStep = 4
+        case .liquidFluid: currentThemeStep = 3
         }
         themeToggle.stepIndex = currentThemeStep
         themeToggle.onStep = { [weak self] step in
@@ -3443,9 +3441,6 @@ extension DynamicIslandPlayerView {
                 PlayerDesign.current = .glassMode
                 CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Theme: Crystal Glass")
             case 3:
-                PlayerDesign.current = .native
-                CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Theme: macOS Vibrancy")
-            case 4:
                 PlayerDesign.current = .liquidFluid
                 CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Theme: Watery Transparent")
             default:
@@ -3488,9 +3483,6 @@ extension DynamicIslandPlayerView {
             PlayerDesign.current = .glassMode
             CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Theme: Crystal Glass")
         case .glassMode:
-            PlayerDesign.current = .native
-            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Theme: macOS Vibrancy")
-        case .native:
             PlayerDesign.current = .liquidFluid
             CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Theme: Watery Transparent")
         case .liquidFluid:
@@ -3736,7 +3728,7 @@ extension DynamicIslandPlayerView {
             return .dark
         case .glassMode:
             return .light
-        case .adaptive, .native:
+        case .adaptive:
             return SystemAppearanceHelper.isDarkSystemAppearance ? .dark : .light
         }
     }
@@ -3763,24 +3755,15 @@ extension DynamicIslandPlayerView {
         case .adaptive: currentThemeStep = 0
         case .darkMode: currentThemeStep = 1
         case .glassMode: currentThemeStep = 2
-        case .native: currentThemeStep = 3
-        case .liquidFluid: currentThemeStep = 4
+        case .liquidFluid: currentThemeStep = 3
         }
         themeToggle.stepIndex = currentThemeStep
         let allStyles = ProgressStyle.allCases
         progressToggle.stepIndex = allStyles.firstIndex(of: ProgressStyle.current) ?? 0
 
-        let isNative = (PlayerDesign.current == .native)
         for row in featureRowContainers {
-            if isNative {
-                row.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.08).cgColor
-                row.layer?.cornerRadius = 8
-                row.layer?.borderWidth = 1.0
-                row.layer?.borderColor = NSColor(white: 1.0, alpha: 0.08).cgColor
-            } else {
-                row.layer?.backgroundColor = NSColor.clear.cgColor
-                row.layer?.borderWidth = 0
-            }
+            row.layer?.backgroundColor = NSColor.clear.cgColor
+            row.layer?.borderWidth = 0
         }
 
         for icon in featureIconViews {
@@ -3805,9 +3788,7 @@ extension DynamicIslandPlayerView {
         let isGlass = (PlayerDesign.current == .glassMode)
         let isDark = (PlayerDesign.current == .darkMode || tone == .dark)
         let cyan: NSColor
-        if isNative {
-            cyan = NSColor.white
-        } else if isGlass {
+        if isGlass {
             cyan = NSColor.lightThemeSelector
         } else if isDark {
             cyan = NSColor.darkThemeSelector

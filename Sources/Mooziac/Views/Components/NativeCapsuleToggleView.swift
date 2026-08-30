@@ -45,12 +45,9 @@ final class NativeCapsuleToggleView: NSControl {
     public func updateVisuals(animated: Bool = true) {
         let isDark = (PlayerDesign.current == .darkMode)
         let isGlass = (PlayerDesign.current == .glassMode)
-        let isNative = (PlayerDesign.current == .native)
         
         let activeColor: CGColor
-        if isNative {
-            activeColor = NSColor.white.cgColor
-        } else if isDark {
+        if isDark {
             activeColor = NSColor.darkThemeSelector.cgColor
         } else if isGlass {
             activeColor = NSColor.lightThemeSelector.cgColor
@@ -59,18 +56,16 @@ final class NativeCapsuleToggleView: NSControl {
         }
         
         let inactiveTrackColor: CGColor
-        if isNative {
-            inactiveTrackColor = NSColor(white: 1.0, alpha: 0.16).cgColor
-        } else if isGlass {
+        if isGlass {
             inactiveTrackColor = NSColor(white: 0.0, alpha: 0.14).cgColor
         } else {
-            inactiveTrackColor = NSColor(white: 0.28, alpha: 1.0).cgColor
+            inactiveTrackColor = NSColor(white: 1.0, alpha: 0.14).cgColor
         }
         
         let targetTrackColor = isOn ? activeColor : inactiveTrackColor
         let targetKnobX: CGFloat = isOn ? 16.0 : 2.0
         let targetKnobColor: CGColor
-        if isOn && (isNative || isDark) {
+        if isOn && isDark {
             targetKnobColor = NSColor(white: 0.12, alpha: 1.0).cgColor
         } else {
             targetKnobColor = NSColor.white.cgColor

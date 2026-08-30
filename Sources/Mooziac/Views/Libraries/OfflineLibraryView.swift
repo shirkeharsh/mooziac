@@ -328,21 +328,6 @@ public class OfflineLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSou
             context.duration = 0.35
 
             switch design {
-            case .native:
-                visualEffectBackdrop.isHidden = false
-                visualEffectBackdrop.material = .hudWindow
-                visualEffectBackdrop.blendingMode = .behindWindow
-                visualEffectBackdrop.state = .active
-
-                layer?.backgroundColor = SystemAppearanceHelper.clearModeBackingColor.cgColor
-                layer?.borderWidth = 1.0
-                layer?.borderColor = SystemAppearanceHelper.clearModeBorderColor.cgColor
-
-                headerTitleLabel.textColor = SystemAppearanceHelper.primaryTextColor(for: .native)
-                backButton.contentTintColor = SystemAppearanceHelper.primaryTextColor(for: .native)
-                importButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .native)
-                openFolderButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .native)
-
             case .adaptive:
                 visualEffectBackdrop.isHidden = true
                 let bg = DynamicIslandPlayerView.sharedAmbientBgColor ?? NSColor(red: 0.08, green: 0.08, blue: 0.11, alpha: 0.98).cgColor

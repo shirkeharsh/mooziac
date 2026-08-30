@@ -181,8 +181,6 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
                 repeatButton.contentTintColor = NSColor(red: 0.082, green: 0.082, blue: 0.082, alpha: 1.0)
             case .adaptive, .darkMode, .liquidFluid:
                 repeatButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
-            case .native:
-                repeatButton.contentTintColor = NSColor(white: 0.88, alpha: 1.0)
             }
         }
     }
@@ -1150,8 +1148,6 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
                 browserButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
             case .darkMode:
                 browserButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
-            case .native:
-                browserButton.contentTintColor = NSColor(white: 0.88, alpha: 1.0)
             }
         }
     }
@@ -1169,8 +1165,6 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
                 addToPlaylistButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
             case .darkMode:
                 addToPlaylistButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
-            case .native:
-                addToPlaylistButton.contentTintColor = NSColor(white: 0.88, alpha: 1.0)
             }
         }
     }

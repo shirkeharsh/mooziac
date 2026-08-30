@@ -163,49 +163,6 @@ extension DynamicIslandPlayerView {
                 browserButton.contentTintColor = btnTint
                 resetPositionButton.contentTintColor = btnTint
 
-            case .native:
-                // macOS Control Center Liquid Glass: WindowServer optical blur, convex meniscus sheen, transparent plate
-                visualEffectBackdrop.isHidden = false
-                visualEffectBackdrop.material = .hudWindow
-                visualEffectBackdrop.blendingMode = .behindWindow
-                visualEffectBackdrop.state = .active
-                
-                glassSheenLayer.isHidden = false
-                glassSheenLayer.frame = containerPill.bounds
-                glassSheenLayer.colors = [
-                    NSColor(white: 1.0, alpha: SystemAppearanceHelper.isDarkSystemAppearance ? 0.35 : 0.45).cgColor,
-                    NSColor(white: 1.0, alpha: 0.10).cgColor,
-                    NSColor(white: 1.0, alpha: 0.00).cgColor,
-                    NSColor(white: 1.0, alpha: 0.14).cgColor
-                ]
-                glassSheenLayer.locations = [0.0, 0.20, 0.80, 1.0]
-                
-                // Translucent Control Center glass backing
-                containerPill.layer?.backgroundColor = SystemAppearanceHelper.clearModeBackingColor.cgColor
-                containerPill.layer?.borderWidth = 1.0
-                containerPill.layer?.borderColor = SystemAppearanceHelper.clearModeBorderColor.cgColor
-                
-                titleLabel.font = NSFont.systemFont(ofSize: 13, weight: .bold)
-                artistLabel.font = NSFont.systemFont(ofSize: 11, weight: .medium)
-                timeLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular)
-                
-                titleLabel.textColor = SystemAppearanceHelper.primaryTextColor(for: .native)
-                artistLabel.textColor = SystemAppearanceHelper.secondaryTextColor(for: .native)
-                timeLabel.textColor = SystemAppearanceHelper.tertiaryTextColor(for: .native)
-                
-                waveformProgressView.accentColor = SystemAppearanceHelper.isDarkSystemAppearance ? NSColor.white : NSColor(red: 0.10, green: 0.10, blue: 0.12, alpha: 1.0)
-                
-                let clearBtnTint = SystemAppearanceHelper.controlButtonTint(for: .native)
-                playPauseButton.contentTintColor = SystemAppearanceHelper.primaryTextColor(for: .native)
-                previousButton.contentTintColor = clearBtnTint
-                nextButton.contentTintColor = clearBtnTint
-                addToPlaylistButton.contentTintColor = clearBtnTint
-                repeatButton.contentTintColor = (repeatMode != .off) ? SystemAppearanceHelper.primaryTextColor(for: .native) : clearBtnTint
-                likeButton.contentTintColor = isLiked ? NSColor(red: 1.0, green: 0.28, blue: 0.38, alpha: 1.0) : clearBtnTint
-                searchIconButton.contentTintColor = clearBtnTint
-                fullScreenButton.contentTintColor = clearBtnTint
-                browserButton.contentTintColor = clearBtnTint
-                resetPositionButton.contentTintColor = clearBtnTint
 
             case .darkMode:
                 visualEffectBackdrop.isHidden = true

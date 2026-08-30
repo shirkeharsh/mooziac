@@ -4,15 +4,10 @@ public enum PlayerDesign: String, CaseIterable {
     case adaptive = "Adaptive (Ambient Dark)"
     case darkMode = "OLED Dark Mode"
     case glassMode = "Pure Crystal Glass Mode"
-    case native = "macOS Native Vibrancy"
     case liquidFluid = "Watery Pure Transparent"
 
     public var isGlass: Bool {
         return self == .glassMode
-    }
-
-    public var isNativeVibrancy: Bool {
-        return self == .native
     }
 
     public var isLiquidFluid: Bool {
@@ -23,6 +18,7 @@ public enum PlayerDesign: String, CaseIterable {
         get {
             let saved = UserDefaults.standard.string(forKey: "YTM_playerDesign") ?? PlayerDesign.adaptive.rawValue
             if saved == "Adaptive (Glass & Ambient)" { return .adaptive }
+            if saved == "macOS Native Vibrancy" { return .liquidFluid }
             if saved == "Liquid Fluid Glow" || saved == "Watery Pure Transparent" { return .liquidFluid }
             return PlayerDesign(rawValue: saved) ?? .adaptive
         }

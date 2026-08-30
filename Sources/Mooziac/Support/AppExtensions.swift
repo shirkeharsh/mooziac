@@ -78,24 +78,6 @@ public enum SystemAppearanceHelper {
         return match == .darkAqua
     }
 
-    /// Apple Control Center Native Liquid Glass Backing
-    public static var clearModeBackingColor: NSColor {
-        if isDarkSystemAppearance {
-            return NSColor(white: 1.0, alpha: 0.08)
-        } else {
-            return NSColor(white: 1.0, alpha: 0.22)
-        }
-    }
-
-    /// Specular perimeter border for Native Glass mode
-    public static var clearModeBorderColor: NSColor {
-        if isDarkSystemAppearance {
-            return NSColor(white: 1.0, alpha: 0.32)
-        } else {
-            return NSColor(white: 1.0, alpha: 0.45)
-        }
-    }
-
     /// Contrast-safe backing color for Dark Mode
     public static var darkModeBackingColor: NSColor {
         return NSColor(red: 0.045, green: 0.045, blue: 0.065, alpha: 0.98)
@@ -121,8 +103,6 @@ public enum SystemAppearanceHelper {
         switch design {
         case .glassMode:
             return NSColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 1.0)
-        case .native:
-            return isDarkSystemAppearance ? NSColor.white : NSColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 1.0)
         case .adaptive, .darkMode, .liquidFluid:
             return NSColor.white
         }
@@ -133,8 +113,6 @@ public enum SystemAppearanceHelper {
         switch design {
         case .glassMode:
             return NSColor(red: 0.15, green: 0.15, blue: 0.15, alpha: 0.85)
-        case .native:
-            return isDarkSystemAppearance ? NSColor(white: 0.82, alpha: 1.0) : NSColor(white: 0.20, alpha: 0.85)
         case .adaptive, .liquidFluid:
             return NSColor(white: 0.85, alpha: 1.0)
         case .darkMode:
@@ -147,8 +125,6 @@ public enum SystemAppearanceHelper {
         switch design {
         case .glassMode:
             return NSColor(red: 0.25, green: 0.25, blue: 0.25, alpha: 0.75)
-        case .native:
-            return isDarkSystemAppearance ? NSColor(white: 0.74, alpha: 1.0) : NSColor(white: 0.30, alpha: 0.75)
         case .adaptive, .liquidFluid:
             return NSColor(white: 0.75, alpha: 1.0)
         case .darkMode:
@@ -164,8 +140,6 @@ public enum SystemAppearanceHelper {
         switch design {
         case .glassMode:
             return NSColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 1.0)
-        case .native:
-            return isDarkSystemAppearance ? NSColor(white: 0.90, alpha: 1.0) : NSColor(white: 0.10, alpha: 1.0)
         case .adaptive, .darkMode, .liquidFluid:
             return NSColor(white: 0.90, alpha: 1.0)
         }

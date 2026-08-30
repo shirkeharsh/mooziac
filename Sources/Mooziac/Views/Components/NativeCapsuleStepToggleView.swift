@@ -50,14 +50,11 @@ public final class NativeCapsuleStepToggleView: NSControl {
     public func updateVisuals(animated: Bool = true) {
         let isDark = (PlayerDesign.current == .darkMode)
         let isGlass = (PlayerDesign.current == .glassMode)
-        let isNative = (PlayerDesign.current == .native)
         let isLiquid = (PlayerDesign.current == .liquidFluid)
         
         let activeColor: CGColor
         if isLiquid {
             activeColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0).cgColor
-        } else if isNative {
-            activeColor = NSColor.white.cgColor
         } else if isDark {
             activeColor = NSColor.darkThemeSelector.cgColor
         } else if isGlass {
@@ -71,7 +68,7 @@ public final class NativeCapsuleStepToggleView: NSControl {
         let maxX: CGFloat = 16.0
         let effectiveSteps = max(1, totalSteps - 1)
         let targetKnobX: CGFloat = minX + (CGFloat(stepIndex) / CGFloat(effectiveSteps)) * (maxX - minX)
-        let targetKnobColor = (isNative || isDark) ? NSColor(white: 0.12, alpha: 1.0).cgColor : NSColor.white.cgColor
+        let targetKnobColor = isDark ? NSColor(white: 0.12, alpha: 1.0).cgColor : NSColor.white.cgColor
         
         if animated {
             CATransaction.begin()

@@ -9,8 +9,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-APP_VERSION="1.0.6"
-APP_BUILD="6"
+APP_VERSION="1.0.7"
+APP_BUILD="7"
 APP_NAME="Mooziac.app"
 APP_BUNDLE_ID="app.mooziac.mac"
 APP_COPYRIGHT="Copyright © 2026 ThreeTen. All rights reserved."
@@ -24,8 +24,8 @@ LAUNCH_AFTER_BUILD=true
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --no-launch) LAUNCH_AFTER_BUILD=false; shift ;;
-        --version) APP_VERSION="$2"; shift 2 ;;
-        --build) APP_BUILD="$2"; shift 2 ;;
+        --version) APP_VERSION="1.0.7"; shift 2 ;;
+        --build) APP_BUILD="7"; shift 2 ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
