@@ -8,19 +8,18 @@ public final class StudioProcessRunner {
     private let queue = DispatchQueue(label: "app.mooziac.studio.process", qos: .userInitiated)
     
     public var workspacePath: String {
-        let current = FileManager.default.currentDirectoryPath
-        if FileManager.default.fileExists(atPath: "\(current)/Package.swift") {
-            return current
+        let candidates = [
+            "/Users/harshshirke/local/projects/Mooziac/mp3kal",
+            FileManager.default.currentDirectoryPath,
+            "\(FileManager.default.currentDirectoryPath)/mp3kal",
+            "/Users/harshshirke/local/projects/Mooziac"
+        ]
+        for path in candidates {
+            if FileManager.default.fileExists(atPath: "\(path)/Package.swift") {
+                return path
+            }
         }
-        let fallback = "/Users/harshshirke/local/projects/Mooziac/mp3kal"
-        if FileManager.default.fileExists(atPath: fallback) {
-            return fallback
-        }
-        let rootFallback = "/Users/harshshirke/local/projects/Mooziac"
-        if FileManager.default.fileExists(atPath: rootFallback) {
-            return rootFallback
-        }
-        return current
+        return "/Users/harshshirke/local/projects/Mooziac/mp3kal"
     }
     
     public var isRunning: Bool {
@@ -60,9 +59,9 @@ public final class StudioProcessRunner {
             let targetDir = workingDir ?? self.workspacePath
             process.currentDirectoryURL = URL(fileURLWithPath: targetDir)
             
-            // Set up environment with common PATHs (Xcode, Homebrew, local bin, cargo, nvm, etc.)
             var env = ProcessInfo.processInfo.environment
-            let customPath = "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Library/Apple/usr/bin:\(NSHomeDirectory())/.cargo/bin:\(NSHomeDirectory())/.nvm/versions/node/current/bin"
+            let home = NSHomeDirectory()
+            let customPath = "\(home)/.gemini/antigravity-cli/bin:\(home)/.local/bin:\(home)/.cargo/bin:\(home)/miniconda3/bin:\(home)/.pyenv/shims:\(home)/.nvm/versions/node/current/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Library/Apple/usr/bin"
             env["PATH"] = customPath + ":" + (env["PATH"] ?? "")
             env["TERM"] = "xterm-256color"
             process.environment = env
@@ -93,6 +92,18 @@ public final class StudioProcessRunner {
             do {
                 try process.run()
                 process.waitUntilExit()
+                
+                // Drain any trailing bytes left in the pipe buffer
+                let remainingData = outHandle.readDataToEndOfFile()
+                if !remainingData.isEmpty, let text = String(data: remainingData, encoding: .utf8) {
+                    let lines = text.components(separatedBy: .newlines)
+                    for line in lines where !line.isEmpty {
+                        let parsed = ANSIParser.parse(line)
+                        DispatchQueue.main.async {
+                            onOutput(parsed.cleanText, parsed.type)
+                        }
+                    }
+                }
                 
                 outHandle.readabilityHandler = nil
                 

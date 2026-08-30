@@ -20,6 +20,8 @@ public struct NativeTerminalWebView: NSViewRepresentable {
         contentController.add(context.coordinator, name: "terminalInput")
         contentController.add(context.coordinator, name: "terminalResize")
         contentController.add(context.coordinator, name: "terminalReady")
+        contentController.add(context.coordinator, name: "terminalCopy")
+        contentController.add(context.coordinator, name: "terminalRequestPaste")
         
         let config = WKWebViewConfiguration()
         config.userContentController = contentController
@@ -63,6 +65,13 @@ public struct NativeTerminalWebView: NSViewRepresentable {
         public func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             if message.name == "terminalInput", let str = message.body as? String {
                 parent.pty.write(string: str)
+            } else if message.name == "terminalCopy", let text = message.body as? String, !text.isEmpty {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(text, forType: .string)
+            } else if message.name == "terminalRequestPaste" {
+                if let pasteText = NSPasteboard.general.string(forType: .string), !pasteText.isEmpty {
+                    parent.pty.write(string: pasteText)
+                }
             } else if message.name == "terminalResize", let dict = message.body as? [String: Any] {
                 let cols = Int32(dict["cols"] as? Int ?? 80)
                 let rows = Int32(dict["rows"] as? Int ?? 24)

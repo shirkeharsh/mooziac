@@ -123,21 +123,59 @@ public struct ShipPipelineView: View {
             } else if output.contains("Code signing") {
                 state.pipelineSteps[1].status = .completed
                 state.pipelineSteps[2].status = .running
-            } else if output.contains("Packaging Mooziac.dmg") {
+            } else if output.contains("Creating styled DMG") || output.contains("Creating ZIP") {
                 state.pipelineSteps[2].status = .completed
                 state.pipelineSteps[3].status = .running
             }
         } onComplete: { success, code in
-            state.isRunningTask = false
             if success {
                 for i in 0..<4 {
-                    state.pipelineSteps[i].status = .completed
+                    self.state.pipelineSteps[i].status = .completed
                 }
-                state.appendLog("✅ Build & DMG Packaging phase completed successfully!", .success)
-                state.refreshAllTelemetry()
+                self.state.appendLog("✅ Build & DMG Packaging phase completed successfully!", .success)
+                
+                // Step 5: Web Deploy
+                self.state.pipelineSteps[4].status = .running
+                self.state.currentTaskName = "Syncing Website to VPS..."
+                let webCmd = "cd \"\(ws)/www\" && ./push.sh"
+                StudioProcessRunner.shared.executeCommand(webCmd) { out, typ in
+                    self.state.appendLog(out, type: typ)
+                } onComplete: { webSuccess, webCode in
+                    if webSuccess {
+                        self.state.pipelineSteps[4].status = .completed
+                        self.state.appendLog("✅ Website deployment phase finished!", .success)
+                    } else {
+                        self.state.pipelineSteps[4].status = .failed
+                        self.state.appendLog("⚠️ Web deploy finished with warning (\(webCode)).", .warning)
+                    }
+                    
+                    // Step 6: Git Tag & Push Release
+                    self.state.pipelineSteps[5].status = .running
+                    self.state.currentTaskName = "Tagging & Shipping GitHub Release..."
+                    let (newVer, newBuild, newTag) = StudioVersionManager.shared.bumpAndApplyVersion(workspacePath: ws)
+                    let relCmd = "cd \"\(ws)\" && (git add -A && git commit -m \"Release \(newTag) (Build \(newBuild))\" || true) && git push origin HEAD && (git tag -d \(newTag) 2>/dev/null || true) && git tag -a \(newTag) -m \"Mooziac \(newVer) Release\" && git push origin \(newTag) && git status -s"
+                    
+                    StudioProcessRunner.shared.executeCommand(relCmd) { rOut, rTyp in
+                        self.state.appendLog(rOut, type: rTyp)
+                    } onComplete: { relSuccess, relCode in
+                        self.state.isRunningTask = false
+                        self.state.currentTaskName = ""
+                        if relSuccess {
+                            self.state.pipelineSteps[5].status = .completed
+                            self.state.appendLog("🎉 Full Ship Pipeline Complete! All 6 phases passed.", .success)
+                        } else {
+                            self.state.pipelineSteps[5].status = .failed
+                            self.state.appendLog("❌ Git release step failed with exit code \(relCode).", .error)
+                        }
+                        self.state.refreshVersionInfo()
+                        self.state.refreshAllTelemetry()
+                    }
+                }
             } else {
-                state.pipelineSteps[1].status = .failed
-                state.appendLog("❌ Ship pipeline failed at compile phase.", .error)
+                self.state.isRunningTask = false
+                self.state.currentTaskName = ""
+                self.state.pipelineSteps[1].status = .failed
+                self.state.appendLog("❌ Ship pipeline failed at compile phase.", .error)
             }
         }
     }

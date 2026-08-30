@@ -9,8 +9,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-APP_VERSION="1.0.4"
-APP_BUILD="4"
+APP_VERSION="1.0.5"
+APP_BUILD="5"
 APP_NAME="Mooziac.app"
 APP_BUNDLE_ID="app.mooziac.mac"
 APP_COPYRIGHT="Copyright © 2026 ThreeTen. All rights reserved."
@@ -68,12 +68,15 @@ UNIVERSAL_BIN="$DIST_DIR/Mooziac_universal"
 ARM_BIN=".build/arm64-apple-macosx/release/Mooziac"
 INTEL_BIN=".build/x86_64-apple-macosx/release/Mooziac"
 
-if swift build --triple arm64-apple-macosx -c release --product Mooziac 2>/dev/null && swift build --triple x86_64-apple-macosx -c release --product Mooziac 2>/dev/null; then
-    echo "    Merging arm64 and x86_64 into Universal 2 binary via lipo..."
+echo "    [1/2] Compiling Apple Silicon (arm64)..."
+if swift build --triple arm64-apple-macosx -c release --product Mooziac && \
+   echo "    [2/2] Compiling Intel (x86_64)..." && \
+   swift build --triple x86_64-apple-macosx -c release --product Mooziac; then
+    echo "    ✔ Merging arm64 and x86_64 into Universal 2 binary via lipo..."
     lipo -create -output "$UNIVERSAL_BIN" "$ARM_BIN" "$INTEL_BIN"
     BIN_PATH="$UNIVERSAL_BIN"
 else
-    echo "    Compiling release binary for native architecture..."
+    echo "    ⚠️ Universal build failed. Compiling for native architecture..."
     swift build -c release --product Mooziac
     BIN_DIR=$(swift build -c release --show-bin-path)
     BIN_PATH="$BIN_DIR/Mooziac"
@@ -196,13 +199,15 @@ ln -s /Applications "$STAGING_DIR/Applications"
 
 # Create temporary read-write DMG
 rm -f "$TEMP_DMG" "$FINAL_DMG"
+echo "    Creating temporary disk image..."
 hdiutil create -srcfolder "$STAGING_DIR" -volname "$VOLUME_NAME" -fs HFS+ -fsargs "-c c=64,a=16,e=16" -format UDRW -size 150m "$TEMP_DMG" > /dev/null
 
 hdiutil detach "/Volumes/$VOLUME_NAME" -force 2>/dev/null || true
-hdiutil attach -readwrite -noverify -noautoopen "$TEMP_DMG" > /dev/null
+DEVICE=$(hdiutil attach -readwrite -noverify -noautoopen "$TEMP_DMG" | egrep \/Volumes\/ | awk '{print $1}')
 sleep 1
 
 # Apply AppleScript Finder layout & styling
+echo "    Applying Finder window layout & background styling..."
 osascript << EOF || true
 tell application "Finder"
     tell disk "$VOLUME_NAME"
@@ -227,8 +232,8 @@ tell application "Finder"
         set label position of theViewOptions to bottom
         set background picture of theViewOptions to file ".background:dmg_background.png"
         
-        set position of item "$APP_NAME" of container window to {180, 135}
-        set position of item "Applications" of container window to {500, 135}
+        set position of item "$APP_NAME" to {180, 135}
+        set position of item "Applications" to {500, 135}
         
         update without registering applications
         delay 2
@@ -248,14 +253,24 @@ if [ -d "/Volumes/$VOLUME_NAME/.background" ]; then
     SetFile -a V "/Volumes/$VOLUME_NAME/.background" 2>/dev/null || true
 fi
 
+# Close window before unmounting so Finder writes .DS_Store cleanly
+osascript -e "tell application \"Finder\" to close (every window whose name is \"$VOLUME_NAME\")" 2>/dev/null || true
+
 sync
-sleep 1
+sleep 2
 sync
-hdiutil detach "/Volumes/$VOLUME_NAME" -force > /dev/null || true
+
+hdiutil detach "$DEVICE" -force > /dev/null 2>&1 || hdiutil detach "/Volumes/$VOLUME_NAME" -force > /dev/null 2>&1 || true
 
 # Convert to final compressed read-only DMG
+echo "    Compressing final release DMG (UDZO level 9)..."
 hdiutil convert "$TEMP_DMG" -format UDZO -imagekey zlib-level=9 -o "$FINAL_DMG" > /dev/null
 rm -f "$TEMP_DMG"
+
+# Apply DMG file cover icon
+if [ -f "Resources/AppIcon.icns" ]; then
+    swift -e "import AppKit; if let img = NSImage(byReferencingFile: \"Resources/AppIcon.icns\") { NSWorkspace.shared.setIcon(img, forFile: \"$FINAL_DMG\", options: []) }" 2>/dev/null || true
+fi
 
 echo "[7/7] Installing to ~/Applications & Launching..."
 mkdir -p "$HOME/Applications"

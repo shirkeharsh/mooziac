@@ -1,8 +1,11 @@
 # Build artifacts
 .build/
+dist/
+.swiftpm/
 
 # OS cruft
 .DS_Store
+*.DS_Store
 
 # Secrets
 client_secret*.json
@@ -11,11 +14,11 @@ credentials.json
 
 # Local dev tooling & artifacts (never published)
 dev/
+.mooziac-brain/
+mooziac_brain/
+brain
+ReelProduction/
+"Project Blueprint"/
+*.pyc
+__pycache__/
 
-# Website & VPS web deployment (never published to GitHub)
-www/
-*.html
-*.css
-sitemap.xml
-CNAME
-site.webmanifest

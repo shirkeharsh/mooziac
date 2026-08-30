@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://mooziac.threeten.site/</loc>
+    <lastmod>2026-08-22</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://mooziac.threeten.site/assets/og-image.png</image:loc>
+      <image:title>Mooziac — Native macOS Music Player</image:title>
+      <image:caption>Mooziac is a fast, distraction-free YouTube Music and local audio player for macOS.</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://mooziac.threeten.site/assets/screenshot-player.png</image:loc>
+      <image:title>Mooziac Player Interface</image:title>
+      <image:caption>Mooziac Dynamic Island audio player UI with real-time waveform and album artwork.</image:caption>
+    </image:image>
+  </url>
+</urlset>

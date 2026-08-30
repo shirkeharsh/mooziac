@@ -1,0 +1,508 @@
+CODEBASE EFFICIENCY & TECHNICAL DEBT AUDIT Transcribed from 8
+screenshots Generated: 12 August 2026, 06:19:45 PM IST
+
+======================================================================
+R1. Entire dead view layer (~1,150 lines)
+======================================================================
+
+These are complete, self-contained view controllers/views and their
+delegate protocols that are never instantiated anywhere in the app
+(confirmed by grep — the only matches are the declarations themselves):
+
+File / LOC / Evidence
+
+SpotifyPlayerView.swift (+ SpotifyPlayerViewDelegate) 323 LOC No
+allocator; protocol SpotifyPlayerViewDelegate unimplemented by any live
+object. Note MainViewController.spotifyPlayerDidTapLogin is a leftover
+stub — HeaderViewDelegate/SpotifyPlayerViewDelegate require it, but no
+SpotifyPlayerView exists to call it.
+
+MiniPlayerView.swift (+ MiniPlayerViewDelegate) 231 LOC No allocator.
+
+FloatingIslandWindowController.swift 156 LOC shared never referenced;
+would create a second DynamicIslandPlayerView (the real one lives in
+MainViewController).
+
+DancingCatView.swift 170 LOC No allocator.
+
+SearchResultsOptionsView.swift + SearchResultItem + delegate 149 LOC No
+allocator; SearchResultItem wholly unused.
+
+AudioVisualizerView class (lines 4-71 of AudioVisualizerView.swift) 68
+LOC No allocator (the same file also holds the used PlayerDesign enum).
+
+LyricsWindowController (inside LyricsManager.swift:264-406) 143 LOC
+LyricsWindowController.shared never referenced.
+
+Impact: 1,150+ lines of UI that just add compile time, maintenance
+surface, and a parallel (2nd) DynamicIslandPlayerView that duplicates
+the real one — a direct maintainability tax and a “which player is the
+real one” trap. Confidence: 100%. Priority: P2 (no runtime cost, but
+this is the single biggest simplification win).
+
+======================================================================
+R2. SearchSuggestionManager.swift entire file (134 lines)
+======================================================================
+
+SearchSuggestionFetcher, SuggestionsViewController,
+SuggestionsPopoverManager are never referenced. GlassSearchField
+performs its own search handling and onFocusChange; nothing wires
+suggestions. REMOVE. P2.
+
+======================================================================
+R3. WebKitResourceGovernor.swift (38 lines)
+======================================================================
+
+WebKitResourceGovernor.shared is never started anywhere; every method is
+a no-op or unused (startMonitoring only prints). It’s already been
+functionally disabled inline (“Disabled legacy hard RAM cap”) — the file
+is now scaffolding. REMOVE. P3.
+
+======================================================================
+R4. NowPlayingManager.trackKey / isTrackLiked / setTrackLiked (lines
+479-506)
+======================================================================
+
+No callers (grep shows only self-references). Consistent with init()
+line 59 removing YTM_LikedTrackKeysSet — the liked-track persistence
+feature is defunct. Also YTM_lastLiked is still read/written, so the
+dead key-set code is purely orphaned. REMOVE. P3.
+
+======================================================================
+R5. Orphaned @objc selectors in StatusItemManager (lines 739-786)
+======================================================================
+
+toggleMasterGestures(), toggleAutoPauseOnDisconnect(),
+toggleRightEdgeVolume(), toggleRightCornerTaps(),
+toggleLeftCornerTaps(), toggleLeftCornerMenu(), toggleCenterMenu(),
+toggleRightCornerMenu()
+
+None are referenced by any NSMenuItem/action wiring. The context menu
+uses makeCapsuleToggleMenuItem + makeGestureMappingMenuItem closures
+instead. REMOVE. P3.
+
+======================================================================
+R6. Unused protocol members: dynamicIslandDidTapShuffle /
+dynamicIslandDidTapRepeat
+======================================================================
+
+Declared in DynamicIslandPlayerViewDelegate:10-11, implemented by
+MainViewController:171-177 and FloatingIslandWindowController:122-127,
+but never invoked by DynamicIslandPlayerView (there is no shuffle button
+in the native UI — shuffle/repeat go through repeatTapped directly). The
+repeat/shuffle protocol path is dead. REMOVE (from protocol + impls).
+P3.
+
+======================================================================
+R7. YTM_reloadWebView notification (YTMWebView.swift:103)
+======================================================================
+
+Observed in YTMWebViewContainer.init, never posted anywhere. Dead
+observer. REMOVE. P3.
+
+======================================================================
+R8. LaunchAnimationTimeline.swift entire file
+======================================================================
+
+LaunchAnimationController eagerly creates private let timeline =
+LaunchAnimationTimeline() and passes it into run(_:model:screen:), but
+no field of the struct is ever read — run uses only hard-coded
+durations. Dead value + dead parameter. REMOVE. P3.
+
+======================================================================
+R9. Write-only state
+======================================================================
+
+-   NowPlayingManager.lastTrackChangeTime (:365, :395) — written, never
+    read.
+-   NowPlayingManager.lastSavedTitle / lastSavedArtist (:51-52,
+    :426-427) — written and reset, never compared/read.
+-   ClickSound.stop() — empty body; sound.stop() called in finish() does
+    nothing.
+-   AppTheme enum (AudioVisualizerView.swift:92+) — never referenced.
+
+REMOVE each. P3.
+
+======================================================================
+DUPLICATION / SIMPLIFY
+======================================================================
+
+S1. Keyboard-command handling duplicated verbatim
+
+DynamicIslandPlayerView.keyDown (1586-1629) and
+StatusItemManager.keyEventMonitor (lines 444-494) contain the same
+switch on key codes 123/124/126/125/49 (rewind/forward/volume/space)
+with identical overlay strings. Because the status-bar panel is always
+the hosting window, the monitor (active while the panel is visible)
+intercepts these keys and returns nil, so the view-level keyDown is
+effectively redundant in the live path (only reachable via the dead
+FloatingIslandWindowController). SIMPLIFY: keep one handler; route
+commands through one shared helper. P2.
+
+S2. formatTime duplicated 5x — identical 7-line body
+
+InteractiveWaveformProgressView (:363) DynamicIslandPlayerView (:840)
+StatusItemManager (:520) SpotifyPlayerView (:261) MiniPlayerView (:191)
+
+SIMPLIFY: single TimeFormatter/free function. P3.
+
+S3. Search auto-play JS duplicated across two files
+
+MainViewController.dynamicIslandDidSearch (125-152) embeds the entire
+findAndPlayTopTrack polling IIFE that also lives in YTMWebView.didFinish
+(255-283). Both fire on the same search page load (one at +1.0s via the
+controller, one in didFinish). Redundant duplicate injection + duplicate
+autoplay attempts. SIMPLIFY: extract shared JS constant / call once. P3.
+
+S4. Copy-pasted JS helpers inside NowPlayingManager (~150+ lines)
+
+-   simulateClick re-declared in nextTrack, previousTrack,
+    playQueueItem, playAutomixItem (near-identical target lists).
+-   The visible() filter (offsetWidth/offsetHeight/offsetParent +
+    dedupe) re-declared in nextTrack/previousTrack/fetchQueue/
+    fetchUpNextSnapshot/removeQueueItem/moveQueueItem.
+-   Queue DOM extraction is duplicated almost wholesale between
+    fetchQueue (:1053) and fetchUpNextSnapshot (:1217), ~50 lines each
+    parsing ytmusic-player-queue-item, then the Polymer fallback.
+-   The automix-toggle + radio-button lookup is duplicated in fetchQueue
+    (:1171-1189) and triggerAutoplayRadio (:1561-1583).
+
+These are the biggest-in-JS strings in the codebase; a single injected
+“scrape-helper” prelude (click simulation, visibility, queue parsing)
+would remove ~150 lines and reduce the maintenance burden of the fragile
+YouTube-DOM logic that’s duplicated in many places. REFACTOR. P2. (The
+apparent O(n²) pattern is actually fine — the scraper is linear.)
+
+S5. Native “toggled-color” helpers repeated
+
+updateRepeatButtonColor / updateLikeButtonColor /
+updateBrowserButtonColor in DynamicIslandPlayerView (419-435, 498-508,
+1304-1314) repeat the same glassMode ? dark-grey : white ternary with
+slightly different constants. SIMPLIFY into one defaultIconTint()
+helper. P3.
+
+S6. setupIconButton duplicated 4x
+
+DynamicIslandPlayerView (:747), HeaderView (:82), SpotifyPlayerView
+(:198), MiniPlayerView (:132). SIMPLIFY. P3.
+
+S7. CoreAudio default-output-device lookup duplicated
+
+VolumeController.defaultOutputDevice() (EdgeVolumeEngine:26-43) and
+AudioRouteMonitor.getCurrentOutputDeviceID() (:94-111) are the same
+AudioObjectGetPropertyData(kAudioHardwarePropertyDefaultOutputDevice)
+call (second copies the first but returns no status). SIMPLIFY: one
+shared helper. P3.
+
+======================================================================
+OPTIMIZE
+======================================================================
+
+O1. Discord RPC SET_ACTIVITY sent once per second while playing
+
+What: NowPlayingManager.userContentController (:422) calls
+DiscordRPCManager.shared.updatePresence(state:) on every message; the
+observer JS guarantees a post every ~1s while playing (1000ms
+setInterval + video events).
+
+Why: Each call -> queue.async -> rebuild JSON -> sendFrame (socket
+write) -> drainSocket, even though presence would persist on the RPC
+connection.
+
+Evidence: Observer JS :351-356; updatePresenceInternal :213-292 always
+sends when _isConnected.
+
+Additional waste: When Discord is not running, every update runs
+findDiscordIPCSocket() (30 fileExists(atPath:) stat calls across /tmp,
+TMPDIR, envTMP x 10 sockets) at ~1Hz during playback.
+
+Impact: Continuous IPC writes + stat syscalls every second of playback;
+needless battery/syscall churn. Presence only needs refreshing on
+track/pause changes (Discord’s local RPC keeps the activity).
+
+Fix: Throttle to track-change/pause transitions or a 15s cadence;
+early-return when !isConnected instead of re-probing every second.
+
+Confidence: high. Priority: P1.
+
+O2. 1Hz full-state heartbeat even when nothing changed
+
+updateNowPlaying(false) posts while playing even if title/artist/time
+barely changed; Swift-side builds a fresh PlaybackState, overwrites
+currentState, fires notifyObservers (2 live observers) on the main
+thread, and re-renders play-icon + waveform every second.
+
+OPTIMIZE: Gate the heartbeat to skip when currentTime/isPlaying delta is
+negligible (like the existing paused-guard). Massive, loud, but works;
+the extrapolation already makes sub-second accuracy meaningless. P2.
+
+O3. Centered-lyrics 10Hz timer (displayTimer at 0.1s)
+
+CenteredMenuBarLyricsWindowController.updateLyricsFrame (:143) runs
+every 100ms while lyrics are enabled and playing. Each tick calls
+state.getAccurateTime() + a linear scan SyncedLyricsParser.
+activeLineAndWord, and when unchanged does almost nothing, but when it
+changes it also recomputes font width + repositions the window.
+
+Since only line-level text is shown (no word-level highlight), 10Hz is
+far more than needed; a 1Hz tick aligned to state updates is sufficient
+and removes a perpetual 10Hz main-thread timer. OPTIMIZE. P2.
+
+O4. URLCache.shared capped at 0.5MB memory / 2MB disk
+(YTMWebView.swift:21-22)
+
+What: Tiny cache + DynamicIslandPlayerView.loadArtwork does a manual
+URLCache check then Data(contentsOf:) (which does not reliably consult
+the process URLCache) and re-fetches artwork on every panel re-show if
+evicted.
+
+Why: 0.5MB stores only a couple of full-size artwork JPEGs -> repeated
+network re-downloads of the same album art; the per-URL NSCache only
+holds 44px thumbnails.
+
+Evidence: DynamicIslandPlayerView.loadArtwork :943-980; URLCache.shared
+mutation in YTMWebViewContainer.init.
+
+Impact: Redundant network/CDN hits + latency on re-open.
+
+Fix: Raise memory capacity (e.g. 16-32MB) or use URLSession on a
+dedicated cache configured for artwork (LRU). P3.
+
+O5. Notification artwork: full temp-dir scan on every track change
+
+TrackNotificationManager.downloadImage (:69-73) calls
+contentsOfDirectory on the whole temp dir and deletes all ytm_art_*
+files on every track change, before downloading fresh art that the
+player already downloaded.
+
+O(n) scan + duplicate image download per track; only ever needs the
+latest file overwritten (single temp file). OPTIMIZE. P3.
+
+O6. EdgeVolumeEngine auto-reconnect Timer runs forever
+
+autoReconnectTimer (10s, :271-279) is scheduled in
+setupLockWakeObservers() regardless of isEnabled and never invalidated
+on disable -> a repeating main-thread timer alive for the whole app
+lifetime even for users who never enable gestures (the default-off
+case).
+
+OPTIMIZE: Gate with isEnabled or start lazily in start(). P3.
+
+======================================================================
+RISK
+======================================================================
+
+K1. Linear time extrapolation can drift / run backward
+
+PlaybackState.getAccurateTime() (:36-40) extrapolates currentTime +
+(now - hostTimestamp) * playbackRate using the anchor from the last 1s
+message.
+
+During buffering/network stalls the anchor keeps advancing while
+video.currentTime stalls -> the extrapolation runs ahead; on the next
+message it snaps back.
+
+Used by: progress bar, seek labels, Discord timestamps, lyrics
+highlight.
+
+Correctness is approximate by design and usually <=1s, but a dropped/
+queued message can produce a visible backward jump in the lyrics
+highlight and progress thumb.
+
+Acceptable trade-off; worth a monotonic clamp per active track. P2.
+
+K2. System idle-sleep assertion held unconditionally for the whole
+session
+
+BackgroundMediaController.startPreventingSleep()
+(kIOPMAssertionTypePreventUserIdleSystemSleep +
+.idleSystemSleepDisabledProcessActivity) is released only at
+termination.
+
+Combined with AppDelegate calling it again after init() already did
+(no-op due to assertionID guard), this means the Mac will not idle-sleep
+even when music is paused/stopped — a real battery/user-experience
+concern.
+
+Consider scoping the assertion to “isPlaying” only. Authorization
+kIOPMAssertionTypePreventUserIdleSystemSleep is the app-name-honest
+choice already. P2 — note, not necessarily change.
+
+K3. Hard-coded dev-machine path in
+NativeGestureTutorialWindowController.loadHtml (:67)
+
+Falls back to: /Users/harshshirke/local/projects/mp3kal/trackpad.html
+
+when the bundled resource is missing.
+
+This is a personal absolute path baked into production code; on any
+other machine it either silently loads a stale/nonexistent file or opens
+a visible broken window.
+
+RISK. Should only use Bundle.main (the build script does copy
+trackpad.html). P2.
+
+K4. NowPlayingManager.setupInWebView re-adds the observer user script on
+every call
+
+handleWebContentTermination calls setupInWebView again (:94-96);
+WKUserContentController.addUserScript appends without removing the old
+script, so the userContentController can end up with two copies of the
+~250-line script (runtime-guarded by window.ytmObserverInjected, so
+functionally harmless, but duplicated injection per page load forever).
+
+RISK/minor. Track the injected script and removeUserScript before add.
+P3.
+
+K5. Window/clamp logic duplication risk between panel paths
+
+StatusItemManager.positionCustomWindow (:316) and panelDidMove (:254)
+each independently recompute targetX/targetY + clampFrameToVisibleBounds
+with slightly different clamp paths (margin 8 vs 12 vs 0).
+
+On non-primary screens / freshly reconnected displays these two can
+disagree, producing a mid-animation jump on drag — hard to test but the
+same math exists in two shapes.
+
+REFACTOR into one frame(for screen:, width:, height:) helper. P3.
+
+======================================================================
+KEEP (justified complexity — do not touch)
+======================================================================
+
+-   Observer-JS bridge in NowPlayingManager — the entire heartbeat/
+    control/JQ-scrape approach is inherent to driving YouTube Music with
+    no public API; the multi-priority fallbacks (DOM > Polymer data
+    model > player API) are what make it resilient. Keep, even though it
+    is ~1,000 lines of embedded JS.
+
+-   Web-content crash recovery machinery (YTMWebView termination ->
+    snapshot -> restore -> watchdog) — genuinely valuable and carefully
+    done.
+
+-   EdgeVolumeEngine private MultiTouch framework usage +
+    ActiveEngineBox relay — inherently unsafe-looking C interop but
+    necessary for the headline gesture feature; the relay box correctly
+    avoids the retain cycle the callbacks otherwise create.
+
+-   FreshViewRouter… DisplayManager — small, used, single-purpose.
+
+-   DiscordRPCManager socket/opcode layer — correct and isolated; only
+    the update throttle is wrong, not the design.
+
+-   native -> adaptive legacy mapping in PlayerDesign.current —
+    intentional migration; leave the enum case as legacy-read-only.
+
+-   Position persistence + display-change clamping in StatusItemManager
+    — a feature (user’s floating placement survives display changes);
+    keep.
+
+======================================================================
+SUMMARY
+======================================================================
+
+1.  Biggest problems
+
+2.  ~1,500 lines of completely dead code (R1-R9) — nearly 15% of the
+    codebase — including a second full player view
+    (FloatingIslandWindowController + DynamicIslandPlayerView) and a
+    second full music UI (SpotifyPlayerView, MiniPlayerView).
+
+    This is the #1 maintainability liability: it is not obvious which
+    player is canonical, and dead code here is precisely the kind that
+    silently appears live.
+
+3.  Per-second Discord RPC + per-second network probing when Discord
+    isn’t installed (O1) — constant system-call + IPC churn during every
+    playback session.
+
+4.  Three-way duplication of playback UI logic (5x formatTime,
+    duplicated key handling, duplicated search-autoplay JS, 4x
+    setupIconButton, duplicated artwork loaders) — each bugfix/gradient
+    change must be applied N times.
+
+5.  Biggest opportunities to reduce complexity/code
+
+-   Delete R1+R2+R4-R8 -> ~1,500 LOC gone immediately with zero behavior
+    change.
+-   Dedupe the injected-JS scrape helpers in NowPlayingManager (S4) ->
+    ~150 LOC of JS removed and the YouTube-DOM coupling centralized in
+    one place.
+-   Collapse the 5 formatTime / 4 setupIconButton / 3 toggle-color
+    helpers + shared key-command handler (S1/S2/S5/S6) -> ~120 LOC, one
+    source of truth.
+-   Fold the duplicated defaultOutputDevice CoreAudio call (S7).
+
+3.  Biggest performance opportunities
+
+-   O1: throttle Discord presence (P1; worth doing — eliminates a 1Hz
+    write + 30-stat probe loop during idle playback).
+-   O3: drop the 10Hz lyrics timer to ~1Hz/event-driven (P2).
+-   O2: skip no-op heartbeat posts (P2).
+-   O4: raise the URLCache cap to stop re-downloading artwork on every
+    re-open (P3).
+
+4.  Potentially removable code
+
+Exactly R1-R9 plus the orphaned selectors/protocol methods/S5-style
+duplicates:
+
+SpotifyPlayerView.swift MiniPlayerView.swift DancingCatView.swift
+FloatingIslandWindowController.swift SearchSuggestionManager.swift
+SearchResultsOptionsView.swift WebKitResourceGovernor.swift
+LyricsWindowController AudioVisualizerView class
+LaunchAnimationTimeline.swift AppTheme LastTrackChangeTime /
+lastSavedTitle / lastSavedArtist trackKey / isTrackLiked / setTrackLiked
+the 7 dead @objc toggles dynamicIslandDidTapShuffle /
+dynamicIslandDidTapRepeat the never-posted YTM_reloadWebView observer
+
+~1,500 lines.
+
+5.  Things that should NOT be changed
+
+-   The Observer-JS architecture and its DOM/model/API fallbacks
+    (fragile by nature; swapping to a WKScriptMessageHandler-based
+    rewrite risks breaking playback entirely).
+-   WebContent crash-recovery and the restoration watchdog.
+-   EdgeVolumeEngine C-interop and the ActiveEngineBox lifetime relay.
+-   DisplayManager clamping/persistence semantics (carefully tuned to
+    multi-display + notch behavior).
+-   BackgroundMediaController sleep assertion for playback, if you keep
+    it scoped to playback.
+
+6.  Overall technical-debt assessment
+
+Moderate-to-heavy, concentrated and very cleanable.
+
+The debt is not distributed subtly — it is the volume of unused/
+duplicated code plus one systemic performance smell (the per-second RPC
+push).
+
+Core live paths (the panel player, StatusItemManager, YTMWebView,
+NowPlayingManager bridge, gesture engine) are carefully engineered and
+internally consistent.
+
+A focused cleanup pass — delete dead code (R1-R9), dedupe shared helpers
+(S1-S7), and throttle Discord/lyrics timers (O1/O3) — would remove
+~1,600 lines and a 1Hz socket+stat loop with low regression risk,
+because the removal targets are provably unreferenced and the perf
+changes preserve behavior.
+
+The highest-risk refactors are S3/S4 (shared JS) and K5 (unifying clamp
+paths), which should be done carefully with manual playback testing.
+
+No P0 crash/data-loss issue found.
+
+Verified: swift build is clean; grep confirms every “dead” symbol has no
+live callers.
+
+======================================================================
+SOURCE / TRANSCRIPTION NOTE
+======================================================================
+
+This document consolidates the report text visible across the 8 provided
+screenshots. Terminal/editor chrome, phone status bars, toolbars, and
+other non-report UI text were omitted. OCR artifacts were corrected
+where the screenshot made the intended text clear.
+
+Generated: 12 August 2026, 06:19:45 PM IST

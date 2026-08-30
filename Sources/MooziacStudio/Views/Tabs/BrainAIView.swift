@@ -132,9 +132,101 @@ public struct BrainAIView: View {
                 }
             }
             
+            // Brain Issue & Bug Intelligence Section
+            GlassCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        HStack(spacing: 5) {
+                            Image(systemName: "brain.head.profile")
+                                .foregroundColor(ColorTheme.accentPurple)
+                            Text("BRAIN ISSUE & TRIAGE MEMORY (.mooziac-brain/issues)")
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .foregroundColor(.white)
+                        }
+                        
+                        Spacer()
+                        
+                        Text("\(state.brainIssues.count) issues indexed")
+                            .font(.system(size: 9.5, design: .monospaced))
+                            .foregroundColor(ColorTheme.secondaryGray)
+                    }
+                    
+                    if state.brainIssues.isEmpty {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(ColorTheme.statusGreen)
+                            Text("No issues stored in Brain yet. Click 'Add to Brain' on any GitHub issue to index it here.")
+                                .font(.system(size: 10.5))
+                                .foregroundColor(ColorTheme.secondaryGray)
+                        }
+                        .padding(.vertical, 6)
+                    } else {
+                        VStack(spacing: 6) {
+                            ForEach(state.brainIssues) { issue in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Circle()
+                                        .fill(ColorTheme.warningYellow)
+                                        .frame(width: 6, height: 6)
+                                        .padding(.top, 4)
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("#\(issue.number) \(issue.title)")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundColor(.white)
+                                        
+                                        HStack(spacing: 4) {
+                                            Text("by @\(issue.author) • Matched:")
+                                                .font(.system(size: 9))
+                                                .foregroundColor(ColorTheme.secondaryGray)
+                                            
+                                            ForEach(issue.suggestedFiles.prefix(2), id: \.self) { file in
+                                                Text(URL(fileURLWithPath: file).lastPathComponent)
+                                                    .font(.system(size: 8.5, weight: .semibold, design: .monospaced))
+                                                    .padding(.horizontal, 4)
+                                                    .padding(.vertical, 1)
+                                                    .background(ColorTheme.accentPurple.opacity(0.20))
+                                                    .foregroundColor(ColorTheme.accentPurple)
+                                                    .cornerRadius(3)
+                                            }
+                                        }
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Button(action: {
+                                        agentRole = "Bug Fixer"
+                                        agentTask = "Fix Issue #\(issue.number): \(issue.title)"
+                                        generatePromptForAgent()
+                                    }) {
+                                        HStack(spacing: 3) {
+                                            Image(systemName: "sparkles")
+                                            Text("Build Fix Prompt")
+                                        }
+                                        .font(.system(size: 9.5, weight: .bold))
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Color.white.opacity(0.10))
+                                        .foregroundColor(.white)
+                                        .cornerRadius(4)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                .padding(8)
+                                .background(Color.black.opacity(0.30))
+                                .cornerRadius(6)
+                            }
+                        }
+                    }
+                }
+            }
+            
             // Console Stream
             ConsoleStreamView(state: state)
                 .frame(maxHeight: .infinity)
+        }
+        .onAppear {
+            state.refreshBrainAndTodos()
         }
     }
     

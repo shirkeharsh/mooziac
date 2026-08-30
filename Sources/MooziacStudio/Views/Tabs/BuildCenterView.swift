@@ -53,9 +53,22 @@ public struct BuildCenterView: View {
                 // Option Cards
                 GlassCard {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("COMPILATION TARGETS")
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundColor(.secondary)
+                        HStack {
+                            Text("COMPILATION TARGETS")
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .foregroundColor(.secondary)
+                            
+                            Spacer()
+                            
+                            HStack(spacing: 4) {
+                                Text("Project:")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.secondary)
+                                Text("v\(state.versionInfo.projectVersion) (Build \(state.versionInfo.projectBuild))")
+                                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                    .foregroundColor(ColorTheme.accentTeal)
+                            }
+                        }
                         
                         HStack(spacing: 8) {
                             Button(action: {

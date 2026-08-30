@@ -179,6 +179,14 @@ public final class NativePTYSession: ObservableObject {
         write(string: "\(command)\n")
     }
     
+    public func sendCtrlC() {
+        write(string: "\u{0003}")
+    }
+    
+    public func sendCtrlZ() {
+        write(string: "\u{001A}")
+    }
+    
     public func resize(cols: Int32, rows: Int32) {
         guard masterFd >= 0 else { return }
         var win = winsize(
