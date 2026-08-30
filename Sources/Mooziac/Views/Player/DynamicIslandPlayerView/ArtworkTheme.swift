@@ -279,15 +279,15 @@ extension DynamicIslandPlayerView {
                 artistLabel.textColor = NSColor(white: 0.86, alpha: 1.0)
                 timeLabel.textColor = NSColor(white: 0.78, alpha: 1.0)
                 
-                // Luminous liquid water cyan progress accent
-                waveformProgressView.accentColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+                // Pure transparent frosted liquid glass luminous white accent
+                waveformProgressView.accentColor = NSColor.white
                 
                 let fluidBtnTint = NSColor(white: 0.92, alpha: 0.95)
                 playPauseButton.contentTintColor = NSColor.white
                 previousButton.contentTintColor = fluidBtnTint
                 nextButton.contentTintColor = fluidBtnTint
                 addToPlaylistButton.contentTintColor = fluidBtnTint
-                repeatButton.contentTintColor = (repeatMode != .off) ? NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0) : fluidBtnTint
+                repeatButton.contentTintColor = (repeatMode != .off) ? NSColor.white : fluidBtnTint
                 likeButton.contentTintColor = isLiked ? NSColor(red: 1.0, green: 0.28, blue: 0.38, alpha: 1.0) : fluidBtnTint
                 searchIconButton.contentTintColor = fluidBtnTint
                 fullScreenButton.contentTintColor = fluidBtnTint

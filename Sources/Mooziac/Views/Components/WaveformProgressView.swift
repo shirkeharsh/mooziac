@@ -272,9 +272,9 @@ class InteractiveWaveformProgressView: NSView {
                 let activePath = CGPath(roundedRect: activeRect, cornerWidth: trackH / 2.0, cornerHeight: trackH / 2.0, transform: nil)
                 
                 ctx.saveGState()
-                let neonCyan = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
-                ctx.setShadow(offset: .zero, blur: 6.0, color: neonCyan.cgColor)
-                ctx.setFillColor(neonCyan.cgColor)
+                let glowColor = accentColor
+                ctx.setShadow(offset: .zero, blur: 6.0, color: glowColor.cgColor)
+                ctx.setFillColor(glowColor.cgColor)
                 ctx.addPath(activePath)
                 ctx.fillPath()
                 ctx.restoreGState()
@@ -293,7 +293,7 @@ class InteractiveWaveformProgressView: NSView {
                 let headRect = CGRect(x: headX, y: headY, width: headDiameter, height: headDiameter)
                 
                 ctx.saveGState()
-                ctx.setShadow(offset: .zero, blur: 8.0, color: neonCyan.cgColor)
+                ctx.setShadow(offset: .zero, blur: 8.0, color: glowColor.cgColor)
                 ctx.setFillColor(NSColor.white.cgColor)
                 ctx.addEllipse(in: headRect)
                 ctx.fillPath()
