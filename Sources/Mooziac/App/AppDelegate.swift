@@ -7,6 +7,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     static func main() {
         let app = NSApplication.shared
+        if CommandLine.arguments.contains("--generate-screenshots") {
+            VisualMatrixSnapshotGenerator.run()
+            exit(0)
+        }
         let delegate = AppDelegate()
         app.delegate = delegate
         app.run()
