@@ -27,8 +27,8 @@ public class LikedSongsManager {
     public func refreshSignInStatus() {
         WKWebsiteDataStore.default().httpCookieStore.getAllCookies { [weak self] cookies in
             let authCookies = cookies.filter { cookie in
-                let isAuth = cookie.name == "SAPISID" || cookie.name == "__Secure-3PAPISID" || cookie.name == "__Secure-1PAPISID"
-                let isYoutube = cookie.domain.contains("youtube.com") || cookie.domain.contains("google.com")
+                let isAuth = cookie.name == "SAPISID" || cookie.name == "__Secure-3PAPISID" || cookie.name == "__Secure-1PAPISID" || cookie.name == "LOGIN_INFO"
+                let isYoutube = cookie.domain.contains("youtube.com")
                 return isAuth && isYoutube
             }
             let signedIn = !authCookies.isEmpty

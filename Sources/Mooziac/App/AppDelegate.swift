@@ -11,6 +11,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             VisualMatrixSnapshotGenerator.run()
             exit(0)
         }
+        if CommandLine.arguments.contains("--generate-video") {
+            VisualMatrixVideoGenerator.run { url in
+                if let u = url {
+                    NSWorkspace.shared.open(u)
+                }
+            }
+            exit(0)
+        }
         let delegate = AppDelegate()
         app.delegate = delegate
         app.run()

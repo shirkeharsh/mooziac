@@ -464,8 +464,20 @@ public final class DownloadManager: NSObject {
 
         let process = Process()
         guard let ytDlpExecutable = resolveYtDlpPath() else {
-            cleanupJobDir(jobDir)
-            finishTask(task: task, success: false, message: "yt-dlp not found. Run: brew install yt-dlp ffmpeg")
+            self.onDownloadStatusChanged?(true, "Setting up helper...")
+            self.broadcastProgress(id: task.id, videoId: videoId, title: cleanT, progress: 0.05, eta: "", speed: "Installing helper...", status: .downloading(progress: 0.05, eta: "", speed: "Installing helper..."))
+            
+            DependencyManager.shared.installHelper(progress: { [weak self] pct in
+                self?.broadcastProgress(id: task.id, videoId: videoId, title: cleanT, progress: pct, eta: "", speed: "\(Int(pct * 100))%", status: .downloading(progress: pct, eta: "", speed: "Helper Setup"))
+            }) { [weak self] success, error in
+                guard let self = self else { return }
+                if success, self.resolveYtDlpPath() != nil {
+                    self.executeDownloadTask(task: task)
+                } else {
+                    self.cleanupJobDir(jobDir)
+                    self.finishTask(task: task, success: false, message: error ?? "Helper installation failed")
+                }
+            }
             return
         }
 
@@ -474,15 +486,21 @@ public final class DownloadManager: NSObject {
             "--newline",
             "--no-update",
             "--extractor-args", "youtube:player_client=mweb,web_safari,tv_embedded,web",
-            "--no-playlist",
-            "-x",
-            "--audio-format", "m4a",
-            "--audio-quality", "0",
-            "--embed-thumbnail",
-            "--embed-metadata"
+            "--no-playlist"
         ]
         if let ffmpegLoc = resolveFFmpegLocation() {
-            arguments.append(contentsOf: ["--ffmpeg-location", ffmpegLoc])
+            arguments.append(contentsOf: [
+                "-x",
+                "--audio-format", "m4a",
+                "--audio-quality", "0",
+                "--embed-thumbnail",
+                "--embed-metadata",
+                "--ffmpeg-location", ffmpegLoc
+            ])
+        } else {
+            arguments.append(contentsOf: [
+                "-f", "ba[ext=m4a]/ba/b"
+            ])
         }
         arguments.append(contentsOf: ["-o", outputTemplate, targetQuery])
         process.arguments = arguments
@@ -823,6 +841,13 @@ public final class DownloadManager: NSObject {
     private func resolveYtDlpPath() -> String? {
         if let cached = ytDlpPath, FileManager.default.isExecutableFile(atPath: cached) {
             return cached
+        }
+
+        // 0. Check Application Support / Mooziac helper location first
+        let helperPath = DependencyManager.shared.ytDlpExecutableURL.path
+        if FileManager.default.isExecutableFile(atPath: helperPath) {
+            ytDlpPath = helperPath
+            return helperPath
         }
 
         // 1. Try resolving via user login shell first (picks up pyenv/brew/pip envs)

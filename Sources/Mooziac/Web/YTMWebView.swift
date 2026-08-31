@@ -109,16 +109,16 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         
         let blockRules = """
         [
-            { "trigger": { "url-filter": ".*google-analytics\\\\.com.*" }, "action": { "type": "block" } },
-            { "trigger": { "url-filter": ".*doubleclick\\\\.net.*" }, "action": { "type": "block" } },
-            { "trigger": { "url-filter": ".*googletagmanager\\\\.com.*" }, "action": { "type": "block" } },
-            { "trigger": { "url-filter": ".*googleadservices\\\\.com.*" }, "action": { "type": "block" } },
-            { "trigger": { "url-filter": ".*googlesyndication\\\\.com.*" }, "action": { "type": "block" } },
-            { "trigger": { "url-filter": ".*googletagservices\\\\.com.*" }, "action": { "type": "block" } },
-            { "trigger": { "url-filter": ".*mobileads\\\\.google\\\\.com.*" }, "action": { "type": "block" } },
-            { "trigger": { "url-filter": ".*adsafeprotected\\\\.com.*" }, "action": { "type": "block" } },
-            { "trigger": { "url-filter": ".*scorecardresearch\\\\.com.*" }, "action": { "type": "block" } },
-            { "trigger": { "url-filter": ".*quantserve\\\\.com.*" }, "action": { "type": "block" } }
+            { "trigger": { "url-filter": ".*google-analytics\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
+            { "trigger": { "url-filter": ".*doubleclick\\\\.net.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
+            { "trigger": { "url-filter": ".*googletagmanager\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
+            { "trigger": { "url-filter": ".*googleadservices\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
+            { "trigger": { "url-filter": ".*googlesyndication\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
+            { "trigger": { "url-filter": ".*googletagservices\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
+            { "trigger": { "url-filter": ".*mobileads\\\\.google\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
+            { "trigger": { "url-filter": ".*adsafeprotected\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
+            { "trigger": { "url-filter": ".*scorecardresearch\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
+            { "trigger": { "url-filter": ".*quantserve\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } }
         ]
         """
         
@@ -158,22 +158,6 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
     
     func cookiesDidChange(in cookieStore: WKHTTPCookieStore) {
         LikedSongsManager.shared.refreshSignInStatus()
-        cookieStore.getAllCookies { [weak self] cookies in
-            guard let self = self else { return }
-            let hasAuth = cookies.contains { cookie in
-                (cookie.name == "SAPISID" || cookie.name == "__Secure-3PAPISID" || cookie.name == "__Secure-1PAPISID") &&
-                (cookie.domain.contains("youtube.com") || cookie.domain.contains("google.com"))
-            }
-            if hasAuth {
-                DispatchQueue.main.async {
-                    if let urlStr = self.webView.url?.absoluteString,
-                       (urlStr.contains("accounts.google.com") || urlStr.contains("myaccount.google.com")) {
-                        print("[YTMWebView] Auth cookies detected while on Google accounts; redirecting to music site")
-                        self.loadMusicHome()
-                    }
-                }
-            }
-        }
     }
     
     public func loadMusicHome(autoPlayRandom: Bool = false) {
@@ -744,7 +728,7 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         webView.load(request)
     }
 
-    public static let userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
+    public static let userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
 
     // MARK: - WKUIDelegate & Navigation Policy for Single-Window Google Auth
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
@@ -763,7 +747,7 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         
         if let url = navigationAction.request.url {
             let urlString = url.absoluteString
-            if urlString.contains("myaccount.google.com") || urlString.contains("accounts.google.com/ManageAccount") {
+            if urlString.contains("accounts.google.com/ManageAccount") {
                 decisionHandler(.cancel)
                 loadMusicHome()
                 return

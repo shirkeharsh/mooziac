@@ -90,7 +90,7 @@ public enum SystemAppearanceHelper {
 
     /// Apple Control Center Smoky Obsidian Liquid Backing
     public static var liquidFluidBackingColor: NSColor {
-        return NSColor(red: 0.08, green: 0.09, blue: 0.13, alpha: 0.46)
+        return NSColor(red: 0.08, green: 0.09, blue: 0.13, alpha: 0.72)
     }
 
     /// Molded acrylic specular perimeter border
