@@ -30,4 +30,4 @@ Mooziac ("we", "our", or "the app") is designed from the ground up with a **loca
 ---
 
 ## 5. Contact
-If you have any questions regarding privacy or the app's local data handling, please open an issue on our [GitHub repository](https://github.com/mooziac/mooziac).
+If you have any questions regarding privacy or the app's local data handling, please open an issue on our [GitHub repository](https://github.com/shirkeharsh/mooziac).

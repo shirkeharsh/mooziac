@@ -122,6 +122,9 @@ mp3kal/
 
 ---
 
-## 📄 License
+## 📄 License & Legal
 
-Distributed under the MIT License. Copyright © 2026 ThreeTen. All rights reserved.
+- **License:** Distributed under the MIT License. Copyright © 2026 ThreeTen. All rights reserved.
+- **Privacy Policy:** Read our [Privacy Policy](docs/PRIVACY.md).
+- **Terms of Service:** Read our [Terms of Service](docs/TERMS.md).
+- **Security Policy:** Read our [Security Policy](SECURITY.md).
