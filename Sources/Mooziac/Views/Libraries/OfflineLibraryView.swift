@@ -364,8 +364,9 @@ public class OfflineLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSou
                 openFolderButton.contentTintColor = pitchBlack
 
             case .liquidFluid:
+                let isDark = SystemAppearanceHelper.isDarkSystemAppearance
                 visualEffectBackdrop.isHidden = false
-                visualEffectBackdrop.material = .hudWindow
+                visualEffectBackdrop.material = isDark ? .hudWindow : .popover
                 visualEffectBackdrop.blendingMode = .behindWindow
                 visualEffectBackdrop.state = .active
 
@@ -373,16 +374,19 @@ public class OfflineLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSou
                 layer?.borderWidth = 1.5
                 layer?.borderColor = SystemAppearanceHelper.liquidFluidBorderColor.cgColor
 
-                headerTitleLabel.textColor = NSColor.white
-                backButton.contentTintColor = NSColor.white
-                importButton.contentTintColor = NSColor(white: 0.90, alpha: 1.0)
-                openFolderButton.contentTintColor = NSColor(white: 0.90, alpha: 1.0)
+                let primaryColor = SystemAppearanceHelper.primaryTextColor(for: .liquidFluid)
+                let btnTint = SystemAppearanceHelper.controlButtonTint(for: .liquidFluid)
+                headerTitleLabel.textColor = primaryColor
+                backButton.contentTintColor = primaryColor
+                importButton.contentTintColor = btnTint
+                openFolderButton.contentTintColor = btnTint
             }
 
             searchField.applyTheme(design)
-            emptyStateLabel.textColor = (design == .glassMode) ? NSColor(white: 0.15, alpha: 1.0) : NSColor(white: 0.88, alpha: 1.0)
-            emptyStateSubLabel.textColor = (design == .glassMode) ? NSColor(white: 0.35, alpha: 1.0) : NSColor(white: 0.65, alpha: 1.0)
-            emptyStateIcon.contentTintColor = (design == .glassMode) ? NSColor(white: 0.30, alpha: 1.0) : NSColor(white: 0.60, alpha: 1.0)
+            let isLight = (design == .glassMode || (design == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
+            emptyStateLabel.textColor = isLight ? NSColor(white: 0.15, alpha: 1.0) : NSColor(white: 0.88, alpha: 1.0)
+            emptyStateSubLabel.textColor = isLight ? NSColor(white: 0.35, alpha: 1.0) : NSColor(white: 0.65, alpha: 1.0)
+            emptyStateIcon.contentTintColor = isLight ? NSColor(white: 0.30, alpha: 1.0) : NSColor(white: 0.60, alpha: 1.0)
         }
 
         tableView.reloadData()
@@ -782,11 +786,11 @@ private class OfflineTrackCellView: NSTableCellView {
 
     override func mouseEntered(with event: NSEvent) {
         guard !swipeContainer.isSwipedOpen else { return }
-        let isGlass = (PlayerDesign.current == .glassMode)
-        let isLiquid = (PlayerDesign.current == .liquidFluid)
-        if isGlass {
+        let isLight = (PlayerDesign.current == .glassMode || (PlayerDesign.current == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
+        let isLiquidDark = (PlayerDesign.current == .liquidFluid && SystemAppearanceHelper.isDarkSystemAppearance)
+        if isLight {
             swipeContainer.contentCardView.layer?.backgroundColor = NSColor(white: 0.0, alpha: 0.05).cgColor
-        } else if isLiquid {
+        } else if isLiquidDark {
             swipeContainer.contentCardView.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.24).cgColor
         } else {
             swipeContainer.contentCardView.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.08).cgColor
@@ -795,11 +799,11 @@ private class OfflineTrackCellView: NSTableCellView {
 
     override func mouseExited(with event: NSEvent) {
         guard !swipeContainer.isSwipedOpen else { return }
-        let isGlass = (PlayerDesign.current == .glassMode)
-        let isLiquid = (PlayerDesign.current == .liquidFluid)
-        if isGlass {
+        let isLight = (PlayerDesign.current == .glassMode || (PlayerDesign.current == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
+        let isLiquidDark = (PlayerDesign.current == .liquidFluid && SystemAppearanceHelper.isDarkSystemAppearance)
+        if isLight {
             swipeContainer.contentCardView.layer?.backgroundColor = NSColor(white: 0.0, alpha: 0.02).cgColor
-        } else if isLiquid {
+        } else if isLiquidDark {
             swipeContainer.contentCardView.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.16).cgColor
         } else {
             swipeContainer.contentCardView.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.04).cgColor
@@ -831,24 +835,24 @@ private class OfflineTrackCellView: NSTableCellView {
             durationLabel.stringValue = "--:--"
         }
 
-        let isGlass = (design == .glassMode)
-        let isLiquid = (design == .liquidFluid)
+        let isLight = (design == .glassMode || (design == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
+        let isLiquidDark = (design == .liquidFluid && SystemAppearanceHelper.isDarkSystemAppearance)
         let isDark = (design == .darkMode)
 
         if isPlaying {
-            let accentColor = DynamicIslandPlayerView.sharedAmbientAccentColor ?? (isGlass ? NSColor(red: 0.0, green: 0.45, blue: 0.90, alpha: 1.0) : NSColor(red: 0.2, green: 0.8, blue: 1.0, alpha: 1.0))
+            let accentColor = DynamicIslandPlayerView.sharedAmbientAccentColor ?? (isLight ? NSColor(red: 0.0, green: 0.45, blue: 0.90, alpha: 1.0) : NSColor(red: 0.2, green: 0.8, blue: 1.0, alpha: 1.0))
             titleLabel.textColor = accentColor
         } else {
-            titleLabel.textColor = isGlass ? NSColor.black : NSColor.white
+            titleLabel.textColor = isLight ? NSColor.black : NSColor.white
         }
 
-        if isGlass {
+        if isLight {
             swipeContainer.contentCardView.layer?.backgroundColor = NSColor(white: 0.0, alpha: 0.02).cgColor
             swipeContainer.contentCardView.layer?.borderWidth = 1.0
             swipeContainer.contentCardView.layer?.borderColor = NSColor(white: 0.0, alpha: 0.08).cgColor
             artistLabel.textColor = NSColor(white: 0.30, alpha: 1.0)
             durationLabel.textColor = NSColor(white: 0.40, alpha: 1.0)
-        } else if isLiquid {
+        } else if isLiquidDark {
             swipeContainer.contentCardView.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.16).cgColor
             swipeContainer.contentCardView.layer?.borderWidth = 1.0
             swipeContainer.contentCardView.layer?.borderColor = NSColor(white: 1.0, alpha: 0.20).cgColor
@@ -868,7 +872,7 @@ private class OfflineTrackCellView: NSTableCellView {
         if track.isLiked {
             likeButton.contentTintColor = NSColor(red: 0.98, green: 0.25, blue: 0.35, alpha: 1.0)
         } else {
-            likeButton.contentTintColor = isGlass ? NSColor(white: 0.25, alpha: 1.0) : NSColor(white: 0.60, alpha: 1.0)
+            likeButton.contentTintColor = isLight ? NSColor(white: 0.25, alpha: 1.0) : NSColor(white: 0.60, alpha: 1.0)
         }
     }
 

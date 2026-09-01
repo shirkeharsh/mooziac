@@ -44,19 +44,19 @@ final class NativeCapsuleToggleView: NSControl {
     
     public func updateVisuals(animated: Bool = true) {
         let isDark = (PlayerDesign.current == .darkMode)
-        let isGlass = (PlayerDesign.current == .glassMode)
+        let isLight = (PlayerDesign.current == .glassMode || (PlayerDesign.current == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
         
         let activeColor: CGColor
         if isDark {
             activeColor = NSColor.darkThemeSelector.cgColor
-        } else if isGlass {
+        } else if isLight {
             activeColor = NSColor.lightThemeSelector.cgColor
         } else {
             activeColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0).cgColor
         }
         
         let inactiveTrackColor: CGColor
-        if isGlass {
+        if isLight {
             inactiveTrackColor = NSColor(white: 0.0, alpha: 0.14).cgColor
         } else {
             inactiveTrackColor = NSColor(white: 1.0, alpha: 0.14).cgColor

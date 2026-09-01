@@ -180,7 +180,8 @@ public class GlassSearchField: NSSearchField {
         if let _ = customIdleBorderColor {
             return
         }
-        if design == .glassMode {
+        let isLight = (design == .glassMode || (design == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
+        if isLight {
             textColor = NSColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 1.0)
             layer?.backgroundColor = NSColor(white: 0.0, alpha: 0.06).cgColor
             layer?.borderColor = NSColor(white: 0.0, alpha: 0.16).cgColor

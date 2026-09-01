@@ -1149,14 +1149,16 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     
     func updateBrowserButtonColor() {
         if isSettingsExpanded && activeSettingsMode == .preferences {
-            let isGlass = (PlayerDesign.current == .glassMode)
+            let isLight = (PlayerDesign.current == .glassMode || (PlayerDesign.current == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
             let isDark = (PlayerDesign.current == .darkMode)
-            browserButton.contentTintColor = isGlass ? NSColor.lightThemeSelector : (isDark ? NSColor.darkThemeSelector : NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0))
+            browserButton.contentTintColor = isLight ? NSColor.lightThemeSelector : (isDark ? NSColor.darkThemeSelector : NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0))
         } else {
             switch PlayerDesign.current {
             case .glassMode:
                 browserButton.contentTintColor = NSColor(red: 0.082, green: 0.082, blue: 0.082, alpha: 1.0)
-            case .adaptive, .liquidFluid:
+            case .liquidFluid:
+                browserButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .liquidFluid)
+            case .adaptive:
                 browserButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
             case .darkMode:
                 browserButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
@@ -1166,14 +1168,16 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
 
     func updateAddToPlaylistButtonColor() {
         if isSettingsExpanded && activeSettingsMode == .playlist {
-            let isGlass = (PlayerDesign.current == .glassMode)
+            let isLight = (PlayerDesign.current == .glassMode || (PlayerDesign.current == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
             let isDark = (PlayerDesign.current == .darkMode)
-            addToPlaylistButton.contentTintColor = isGlass ? NSColor.lightThemeSelector : (isDark ? NSColor.darkThemeSelector : NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0))
+            addToPlaylistButton.contentTintColor = isLight ? NSColor.lightThemeSelector : (isDark ? NSColor.darkThemeSelector : NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0))
         } else {
             switch PlayerDesign.current {
             case .glassMode:
                 addToPlaylistButton.contentTintColor = NSColor(red: 0.082, green: 0.082, blue: 0.082, alpha: 1.0)
-            case .adaptive, .liquidFluid:
+            case .liquidFluid:
+                addToPlaylistButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: .liquidFluid)
+            case .adaptive:
                 addToPlaylistButton.contentTintColor = NSColor(white: 0.80, alpha: 1.0)
             case .darkMode:
                 addToPlaylistButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)

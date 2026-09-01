@@ -1718,8 +1718,9 @@ extension DynamicIslandPlayerView {
         row.wantsLayer = true
         row.layer?.cornerRadius = 14
         row.layer?.borderWidth = 1.0
-        row.layer?.borderColor = (PlayerDesign.current == .liquidFluid ? NSColor(white: 1.0, alpha: 0.20) : tone.dividerColor).cgColor
-        row.layer?.backgroundColor = (PlayerDesign.current == .liquidFluid ? NSColor(white: 1.0, alpha: 0.16) : (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06))).cgColor
+        let isLiquidDark = (PlayerDesign.current == .liquidFluid && SystemAppearanceHelper.isDarkSystemAppearance)
+        row.layer?.borderColor = (isLiquidDark ? NSColor(white: 1.0, alpha: 0.20) : tone.dividerColor).cgColor
+        row.layer?.backgroundColor = (isLiquidDark ? NSColor(white: 1.0, alpha: 0.16) : (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06))).cgColor
 
         swipeContainer.onRowClicked = { [weak self] in
             guard let self = self else { return }
@@ -3725,10 +3726,12 @@ extension DynamicIslandPlayerView {
 
     func currentSettingsTone() -> SettingsTone {
         switch PlayerDesign.current {
-        case .darkMode, .liquidFluid, .adaptive:
+        case .darkMode, .adaptive:
             return .dark
         case .glassMode:
             return .light
+        case .liquidFluid:
+            return SystemAppearanceHelper.isDarkSystemAppearance ? .dark : .light
         }
     }
 
@@ -3760,7 +3763,7 @@ extension DynamicIslandPlayerView {
         let allStyles = ProgressStyle.allCases
         progressToggle.stepIndex = allStyles.firstIndex(of: ProgressStyle.current) ?? 0
 
-        let isGlass = (PlayerDesign.current == .glassMode)
+        let isGlass = (PlayerDesign.current == .glassMode || (PlayerDesign.current == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
         for row in featureRowContainers {
             if isGlass {
                 row.layer?.backgroundColor = NSColor(white: 0.0, alpha: 0.03).cgColor
@@ -3985,9 +3988,10 @@ private class DownloadRowView: NSView {
             playBtn.contentTintColor = accent
             playBtn.toolTip = isPlaybackActive ? "Pause" : "Resume"
         } else {
-            layer?.borderColor = tone.dividerColor.cgColor
+            let isLiquidDark = (PlayerDesign.current == .liquidFluid && SystemAppearanceHelper.isDarkSystemAppearance)
+            layer?.borderColor = isLiquidDark ? NSColor(white: 1.0, alpha: 0.20).cgColor : tone.dividerColor.cgColor
             layer?.borderWidth = 1.0
-            layer?.backgroundColor = (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06)).cgColor
+            layer?.backgroundColor = isLiquidDark ? NSColor(white: 1.0, alpha: 0.16).cgColor : (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06)).cgColor
             titleLbl.textColor = tone.primaryText
             titleLbl.font = NSFont.systemFont(ofSize: 11.5, weight: .medium)
 
@@ -3999,11 +4003,12 @@ private class DownloadRowView: NSView {
     }
 
     private func setupUI(tone: SettingsTone) {
+        let isLiquidDark = (PlayerDesign.current == .liquidFluid && SystemAppearanceHelper.isDarkSystemAppearance)
         wantsLayer = true
         layer?.cornerRadius = 14
         layer?.borderWidth = 1.0
-        layer?.borderColor = (PlayerDesign.current == .liquidFluid ? NSColor(white: 1.0, alpha: 0.20) : tone.dividerColor).cgColor
-        layer?.backgroundColor = (PlayerDesign.current == .liquidFluid ? NSColor(white: 1.0, alpha: 0.16) : (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06))).cgColor
+        layer?.borderColor = isLiquidDark ? NSColor(white: 1.0, alpha: 0.20).cgColor : tone.dividerColor.cgColor
+        layer?.backgroundColor = isLiquidDark ? NSColor(white: 1.0, alpha: 0.16).cgColor : (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06)).cgColor
         translatesAutoresizingMaskIntoConstraints = false
 
         // Play Button
@@ -4290,9 +4295,10 @@ private class DetailItemRowView: NSView {
             playBtn.contentTintColor = accent
             playBtn.toolTip = isPlaybackActive ? "Pause" : "Resume"
         } else {
-            layer?.borderColor = tone.dividerColor.cgColor
+            let isLiquidDark = (PlayerDesign.current == .liquidFluid && SystemAppearanceHelper.isDarkSystemAppearance)
+            layer?.borderColor = (isLiquidDark ? NSColor(white: 1.0, alpha: 0.20) : tone.dividerColor).cgColor
             layer?.borderWidth = 1.0
-            layer?.backgroundColor = (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06)).cgColor
+            layer?.backgroundColor = (isLiquidDark ? NSColor(white: 1.0, alpha: 0.16) : (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06))).cgColor
             titleLbl.textColor = tone.primaryText
             titleLbl.font = NSFont.systemFont(ofSize: 11.5, weight: .medium)
 
@@ -4304,11 +4310,12 @@ private class DetailItemRowView: NSView {
     }
 
     private func setupUI(tone: SettingsTone) {
+        let isLiquidDark = (PlayerDesign.current == .liquidFluid && SystemAppearanceHelper.isDarkSystemAppearance)
         wantsLayer = true
         layer?.cornerRadius = 14
         layer?.borderWidth = 1.0
-        layer?.borderColor = (PlayerDesign.current == .liquidFluid ? NSColor(white: 1.0, alpha: 0.20) : tone.dividerColor).cgColor
-        layer?.backgroundColor = (PlayerDesign.current == .liquidFluid ? NSColor(white: 1.0, alpha: 0.16) : (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06))).cgColor
+        layer?.borderColor = (isLiquidDark ? NSColor(white: 1.0, alpha: 0.20) : tone.dividerColor).cgColor
+        layer?.backgroundColor = (isLiquidDark ? NSColor(white: 1.0, alpha: 0.16) : (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06))).cgColor
         translatesAutoresizingMaskIntoConstraints = false
 
         // Play Button
@@ -4480,9 +4487,10 @@ private class HistoryRowView: NSView {
             playBtn.contentTintColor = accent
             playBtn.toolTip = isPlaybackActive ? "Pause" : "Resume"
         } else {
-            layer?.borderColor = tone.dividerColor.cgColor
+            let isLiquidDark = (PlayerDesign.current == .liquidFluid && SystemAppearanceHelper.isDarkSystemAppearance)
+            layer?.borderColor = isLiquidDark ? NSColor(white: 1.0, alpha: 0.20).cgColor : tone.dividerColor.cgColor
             layer?.borderWidth = 1.0
-            layer?.backgroundColor = (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06)).cgColor
+            layer?.backgroundColor = isLiquidDark ? NSColor(white: 1.0, alpha: 0.16).cgColor : (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06)).cgColor
             titleLbl.textColor = tone.primaryText
             titleLbl.font = NSFont.systemFont(ofSize: 11.5, weight: .medium)
 
@@ -4494,11 +4502,12 @@ private class HistoryRowView: NSView {
     }
 
     private func setupUI(tone: SettingsTone) {
+        let isLiquidDark = (PlayerDesign.current == .liquidFluid && SystemAppearanceHelper.isDarkSystemAppearance)
         wantsLayer = true
         layer?.cornerRadius = 14
         layer?.borderWidth = 1.0
-        layer?.borderColor = (PlayerDesign.current == .liquidFluid ? NSColor(white: 1.0, alpha: 0.20) : tone.dividerColor).cgColor
-        layer?.backgroundColor = (PlayerDesign.current == .liquidFluid ? NSColor(white: 1.0, alpha: 0.16) : (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06))).cgColor
+        layer?.borderColor = isLiquidDark ? NSColor(white: 1.0, alpha: 0.20).cgColor : tone.dividerColor.cgColor
+        layer?.backgroundColor = isLiquidDark ? NSColor(white: 1.0, alpha: 0.16).cgColor : (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06)).cgColor
         translatesAutoresizingMaskIntoConstraints = false
 
         // Play Button
@@ -4663,9 +4672,10 @@ private class LikedSongRowView: NSView {
             playBtn.contentTintColor = accent
             playBtn.toolTip = isPlaybackActive ? "Pause" : "Resume"
         } else {
-            layer?.borderColor = (PlayerDesign.current == .liquidFluid ? NSColor(white: 1.0, alpha: 0.20) : tone.dividerColor).cgColor
+            let isLiquidDark = (PlayerDesign.current == .liquidFluid && SystemAppearanceHelper.isDarkSystemAppearance)
+            layer?.borderColor = (isLiquidDark ? NSColor(white: 1.0, alpha: 0.20) : tone.dividerColor).cgColor
             layer?.borderWidth = 1.0
-            layer?.backgroundColor = (PlayerDesign.current == .liquidFluid ? NSColor(white: 1.0, alpha: 0.16) : (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06))).cgColor
+            layer?.backgroundColor = (isLiquidDark ? NSColor(white: 1.0, alpha: 0.16) : (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06))).cgColor
             titleLbl.textColor = tone.primaryText
             titleLbl.font = NSFont.systemFont(ofSize: 11.5, weight: .medium)
 
@@ -4677,11 +4687,12 @@ private class LikedSongRowView: NSView {
     }
 
     private func setupUI(tone: SettingsTone) {
+        let isLiquidDark = (PlayerDesign.current == .liquidFluid && SystemAppearanceHelper.isDarkSystemAppearance)
         wantsLayer = true
         layer?.cornerRadius = 14
         layer?.borderWidth = 1.0
-        layer?.borderColor = (PlayerDesign.current == .liquidFluid ? NSColor(white: 1.0, alpha: 0.20) : tone.dividerColor).cgColor
-        layer?.backgroundColor = (PlayerDesign.current == .liquidFluid ? NSColor(white: 1.0, alpha: 0.16) : (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06))).cgColor
+        layer?.borderColor = (isLiquidDark ? NSColor(white: 1.0, alpha: 0.20) : tone.dividerColor).cgColor
+        layer?.backgroundColor = (isLiquidDark ? NSColor(white: 1.0, alpha: 0.16) : (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06))).cgColor
         translatesAutoresizingMaskIntoConstraints = false
 
         playBtn.translatesAutoresizingMaskIntoConstraints = false

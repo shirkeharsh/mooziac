@@ -95,7 +95,9 @@ private func idleIconColor() -> NSColor {
             switch PlayerDesign.current {
             case .glassMode:
                 return NSColor(red: 0.082, green: 0.082, blue: 0.082, alpha: 1.0)
-            case .adaptive, .liquidFluid:
+            case .liquidFluid:
+                return SystemAppearanceHelper.isDarkSystemAppearance ? NSColor(white: 0.80, alpha: 1.0) : NSColor(red: 0.082, green: 0.082, blue: 0.082, alpha: 1.0)
+            case .adaptive:
                 return NSColor(white: 0.80, alpha: 1.0)
             case .darkMode:
                 return NSColor(white: 0.85, alpha: 1.0)
@@ -104,7 +106,8 @@ private func idleIconColor() -> NSColor {
 
         private func isDarkTheme() -> Bool {
             switch PlayerDesign.current {
-            case .darkMode, .liquidFluid: return true
+            case .darkMode: return true
+            case .liquidFluid: return SystemAppearanceHelper.isDarkSystemAppearance
             case .glassMode: return false
             case .adaptive:
                 return NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
@@ -112,7 +115,7 @@ private func idleIconColor() -> NSColor {
         }
 
     func updateVisuals() {
-        let isLight = (PlayerDesign.current == .glassMode)
+        let isLight = (PlayerDesign.current == .glassMode || (PlayerDesign.current == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
         let accentColor = isLight ? NSColor.lightThemeSelector : NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
         let trackColor = isLight ? NSColor(white: 0.0, alpha: 0.14).cgColor : NSColor(white: 1.0, alpha: 0.20).cgColor
 

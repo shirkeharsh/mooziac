@@ -606,36 +606,43 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
                 bottomImportButton.contentTintColor = NSColor.lightThemeSelector
 
             case .liquidFluid:
+                let isDark = SystemAppearanceHelper.isDarkSystemAppearance
                 visualEffectBackdrop.isHidden = false
-                visualEffectBackdrop.material = .hudWindow
+                visualEffectBackdrop.material = isDark ? .hudWindow : .popover
                 visualEffectBackdrop.blendingMode = .behindWindow
                 visualEffectBackdrop.state = .active
 
                 layer?.backgroundColor = SystemAppearanceHelper.liquidFluidBackingColor.cgColor
                 layer?.borderWidth = 1.5
                 layer?.borderColor = SystemAppearanceHelper.liquidFluidBorderColor.cgColor
-                headerTitleLabel.textColor = NSColor.white
-                headerSubtitleLabel.textColor = NSColor(white: 0.88, alpha: 1.0)
-                backButton.contentTintColor = NSColor.white
-                saveQueueButton.contentTintColor = NSColor(white: 0.90, alpha: 1.0)
-                importHeaderButton.contentTintColor = NSColor(white: 0.90, alpha: 1.0)
-                openFolderHeaderButton.contentTintColor = NSColor(white: 0.90, alpha: 1.0)
-                downloadCurrentHeaderButton.contentTintColor = NSColor(white: 0.90, alpha: 1.0)
-                addCurrentTrackButton.contentTintColor = NSColor(white: 0.90, alpha: 1.0)
-                renameHeaderButton.contentTintColor = NSColor(white: 0.90, alpha: 1.0)
-                downloadButton.contentTintColor = NSColor(white: 0.90, alpha: 1.0)
-                moreMenuButton.contentTintColor = NSColor(white: 0.90, alpha: 1.0)
 
-                bottomBar.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.12).cgColor
-                bottomBar.layer?.borderColor = NSColor(white: 1.0, alpha: 0.18).cgColor
+                let primaryColor = SystemAppearanceHelper.primaryTextColor(for: .liquidFluid)
+                let secondaryColor = SystemAppearanceHelper.secondaryTextColor(for: .liquidFluid)
+                let btnTint = SystemAppearanceHelper.controlButtonTint(for: .liquidFluid)
+
+                headerTitleLabel.textColor = primaryColor
+                headerSubtitleLabel.textColor = secondaryColor
+                backButton.contentTintColor = primaryColor
+                saveQueueButton.contentTintColor = btnTint
+                importHeaderButton.contentTintColor = btnTint
+                openFolderHeaderButton.contentTintColor = btnTint
+                downloadCurrentHeaderButton.contentTintColor = btnTint
+                addCurrentTrackButton.contentTintColor = btnTint
+                renameHeaderButton.contentTintColor = btnTint
+                downloadButton.contentTintColor = btnTint
+                moreMenuButton.contentTintColor = btnTint
+
+                bottomBar.layer?.backgroundColor = isDark ? NSColor(white: 1.0, alpha: 0.12).cgColor : NSColor(white: 0.0, alpha: 0.04).cgColor
+                bottomBar.layer?.borderColor = isDark ? NSColor(white: 1.0, alpha: 0.18).cgColor : NSColor(white: 0.0, alpha: 0.12).cgColor
                 bottomBar.layer?.borderWidth = 1.0
 
-                tableContainer.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.05).cgColor
-                tableContainer.layer?.borderColor = NSColor(white: 1.0, alpha: 0.18).cgColor
+                tableContainer.layer?.backgroundColor = isDark ? NSColor(white: 1.0, alpha: 0.05).cgColor : NSColor(white: 0.0, alpha: 0.02).cgColor
+                tableContainer.layer?.borderColor = isDark ? NSColor(white: 1.0, alpha: 0.18).cgColor : NSColor(white: 0.0, alpha: 0.12).cgColor
 
-                bottomNewPlaylistButton.contentTintColor = NSColor.white
-                bottomAddCurrentTrackButton.contentTintColor = NSColor.white
-                bottomImportButton.contentTintColor = NSColor.white
+                let selectorColor = isDark ? NSColor.white : NSColor.lightThemeSelector
+                bottomNewPlaylistButton.contentTintColor = selectorColor
+                bottomAddCurrentTrackButton.contentTintColor = selectorColor
+                bottomImportButton.contentTintColor = selectorColor
             }
             searchField.applyTheme(design)
         }
@@ -2636,11 +2643,11 @@ private class PlaylistRowCellView: NSTableCellView {
 
     override func mouseEntered(with event: NSEvent) {
         guard !swipeContainer.isSwipedOpen else { return }
-        let isGlass = (PlayerDesign.current == .glassMode)
-        let isLiquid = (PlayerDesign.current == .liquidFluid)
-        if isGlass {
+        let isLight = (PlayerDesign.current == .glassMode || (PlayerDesign.current == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
+        let isLiquidDark = (PlayerDesign.current == .liquidFluid && SystemAppearanceHelper.isDarkSystemAppearance)
+        if isLight {
             swipeContainer.contentCardView.layer?.backgroundColor = NSColor(white: 0.0, alpha: 0.05).cgColor
-        } else if isLiquid {
+        } else if isLiquidDark {
             swipeContainer.contentCardView.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.24).cgColor
         } else {
             swipeContainer.contentCardView.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.08).cgColor
@@ -2649,11 +2656,11 @@ private class PlaylistRowCellView: NSTableCellView {
 
     override func mouseExited(with event: NSEvent) {
         guard !swipeContainer.isSwipedOpen else { return }
-        let isGlass = (PlayerDesign.current == .glassMode)
-        let isLiquid = (PlayerDesign.current == .liquidFluid)
-        if isGlass {
+        let isLight = (PlayerDesign.current == .glassMode || (PlayerDesign.current == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
+        let isLiquidDark = (PlayerDesign.current == .liquidFluid && SystemAppearanceHelper.isDarkSystemAppearance)
+        if isLight {
             swipeContainer.contentCardView.layer?.backgroundColor = NSColor(white: 0.0, alpha: 0.02).cgColor
-        } else if isLiquid {
+        } else if isLiquidDark {
             swipeContainer.contentCardView.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.16).cgColor
         } else {
             swipeContainer.contentCardView.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.04).cgColor
@@ -2665,12 +2672,12 @@ private class PlaylistRowCellView: NSTableCellView {
         titleLabel.stringValue = playlist.name
         countLabel.stringValue = summary.countText
 
-        let isGlass = (design == .glassMode)
-        let isLiquid = (design == .liquidFluid)
+        let isLight = (design == .glassMode || (design == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
+        let isLiquidDark = (design == .liquidFluid && SystemAppearanceHelper.isDarkSystemAppearance)
         let isDark = (design == .darkMode)
-        let cyan = isGlass ? NSColor.lightThemeSelector : NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+        let cyan = isLight ? NSColor.lightThemeSelector : NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
 
-        if isGlass {
+        if isLight {
             swipeContainer.contentCardView.layer?.backgroundColor = NSColor(white: 0.0, alpha: 0.02).cgColor
             swipeContainer.contentCardView.layer?.borderWidth = 1.0
             swipeContainer.contentCardView.layer?.borderColor = NSColor(white: 0.0, alpha: 0.08).cgColor
@@ -2679,7 +2686,7 @@ private class PlaylistRowCellView: NSTableCellView {
             iconImageView.contentTintColor = cyan
             editButton.contentTintColor = NSColor(white: 0.20, alpha: 0.70)
             chevronImageView.contentTintColor = NSColor(white: 0.20, alpha: 0.40)
-        } else if isLiquid {
+        } else if isLiquidDark {
             swipeContainer.contentCardView.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.16).cgColor
             swipeContainer.contentCardView.layer?.borderWidth = 1.0
             swipeContainer.contentCardView.layer?.borderColor = NSColor(white: 1.0, alpha: 0.20).cgColor
@@ -2867,8 +2874,8 @@ private class PlaylistItemRowCellView: NSTableCellView {
         artistLabel.stringValue = item.artist.isEmpty ? "Unknown Artist" : item.artist
         durationLabel.stringValue = item.duration.isEmpty ? "--:--" : item.duration
 
-        let isGlass = (design == .glassMode)
-        let isLiquid = (design == .liquidFluid)
+        let isLight = (design == .glassMode || (design == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
+        let isLiquidDark = (design == .liquidFluid && SystemAppearanceHelper.isDarkSystemAppearance)
         let isDark = (design == .darkMode)
 
         // Check if currently playing
@@ -2892,22 +2899,22 @@ private class PlaylistItemRowCellView: NSTableCellView {
         }
 
         if isCurrent {
-            let accentColor = DynamicIslandPlayerView.sharedAmbientAccentColor ?? (isGlass ? NSColor(red: 0.0, green: 0.45, blue: 0.90, alpha: 1.0) : NSColor(red: 0.2, green: 0.8, blue: 1.0, alpha: 1.0))
+            let accentColor = DynamicIslandPlayerView.sharedAmbientAccentColor ?? (isLight ? NSColor(red: 0.0, green: 0.45, blue: 0.90, alpha: 1.0) : NSColor(red: 0.2, green: 0.8, blue: 1.0, alpha: 1.0))
             titleLabel.textColor = accentColor
             nowPlayingWave.isHidden = false
             nowPlayingWave.contentTintColor = accentColor
         } else {
-            titleLabel.textColor = isGlass ? NSColor.black : NSColor.white
+            titleLabel.textColor = isLight ? NSColor.black : NSColor.white
             nowPlayingWave.isHidden = true
         }
 
-        if isGlass {
+        if isLight {
             containerView.layer?.backgroundColor = NSColor(white: 0.0, alpha: 0.02).cgColor
             containerView.layer?.borderColor = NSColor(white: 0.0, alpha: 0.08).cgColor
             artistLabel.textColor = NSColor(white: 0.35, alpha: 1.0)
             durationLabel.textColor = NSColor(white: 0.45, alpha: 1.0)
             optionsButton.contentTintColor = NSColor(white: 0.35, alpha: 1.0)
-        } else if isLiquid {
+        } else if isLiquidDark {
             containerView.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.16).cgColor
             containerView.layer?.borderWidth = 1.0
             containerView.layer?.borderColor = NSColor(white: 1.0, alpha: 0.20).cgColor
@@ -3138,29 +3145,29 @@ private class DownloadRowCellView: NSTableCellView {
         let secs = Int(track.duration) % 60
         durationLabel.stringValue = track.duration > 0 ? String(format: "%d:%02d", mins, secs) : "--:--"
 
-        let isGlass = (design == .glassMode)
-        let isLiquid = (design == .liquidFluid)
+        let isLight = (design == .glassMode || (design == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
+        let isLiquidDark = (design == .liquidFluid && SystemAppearanceHelper.isDarkSystemAppearance)
         let isDark = (design == .darkMode)
 
         let isCurrent = (NowPlayingManager.shared.engineMode == .offline && NativeAudioPlayer.shared.currentTrack?.id == track.id)
 
         if isCurrent {
-            let accentColor = DynamicIslandPlayerView.sharedAmbientAccentColor ?? (isGlass ? NSColor(red: 0.0, green: 0.45, blue: 0.90, alpha: 1.0) : NSColor(red: 0.2, green: 0.8, blue: 1.0, alpha: 1.0))
+            let accentColor = DynamicIslandPlayerView.sharedAmbientAccentColor ?? (isLight ? NSColor(red: 0.0, green: 0.45, blue: 0.90, alpha: 1.0) : NSColor(red: 0.2, green: 0.8, blue: 1.0, alpha: 1.0))
             titleLabel.textColor = accentColor
             nowPlayingWave.isHidden = false
             nowPlayingWave.contentTintColor = accentColor
         } else {
-            titleLabel.textColor = isGlass ? NSColor.black : NSColor.white
+            titleLabel.textColor = isLight ? NSColor.black : NSColor.white
             nowPlayingWave.isHidden = true
         }
 
-        if isGlass {
+        if isLight {
             containerView.layer?.backgroundColor = NSColor(white: 0.0, alpha: 0.02).cgColor
             containerView.layer?.borderColor = NSColor(white: 0.0, alpha: 0.08).cgColor
             artistLabel.textColor = NSColor(white: 0.35, alpha: 1.0)
             durationLabel.textColor = NSColor(white: 0.45, alpha: 1.0)
             optionsButton.contentTintColor = NSColor(white: 0.35, alpha: 1.0)
-        } else if isLiquid {
+        } else if isLiquidDark {
             containerView.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.16).cgColor
             containerView.layer?.borderWidth = 1.0
             containerView.layer?.borderColor = NSColor(white: 1.0, alpha: 0.20).cgColor
@@ -3345,7 +3352,8 @@ private class HistoryRowCellView: NSTableCellView {
         artistLabel.stringValue = item.artist.isEmpty ? (item.sourceType == "local" ? "Offline Audio" : "YouTube Music") : item.artist
         timeLabel.stringValue = item.relativePlayedTimeString
 
-        let isGlass = (design == .glassMode)
+        let isLight = (design == .glassMode || (design == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
+        let isLiquidDark = (design == .liquidFluid && SystemAppearanceHelper.isDarkSystemAppearance)
         let isDark = (design == .darkMode)
 
         // Check if currently playing
@@ -3369,21 +3377,28 @@ private class HistoryRowCellView: NSTableCellView {
         }
 
         if isCurrent {
-            let accentColor = DynamicIslandPlayerView.sharedAmbientAccentColor ?? (isGlass ? NSColor(red: 0.0, green: 0.45, blue: 0.90, alpha: 1.0) : NSColor(red: 0.2, green: 0.8, blue: 1.0, alpha: 1.0))
+            let accentColor = DynamicIslandPlayerView.sharedAmbientAccentColor ?? (isLight ? NSColor(red: 0.0, green: 0.45, blue: 0.90, alpha: 1.0) : NSColor(red: 0.2, green: 0.8, blue: 1.0, alpha: 1.0))
             titleLabel.textColor = accentColor
             nowPlayingWave.isHidden = false
             nowPlayingWave.contentTintColor = accentColor
         } else {
-            titleLabel.textColor = isGlass ? NSColor.black : NSColor.white
+            titleLabel.textColor = isLight ? NSColor.black : NSColor.white
             nowPlayingWave.isHidden = true
         }
 
-        if isGlass {
+        if isLight {
             containerView.layer?.backgroundColor = NSColor(white: 0.0, alpha: 0.02).cgColor
             containerView.layer?.borderColor = NSColor(white: 0.0, alpha: 0.08).cgColor
             artistLabel.textColor = NSColor(white: 0.35, alpha: 1.0)
             timeLabel.textColor = NSColor(white: 0.45, alpha: 1.0)
             optionsButton.contentTintColor = NSColor(white: 0.35, alpha: 1.0)
+        } else if isLiquidDark {
+            containerView.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.16).cgColor
+            containerView.layer?.borderWidth = 1.0
+            containerView.layer?.borderColor = NSColor(white: 1.0, alpha: 0.20).cgColor
+            artistLabel.textColor = NSColor(white: 0.88, alpha: 1.0)
+            timeLabel.textColor = NSColor(white: 0.82, alpha: 1.0)
+            optionsButton.contentTintColor = NSColor(white: 0.90, alpha: 1.0)
         } else {
             containerView.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.04).cgColor
             containerView.layer?.borderColor = NSColor(white: 1.0, alpha: 0.08).cgColor
@@ -3465,7 +3480,7 @@ private class LikedSongRowCellView: NSTableCellView {
         wantsLayer = true
 
         swipeContainer.translatesAutoresizingMaskIntoConstraints = false
-        swipeContainer.deleteButtonTitle = "Unlike"
+        swipeContainer.deleteButtonTitle = "Remove"
         swipeContainer.onRowClicked = { [weak self] in
             self?.onRowClicked?()
         }
@@ -3483,8 +3498,9 @@ private class LikedSongRowCellView: NSTableCellView {
 
         containerView.translatesAutoresizingMaskIntoConstraints = false
         containerView.wantsLayer = true
-        containerView.layer?.cornerRadius = 6
-        containerView.layer?.borderWidth = 0.5
+        containerView.layer?.cornerRadius = 8
+        containerView.layer?.borderWidth = 1.0
+        containerView.layer?.masksToBounds = true
         card.addSubview(containerView)
 
         artImageView.translatesAutoresizingMaskIntoConstraints = false
@@ -3527,9 +3543,9 @@ private class LikedSongRowCellView: NSTableCellView {
         textStack.translatesAutoresizingMaskIntoConstraints = false
 
         heartIcon.translatesAutoresizingMaskIntoConstraints = false
-        let heartConfig = NSImage.SymbolConfiguration(pointSize: 10.0, weight: .medium)
+        let heartConfig = NSImage.SymbolConfiguration(pointSize: 11.0, weight: .semibold)
         heartIcon.image = NSImage(systemSymbolName: "heart.fill", accessibilityDescription: "Liked")?.withSymbolConfiguration(heartConfig)
-        heartIcon.contentTintColor = NSColor(red: 1.0, green: 0.22, blue: 0.38, alpha: 1.0)
+        heartIcon.contentTintColor = NSColor(red: 1.0, green: 0.28, blue: 0.38, alpha: 1.0)
 
         optionsButton.translatesAutoresizingMaskIntoConstraints = false
         let config = NSImage.SymbolConfiguration(pointSize: 10.5, weight: .medium)
@@ -3538,8 +3554,6 @@ private class LikedSongRowCellView: NSTableCellView {
         optionsButton.target = self
         optionsButton.action = #selector(handleOptions)
         optionsButton.isBordered = false
-        optionsButton.wantsLayer = true
-        optionsButton.layer?.cornerRadius = 4
 
         containerView.addSubview(artImageView)
         containerView.addSubview(nowPlayingWave)
@@ -3549,9 +3563,9 @@ private class LikedSongRowCellView: NSTableCellView {
 
         NSLayoutConstraint.activate([
             containerView.topAnchor.constraint(equalTo: card.topAnchor, constant: 1),
+            containerView.leadingAnchor.constraint(equalTo: card.leadingAnchor),
+            containerView.trailingAnchor.constraint(equalTo: card.trailingAnchor),
             containerView.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -1),
-            containerView.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 6),
-            containerView.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -6),
 
             artImageView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 6),
             artImageView.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
@@ -3584,8 +3598,8 @@ private class LikedSongRowCellView: NSTableCellView {
         titleLabel.stringValue = record.title
         artistLabel.stringValue = record.artist.isEmpty ? "YouTube Music" : record.artist
 
-        let isGlass = (design == .glassMode)
-        let isLiquid = (design == .liquidFluid)
+        let isLight = (design == .glassMode || (design == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
+        let isLiquidDark = (design == .liquidFluid && SystemAppearanceHelper.isDarkSystemAppearance)
         let isDark = (design == .darkMode)
 
         let currentVid = UserDefaults.standard.string(forKey: "YTM_lastVideoId") ?? ""
@@ -3600,21 +3614,21 @@ private class LikedSongRowCellView: NSTableCellView {
         }
 
         if isCurrent {
-            let accentColor = DynamicIslandPlayerView.sharedAmbientAccentColor ?? (isGlass ? NSColor(red: 0.0, green: 0.45, blue: 0.90, alpha: 1.0) : NSColor(red: 0.2, green: 0.8, blue: 1.0, alpha: 1.0))
+            let accentColor = DynamicIslandPlayerView.sharedAmbientAccentColor ?? (isLight ? NSColor(red: 0.0, green: 0.45, blue: 0.90, alpha: 1.0) : NSColor(red: 0.2, green: 0.8, blue: 1.0, alpha: 1.0))
             titleLabel.textColor = accentColor
             nowPlayingWave.isHidden = false
             nowPlayingWave.contentTintColor = accentColor
         } else {
-            titleLabel.textColor = isGlass ? NSColor.black : NSColor.white
+            titleLabel.textColor = isLight ? NSColor.black : NSColor.white
             nowPlayingWave.isHidden = true
         }
 
-        if isGlass {
+        if isLight {
             containerView.layer?.backgroundColor = NSColor(white: 0.0, alpha: 0.02).cgColor
             containerView.layer?.borderColor = NSColor(white: 0.0, alpha: 0.08).cgColor
             artistLabel.textColor = NSColor(white: 0.35, alpha: 1.0)
             optionsButton.contentTintColor = NSColor(white: 0.35, alpha: 1.0)
-        } else if isLiquid {
+        } else if isLiquidDark {
             containerView.layer?.backgroundColor = NSColor(white: 1.0, alpha: 0.16).cgColor
             containerView.layer?.borderWidth = 1.0
             containerView.layer?.borderColor = NSColor(white: 1.0, alpha: 0.20).cgColor
