@@ -705,7 +705,7 @@ extension DynamicIslandPlayerView {
         // Section label
         let sectionLabel = NSTextField(labelWithString: "GESTURE MAPPING")
         sectionLabel.font = NSFont.systemFont(ofSize: 11, weight: .bold)
-        sectionLabel.textColor = NSColor(white: 0.92, alpha: 1.0)
+        sectionLabel.textColor = currentSettingsTone().primaryText
         sectionLabel.isEditable = false
         sectionLabel.isSelectable = false
         sectionLabel.refusesFirstResponder = true
@@ -3697,6 +3697,7 @@ extension DynamicIslandPlayerView {
         chevronImg.contentTintColor = NSColor(white: 0.5, alpha: 1.0)
         chevronImg.widthAnchor.constraint(equalToConstant: 12).isActive = true
         chevronImg.heightAnchor.constraint(equalToConstant: 12).isActive = true
+        featureChevronViews.append(chevronImg)
 
         let rowStack = NSStackView(views: [iconImg, textStack, chevronImg])
         rowStack.orientation = .horizontal
@@ -3724,12 +3725,10 @@ extension DynamicIslandPlayerView {
 
     func currentSettingsTone() -> SettingsTone {
         switch PlayerDesign.current {
-        case .darkMode, .liquidFluid:
+        case .darkMode, .liquidFluid, .adaptive:
             return .dark
         case .glassMode:
             return .light
-        case .adaptive:
-            return SystemAppearanceHelper.isDarkSystemAppearance ? .dark : .light
         }
     }
 
@@ -3761,9 +3760,16 @@ extension DynamicIslandPlayerView {
         let allStyles = ProgressStyle.allCases
         progressToggle.stepIndex = allStyles.firstIndex(of: ProgressStyle.current) ?? 0
 
+        let isGlass = (PlayerDesign.current == .glassMode)
         for row in featureRowContainers {
-            row.layer?.backgroundColor = NSColor.clear.cgColor
-            row.layer?.borderWidth = 0
+            if isGlass {
+                row.layer?.backgroundColor = NSColor(white: 0.0, alpha: 0.03).cgColor
+                row.layer?.borderColor = NSColor(white: 0.0, alpha: 0.06).cgColor
+                row.layer?.borderWidth = 0.5
+            } else {
+                row.layer?.backgroundColor = NSColor.clear.cgColor
+                row.layer?.borderWidth = 0
+            }
         }
 
         for icon in featureIconViews {
@@ -3775,6 +3781,9 @@ extension DynamicIslandPlayerView {
         for desc in featureDescLabels {
             desc.textColor = tone.secondaryText
         }
+        for chevron in featureChevronViews {
+            chevron.contentTintColor = tone.secondaryText.withAlphaComponent(0.7)
+        }
 
         settingsVersionLabel?.textColor = tone.secondaryText.withAlphaComponent(0.6)
 
@@ -3785,7 +3794,6 @@ extension DynamicIslandPlayerView {
         libraryNavContainer.layer?.borderWidth = 0
         libraryNavContainer.layer?.backgroundColor = NSColor.clear.cgColor
 
-        let isGlass = (PlayerDesign.current == .glassMode)
         let isDark = (PlayerDesign.current == .darkMode || tone == .dark)
         let cyan: NSColor
         if isGlass {
@@ -3831,6 +3839,12 @@ extension DynamicIslandPlayerView {
         inlineCreateTextField.textColor = tone.primaryText
         inlineCreateContainer.layer?.borderColor = tone.dividerColor.cgColor
         inlineCreateContainer.layer?.backgroundColor = (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06)).cgColor
+
+        gestureMappingSectionLabel?.textColor = tone.primaryText
+        gestureMappingBackButton?.contentTintColor = cyan
+        for rowView in gestureMappingRows {
+            rowView.updateAppearance(tone: tone)
+        }
     }
 }
 

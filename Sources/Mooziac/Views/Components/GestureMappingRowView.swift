@@ -23,9 +23,12 @@ final class GestureMappingRowView: NSView {
     }
 
     private func setupUI(currentAction: GestureAction) {
+        let isLight = (PlayerDesign.current == .glassMode)
         wantsLayer = true
         layer?.cornerRadius = 8
-        layer?.backgroundColor = NSColor(white: 0.12, alpha: 0.6).cgColor
+        layer?.backgroundColor = (isLight ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 0.12, alpha: 0.6)).cgColor
+        layer?.borderWidth = 1.0
+        layer?.borderColor = (isLight ? NSColor(white: 0.0, alpha: 0.12) : NSColor(white: 1.0, alpha: 0.14)).cgColor
         translatesAutoresizingMaskIntoConstraints = false
 
         // Icon
@@ -34,14 +37,14 @@ final class GestureMappingRowView: NSView {
         if let img = NSImage(systemSymbolName: gestureType.iconName, accessibilityDescription: gestureType.displayName)?.withSymbolConfiguration(iconConfig) {
             iconView.image = img
         }
-        iconView.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
+        iconView.contentTintColor = isLight ? NSColor(white: 0.20, alpha: 1.0) : NSColor(white: 0.85, alpha: 1.0)
         iconView.widthAnchor.constraint(equalToConstant: 20).isActive = true
         iconView.heightAnchor.constraint(equalToConstant: 20).isActive = true
 
         // Title
         titleLabel.stringValue = gestureType.displayName
         titleLabel.font = NSFont.systemFont(ofSize: 12, weight: .medium)
-        titleLabel.textColor = NSColor(white: 0.92, alpha: 1.0)
+        titleLabel.textColor = isLight ? NSColor(srgbRed: 0.11, green: 0.11, blue: 0.11, alpha: 1.0) : NSColor(white: 0.92, alpha: 1.0)
         titleLabel.isEditable = false
         titleLabel.isSelectable = false
         titleLabel.refusesFirstResponder = true
@@ -64,11 +67,12 @@ final class GestureMappingRowView: NSView {
         popupButton.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
         // Reset button
+        let cyan = isLight ? NSColor.lightThemeSelector : NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
         resetButton.translatesAutoresizingMaskIntoConstraints = false
         resetButton.title = "Reset"
         resetButton.font = NSFont.systemFont(ofSize: 10, weight: .medium)
         resetButton.isBordered = false
-        resetButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+        resetButton.contentTintColor = cyan
         resetButton.target = self
         resetButton.action = #selector(resetTapped(_:))
         resetButton.widthAnchor.constraint(equalToConstant: 50).isActive = true
@@ -76,8 +80,8 @@ final class GestureMappingRowView: NSView {
         resetButton.wantsLayer = true
         resetButton.layer?.cornerRadius = 4
         resetButton.layer?.borderWidth = 1.0
-        resetButton.layer?.borderColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 0.4).cgColor
-        resetButton.layer?.backgroundColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 0.12).cgColor
+        resetButton.layer?.borderColor = cyan.withAlphaComponent(0.35).cgColor
+        resetButton.layer?.backgroundColor = cyan.withAlphaComponent(isLight ? 0.08 : 0.12).cgColor
 
         // Layout
         let textStack = NSStackView(views: [titleLabel])
@@ -114,5 +118,18 @@ final class GestureMappingRowView: NSView {
 
     func updatePopupSelection(_ action: GestureAction) {
         popupButton.selectItem(withTitle: action.displayName)
+    }
+
+    func updateAppearance(tone: SettingsTone) {
+        let isLight = (tone == .light)
+        layer?.backgroundColor = (isLight ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 0.12, alpha: 0.6)).cgColor
+        layer?.borderColor = tone.dividerColor.cgColor
+        layer?.borderWidth = 1.0
+        titleLabel.textColor = tone.primaryText
+        iconView.contentTintColor = tone.iconColor
+        let cyan = isLight ? NSColor.lightThemeSelector : NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+        resetButton.contentTintColor = cyan
+        resetButton.layer?.borderColor = cyan.withAlphaComponent(0.35).cgColor
+        resetButton.layer?.backgroundColor = cyan.withAlphaComponent(isLight ? 0.08 : 0.12).cgColor
     }
 }

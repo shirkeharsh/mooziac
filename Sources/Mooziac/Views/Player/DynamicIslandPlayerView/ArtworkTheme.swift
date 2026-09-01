@@ -201,10 +201,10 @@ extension DynamicIslandPlayerView {
                 visualEffectBackdrop.isHidden = true
                 glassSheenLayer.isHidden = true
                 cylindricalLensLayer.isHidden = true
-                // Premium Light Mode #EFF2F0 with high-contrast text
+                // Premium Light Mode #EFF2F0 with high-contrast text and crisp perimeter rim
                 containerPill.layer?.backgroundColor = NSColor(red: 0.93725, green: 0.94902, blue: 0.94118, alpha: 0.98).cgColor
-                containerPill.layer?.borderWidth = 1.0
-                containerPill.layer?.borderColor = NSColor(red: 0.78, green: 0.80, blue: 0.79, alpha: 0.90).cgColor
+                containerPill.layer?.borderWidth = 1.2
+                containerPill.layer?.borderColor = NSColor(red: 0.70, green: 0.72, blue: 0.71, alpha: 1.0).cgColor
                 
                 titleLabel.font = NSFont.systemFont(ofSize: 13, weight: .heavy)
                 artistLabel.font = NSFont.systemFont(ofSize: 11, weight: .bold)

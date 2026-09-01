@@ -146,6 +146,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     var featureIconViews: [NSImageView] = []
     var featureTitleLabels: [NSTextField] = []
     var featureDescLabels: [NSTextField] = []
+    var featureChevronViews: [NSImageView] = []
     var featureRowContainers: [NSView] = []
 
     var masterGesturesToggle = NativeCapsuleToggleView()
@@ -215,6 +216,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         setupUI()
         restoreSavedState()
         NotificationCenter.default.addObserver(self, selector: #selector(applyTheme), name: NSNotification.Name("YTM_playerDesignChanged"), object: nil)
+        DistributedNotificationCenter.default().addObserver(self, selector: #selector(appearanceChangedNotification), name: NSNotification.Name("AppleInterfaceThemeChangedNotification"), object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(networkStatusChanged(_:)), name: NetworkMonitor.statusChangedNotification, object: nil)
         applyTheme()
     }
@@ -224,6 +226,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         setupUI()
         restoreSavedState()
         NotificationCenter.default.addObserver(self, selector: #selector(applyTheme), name: NSNotification.Name("YTM_playerDesignChanged"), object: nil)
+        DistributedNotificationCenter.default().addObserver(self, selector: #selector(appearanceChangedNotification), name: NSNotification.Name("AppleInterfaceThemeChangedNotification"), object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(networkStatusChanged(_:)), name: NetworkMonitor.statusChangedNotification, object: nil)
         applyTheme()
     }
@@ -1251,6 +1254,17 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         glassSheenLayer.frame = containerPill.bounds
         cylindricalLensLayer.frame = containerPill.bounds
         liquidFluidMeshLayer.frame = containerPill.bounds
+    }
+
+    public override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        applyTheme()
+        updateSettingsThemeHighlight()
+    }
+
+    @objc func appearanceChangedNotification() {
+        applyTheme()
+        updateSettingsThemeHighlight()
     }
 }
 
