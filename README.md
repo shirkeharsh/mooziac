@@ -128,3 +128,4 @@ mp3kal/
 - **Privacy Policy:** Read our [Privacy Policy](docs/PRIVACY.md).
 - **Terms of Service:** Read our [Terms of Service](docs/TERMS.md).
 - **Security Policy:** Read our [Security Policy](SECURITY.md).
+
