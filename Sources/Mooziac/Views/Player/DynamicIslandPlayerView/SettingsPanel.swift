@@ -3791,6 +3791,7 @@ extension DynamicIslandPlayerView {
         settingsVersionLabel?.textColor = tone.secondaryText.withAlphaComponent(0.6)
 
         playlistSearchField?.applyPlaylistContainerStyle(tone: tone)
+        playlistSearchField?.layer?.shadowOpacity = (tone == .light) ? 0.04 : 0.22
 
         librarySectionHeaderLabel.textColor = tone.secondaryText
 

@@ -26,6 +26,21 @@ final class GlassSearchFieldCell: NSSearchFieldCell {
     override func drawFocusRingMask(withFrame cellFrame: NSRect, in controlView: NSView) {
         // Suppress default focus ring mask
     }
+
+    override func setUpFieldEditorAttributes(_ textObj: NSText) -> NSText {
+        let editor = super.setUpFieldEditorAttributes(textObj)
+        editor.drawsBackground = false
+        editor.backgroundColor = .clear
+        if let textView = editor as? NSTextView {
+            textView.drawsBackground = false
+            textView.backgroundColor = .clear
+            let isLight = (PlayerDesign.current == .glassMode || (PlayerDesign.current == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
+            let color = isLight ? NSColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 1.0) : NSColor.white
+            textView.insertionPointColor = color
+            textView.textColor = color
+        }
+        return editor
+    }
     
     override func searchButtonRect(forBounds rect: NSRect) -> NSRect {
         guard searchButtonCell != nil else { return .zero }
@@ -61,10 +76,22 @@ final class GlassSearchFieldCell: NSSearchFieldCell {
     }
     
     override func edit(withFrame rect: NSRect, in controlView: NSView, editor textObj: NSText, delegate: Any?, event: NSEvent?) {
+        textObj.drawsBackground = false
+        textObj.backgroundColor = .clear
+        if let textView = textObj as? NSTextView {
+            textView.drawsBackground = false
+            textView.backgroundColor = .clear
+        }
         super.edit(withFrame: searchTextRect(forBounds: rect), in: controlView, editor: textObj, delegate: delegate, event: event)
     }
     
     override func select(withFrame rect: NSRect, in controlView: NSView, editor textObj: NSText, delegate: Any?, start selStart: Int, length selLength: Int) {
+        textObj.drawsBackground = false
+        textObj.backgroundColor = .clear
+        if let textView = textObj as? NSTextView {
+            textView.drawsBackground = false
+            textView.backgroundColor = .clear
+        }
         super.select(withFrame: searchTextRect(forBounds: rect), in: controlView, editor: textObj, delegate: delegate, start: selStart, length: selLength)
     }
     
@@ -120,19 +147,7 @@ public class GlassSearchField: NSSearchField {
             cell.focusRingType = .none
         }
         font = NSFont.systemFont(ofSize: 11, weight: .medium)
-        textColor = NSColor.white
-        
-        // Subtle gray border and semi-transparent glass background when idle
-        layer?.backgroundColor = NSColor(white: 0.12, alpha: 0.35).cgColor
-        layer?.cornerRadius = 6.0
-        layer?.borderWidth = 1.0
-        layer?.borderColor = NSColor(white: 1.0, alpha: 0.10).cgColor
-        
-        let placeholderAttrs: [NSAttributedString.Key: Any] = [
-            .foregroundColor: NSColor(white: 0.50, alpha: 0.85),
-            .font: NSFont.systemFont(ofSize: 11.0, weight: .medium)
-        ]
-        placeholderAttributedString = NSAttributedString(string: placeholderString ?? "Search", attributes: placeholderAttrs)
+        applyTheme(PlayerDesign.current)
     }
 
     func applyPlaylistContainerStyle(tone: SettingsTone) {
@@ -150,10 +165,11 @@ public class GlassSearchField: NSSearchField {
         layer?.cornerRadius = 14.0
         layer?.borderWidth = 1.0
         
-        let idleBorder = tone.dividerColor.cgColor
-        let idleBg = (tone == .light ? NSColor(white: 0.0, alpha: 0.04) : NSColor(white: 1.0, alpha: 0.06)).cgColor
-        let focusBorder = (tone == .light ? NSColor(white: 0.0, alpha: 0.25) : NSColor(white: 1.0, alpha: 0.22)).cgColor
-        let focusBg = (tone == .light ? NSColor(white: 0.0, alpha: 0.08) : NSColor(white: 1.0, alpha: 0.10)).cgColor
+        let isLight = (tone == .light)
+        let idleBorder = isLight ? NSColor(white: 0.0, alpha: 0.14).cgColor : tone.dividerColor.cgColor
+        let idleBg = isLight ? NSColor.white.cgColor : NSColor(white: 1.0, alpha: 0.06).cgColor
+        let focusBorder = isLight ? NSColor.lightThemeSelector.cgColor : NSColor(white: 1.0, alpha: 0.28).cgColor
+        let focusBg = isLight ? NSColor.white.cgColor : NSColor(white: 1.0, alpha: 0.10).cgColor
         
         customIdleBorderColor = idleBorder
         customIdleBgColor = idleBg
@@ -162,7 +178,7 @@ public class GlassSearchField: NSSearchField {
         
         textColor = tone.primaryText
         let placeholderAttrs: [NSAttributedString.Key: Any] = [
-            .foregroundColor: tone.secondaryText,
+            .foregroundColor: isLight ? NSColor(white: 0.40, alpha: 0.90) : tone.secondaryText,
             .font: NSFont.systemFont(ofSize: 11.0, weight: .medium)
         ]
         placeholderAttributedString = NSAttributedString(string: placeholderString ?? "Search", attributes: placeholderAttrs)
@@ -183,10 +199,12 @@ public class GlassSearchField: NSSearchField {
         let isLight = (design == .glassMode || (design == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
         if isLight {
             textColor = NSColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 1.0)
-            layer?.backgroundColor = NSColor(white: 0.0, alpha: 0.06).cgColor
-            layer?.borderColor = NSColor(white: 0.0, alpha: 0.16).cgColor
+            layer?.backgroundColor = NSColor.white.cgColor
+            layer?.borderColor = NSColor(white: 0.0, alpha: 0.14).cgColor
+            layer?.borderWidth = 1.0
+            layer?.cornerRadius = customCornerRadius ?? 8.0
             let placeholderAttrs: [NSAttributedString.Key: Any] = [
-                .foregroundColor: NSColor(white: 0.30, alpha: 0.90),
+                .foregroundColor: NSColor(white: 0.40, alpha: 0.90),
                 .font: NSFont.systemFont(ofSize: 11.0, weight: .medium)
             ]
             placeholderAttributedString = NSAttributedString(string: placeholderString ?? "Search", attributes: placeholderAttrs)
@@ -194,6 +212,8 @@ public class GlassSearchField: NSSearchField {
             textColor = NSColor.white
             layer?.backgroundColor = NSColor(white: 0.16, alpha: 0.45).cgColor
             layer?.borderColor = NSColor(white: 1.0, alpha: 0.18).cgColor
+            layer?.borderWidth = 1.0
+            layer?.cornerRadius = customCornerRadius ?? 8.0
             let placeholderAttrs: [NSAttributedString.Key: Any] = [
                 .foregroundColor: NSColor(white: 0.70, alpha: 0.85),
                 .font: NSFont.systemFont(ofSize: 11.0, weight: .medium)
@@ -204,7 +224,8 @@ public class GlassSearchField: NSSearchField {
     
     public override var placeholderString: String? {
         didSet {
-            let color = (PlayerDesign.current == .glassMode) ? NSColor(white: 0.30, alpha: 0.90) : NSColor(white: 0.70, alpha: 0.85)
+            let isLight = (PlayerDesign.current == .glassMode || (PlayerDesign.current == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
+            let color = isLight ? NSColor(white: 0.40, alpha: 0.90) : NSColor(white: 0.70, alpha: 0.85)
             let attrs: [NSAttributedString.Key: Any] = [
                 .foregroundColor: color,
                 .font: NSFont.systemFont(ofSize: 11.0, weight: .medium)
@@ -220,11 +241,15 @@ public class GlassSearchField: NSSearchField {
         if ok && !isFocusedState {
             isFocusedState = true
             onFocusChange?(true)
+            if let editor = currentEditor() as? NSTextView {
+                editor.drawsBackground = false
+                editor.backgroundColor = .clear
+            }
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 0.18
-                let isLight = (PlayerDesign.current == .glassMode)
-                let defaultFocusBorder = isLight ? NSColor(white: 0.0, alpha: 0.25).cgColor : NSColor(white: 1.0, alpha: 0.22).cgColor
-                let defaultFocusBg = isLight ? NSColor(white: 0.0, alpha: 0.10).cgColor : NSColor(white: 0.16, alpha: 0.65).cgColor
+                let isLight = (PlayerDesign.current == .glassMode || (PlayerDesign.current == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
+                let defaultFocusBorder = isLight ? NSColor.lightThemeSelector.cgColor : NSColor(white: 1.0, alpha: 0.28).cgColor
+                let defaultFocusBg = isLight ? NSColor.white.cgColor : NSColor(white: 0.16, alpha: 0.65).cgColor
                 layer?.borderColor = customFocusBorderColor ?? defaultFocusBorder
                 layer?.backgroundColor = customFocusBgColor ?? defaultFocusBg
                 layer?.borderWidth = 1.0
@@ -274,9 +299,9 @@ public class GlassSearchField: NSSearchField {
             onFocusChange?(false)
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 0.18
-                let isLight = (PlayerDesign.current == .glassMode)
-                let defaultIdleBorder = isLight ? NSColor(white: 0.0, alpha: 0.12).cgColor : NSColor(white: 1.0, alpha: 0.10).cgColor
-                let defaultIdleBg = isLight ? NSColor(white: 0.0, alpha: 0.06).cgColor : NSColor(white: 0.12, alpha: 0.35).cgColor
+                let isLight = (PlayerDesign.current == .glassMode || (PlayerDesign.current == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
+                let defaultIdleBorder = isLight ? NSColor(white: 0.0, alpha: 0.14).cgColor : NSColor(white: 1.0, alpha: 0.16).cgColor
+                let defaultIdleBg = isLight ? NSColor.white.cgColor : NSColor(white: 0.12, alpha: 0.35).cgColor
                 layer?.borderColor = customIdleBorderColor ?? defaultIdleBorder
                 layer?.backgroundColor = customIdleBgColor ?? defaultIdleBg
                 layer?.borderWidth = 1.0

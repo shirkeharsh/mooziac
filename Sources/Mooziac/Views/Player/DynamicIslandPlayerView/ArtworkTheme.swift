@@ -328,6 +328,7 @@ extension DynamicIslandPlayerView {
 
         downloadButton.updateVisuals()
         updateDownloadButtonState()
+        searchField.applyTheme(design)
         refreshPlaylistsSection()
         updateSettingsThemeHighlight()
         updateBrowserButtonColor()
