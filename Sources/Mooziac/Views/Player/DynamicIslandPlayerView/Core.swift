@@ -175,15 +175,18 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
             repeatButton.image = image
         }
 
+        let isLight = (PlayerDesign.current == .glassMode || (PlayerDesign.current == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
+
         if repeatMode != .off {
-            repeatButton.contentTintColor = NSColor(red: 0.0, green: 0.80, blue: 1.0, alpha: 1.0)
-        } else {
-            switch PlayerDesign.current {
-            case .glassMode:
-                repeatButton.contentTintColor = NSColor(red: 0.082, green: 0.082, blue: 0.082, alpha: 1.0)
-            case .adaptive, .darkMode, .liquidFluid:
-                repeatButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
+            if isLight {
+                repeatButton.contentTintColor = NSColor.lightThemeSelector
+            } else if PlayerDesign.current == .darkMode {
+                repeatButton.contentTintColor = NSColor.darkThemeSelector
+            } else {
+                repeatButton.contentTintColor = NSColor(red: 0.0, green: 0.80, blue: 1.0, alpha: 1.0)
             }
+        } else {
+            repeatButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: PlayerDesign.current)
         }
     }
     public static var sharedAmbientBgColor: CGColor?
@@ -260,11 +263,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         if isLiked {
             likeButton.contentTintColor = NSColor(red: 0.98, green: 0.25, blue: 0.35, alpha: 1.0)
         } else {
-            if PlayerDesign.current == .glassMode {
-                likeButton.contentTintColor = NSColor(red: 0.082, green: 0.082, blue: 0.082, alpha: 1.0)
-            } else {
-                likeButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
-            }
+            likeButton.contentTintColor = SystemAppearanceHelper.controlButtonTint(for: PlayerDesign.current)
         }
     }
     
