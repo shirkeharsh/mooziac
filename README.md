@@ -30,7 +30,7 @@
 <br>
 
 <p align="center">
-  <img src="Resources/Animals.png" alt="Mooziac macOS Dynamic Island Interface" width="700">
+  <img src="Resources/Animals.png" alt="Mooziac macOS Menu Bar Interface" width="700">
 </p>
 
 ---
@@ -48,7 +48,7 @@ Instead of running heavy web browser tabs or resource-hungry Electron wrappers, 
 <table>
   <tr>
     <td width="50%" valign="top">
-      <h3>🏝️ Dynamic Island Player</h3>
+      <h3>🎵 Native Menu Bar Player</h3>
       <ul>
         <li><b>Pixel-Perfect 8px Grid:</b> Strict alignment across 3 rows without overlap or text clipping.</li>
         <li><b>Real-Time Waveform Seeker:</b> Interactive audio wave rendering with scrub-and-drag seeking.</li>
@@ -167,7 +167,7 @@ mp3kal/
 │   ├── Input/                            # MultiTouch private framework gesture engine & hotkeys
 │   ├── Managers/                         # Local SQLite3, Downloads, Synced Lyrics & Discord RPC
 │   ├── Models/                           # Pure data structures and state snapshots
-│   ├── Views/                            # Dynamic Island player UI, Waveform bar, lyrics HUD
+│   ├── Views/                            # Menu bar player UI, Waveform bar, lyrics HUD
 │   ├── Web/                              # Sandboxed WebKit bridge for YouTube Music
 │   └── Support/                          # Color palettes, string helpers, system extensions
 └── Resources/                            # Visual assets, SVG banner, themes, and menu bar icons
