@@ -29,8 +29,6 @@
 
 <br>
 
-<p align="center">
-  <img src="Resources/Animals.png" alt="Mooziac macOS Menu Bar Interface" width="700">
 </p>
 
 ---
@@ -42,6 +40,11 @@
 Instead of running heavy web browser tabs or resource-hungry Electron wrappers, Mooziac docks discreetly in your Mac’s menu bar. It delivers instantaneous playback controls, seamless **YouTube Music** integration, an offline lossless audio engine, live synchronized lyrics, and innovative trackpad edge volume gestures — all while consuming a fraction of the RAM and battery of standard players.
 
 ---
+
+<br>
+
+<p align="center">
+  <img src="Resources/Animals.png" alt="Mooziac macOS Menu Bar Interface" width="700">
 
 ## 🌟 Core Features
 
