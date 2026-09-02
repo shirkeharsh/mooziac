@@ -5,21 +5,21 @@
 </p>
 
 <p align="center">
-  <a href="https://mooziac.threeten.site"><img src="https://img.shields.io/badge/Website-mooziac.threeten.site-007AFF?style=flat-square&logo=safari&logoColor=white" alt="Mooziac Website"></a>
+  <a href="https://mooziac.threeten.site"><img src="https://img.shields.io/badge/Website-mooziac.threeten.site-FA4059?style=flat-square&logo=safari&logoColor=white" alt="Mooziac Website"></a>
   <a href="https://github.com/shirkeharsh/mooziac/releases/latest"><img src="https://img.shields.io/badge/macOS-13.0%2B%20Ventura%20%7C%20Sonoma%20%7C%20Sequoia-000000?style=flat-square&logo=apple&logoColor=white" alt="macOS 13+ Compatibility"></a>
   <a href="https://github.com/shirkeharsh/mooziac/releases/latest"><img src="https://img.shields.io/badge/Architecture-Universal%20(Apple%20Silicon%20%2B%20Intel)-brightgreen?style=flat-square" alt="Universal 2 Binary"></a>
-  <a href="https://github.com/shirkeharsh/mooziac/releases/latest"><img src="https://img.shields.io/github/v/release/shirkeharsh/mooziac?style=flat-square&color=FF9500" alt="Latest Release"></a>
+  <a href="https://github.com/shirkeharsh/mooziac/releases/latest"><img src="https://img.shields.io/github/v/release/shirkeharsh/mooziac?style=flat-square&color=8B7BFF" alt="Latest Release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-purple?style=flat-square" alt="MIT License"></a>
   <a href="#-privacy-first-architecture"><img src="https://img.shields.io/badge/Privacy-100%25%20Local--First-28cd41?style=flat-square&logo=shield" alt="Zero Telemetry"></a>
 </p>
 
 <p align="center">
   <a href="https://github.com/shirkeharsh/mooziac/releases/latest/download/Mooziac.dmg">
-    <img src="https://img.shields.io/badge/Download-Mooziac.dmg-007AFF?style=for-the-badge&logo=apple&logoColor=white" alt="Download DMG">
+    <img src="https://img.shields.io/badge/Download-Mooziac.dmg-FA4059?style=for-the-badge&logo=apple&logoColor=white" alt="Download DMG">
   </a>
   &nbsp;&nbsp;
   <a href="https://github.com/shirkeharsh/mooziac/releases/latest/download/Mooziac.zip">
-    <img src="https://img.shields.io/badge/Download-Mooziac.zip-5856D6?style=for-the-badge&logo=zip&logoColor=white" alt="Download ZIP">
+    <img src="https://img.shields.io/badge/Download-Mooziac.zip-8B7BFF?style=for-the-badge&logo=zip&logoColor=white" alt="Download ZIP">
   </a>
   &nbsp;&nbsp;
   <a href="https://mooziac.threeten.site">
@@ -40,23 +40,6 @@
 **Mooziac** is an ultra-lightweight, open-source macOS music player engineered from the ground up in **pure Swift 5.9 and AppKit**. 
 
 Instead of running heavy web browser tabs or resource-hungry Electron wrappers, Mooziac docks discreetly in your Mac’s menu bar. It delivers instantaneous playback controls, seamless **YouTube Music** integration, an offline lossless audio engine, live synchronized lyrics, and innovative trackpad edge volume gestures — all while consuming a fraction of the RAM and battery of standard players.
-
----
-
-## 📊 Performance Comparison
-
-Why run an 800 MB browser tab just to listen to music?
-
-| Metric / Capability | 🌐 Browser Tab (Chrome / Safari) | 📦 Electron Desktop Wrappers | ⚡ **Mooziac (Native Swift)** |
-| :--- | :---: | :---: | :---: |
-| **Active Memory (RAM)** | ~450 MB – 850 MB | ~500 MB – 950 MB | **~114 MB – 122 MB** |
-| **Idle CPU Usage** | 8% – 18% | 6% – 15% | **0.5% – 1.8%** |
-| **UI Rendering Engine** | Heavy Web DOM | Chromium Compositor | **Pure Liquid-Glass AppKit** |
-| **Trackpad Edge Gestures** | ❌ None | ❌ None | **✅ Hardware MultiTouch Engine** |
-| **Menu Bar Integration** | ❌ None | ⚠️ Minimal / Web-based | **✅ Dynamic Island Floating Pill** |
-| **Live Synced Lyrics HUD** | ⚠️ In-page only | ⚠️ In-page only | **✅ Anchored Menu Bar HUD** |
-| **Power & Sleep Awareness** | ❌ Keeps tabs awake | ❌ Heavy wake locks | **✅ Native IOKit Power Assertions** |
-| **Telemetry & Privacy** | ❌ Google Tracking & Ad Scripts | ⚠️ Embedded Telemetry | **✅ 100% Local-First / Zero Trackers** |
 
 ---
 
@@ -125,28 +108,9 @@ Why run an 800 MB browser tab just to listen to music?
 
 ---
 
-## 🎨 Design Engine & Theme Showcase
-
-Mooziac features a dual design engine built to match any desktop aesthetic or lighting environment:
-
-<p align="center">
-  <img src="Resources/themes/theme-adaptive.png" alt="Adaptive Ambient Theme" width="48%">
-  &nbsp;
-  <img src="Resources/themes/theme-oled.png" alt="OLED Pitch Black Theme" width="48%">
-</p>
-
-- **Adaptive Ambient Glow (Left):** Extracts dominant chromatic tones directly from current album artwork to cast a rich, subtle glow behind the player.
-- **OLED Pitch Black (Right):** Deep `#000000` true-black theme engineered specifically for mini-LED and OLED displays to maximize contrast and efficiency.
-- **Liquid Glass / Vibrancy:** Frosted blur material respecting macOS system vibrancy and desktop wallpapers.
-
----
-
 ## 🖐️ Hardware Gestures & Shortcuts
 
 ### Trackpad MultiTouch Gestures
-<p align="center">
-  <img src="Resources/macbook_panel.jpg" alt="MacBook Trackpad Gesture Zones" width="600" style="border-radius: 8px;">
-</p>
 
 | Gesture | Trackpad Region | Action |
 | :--- | :--- | :--- |
@@ -157,6 +121,7 @@ Mooziac features a dual design engine built to match any desktop aesthetic or li
 | **Scroll Wheel** | Hovered over Menu Bar Icon | Instant volume nudge |
 
 ### Keyboard Shortcuts
+
 | Shortcut | Action |
 | :--- | :--- |
 | `Space` | Play / Pause |
