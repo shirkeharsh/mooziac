@@ -9,8 +9,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-APP_VERSION="1.1.1"
-APP_BUILD="11"
+APP_VERSION="1.1.2"
+APP_BUILD="12"
 APP_NAME="Mooziac.app"
 APP_BUNDLE_ID="app.mooziac.mac"
 APP_COPYRIGHT="Copyright © 2026 ThreeTen. All rights reserved."
@@ -19,11 +19,16 @@ VOLUME_NAME="Mooziac"
 ZIP_NAME="Mooziac.zip"
 
 LAUNCH_AFTER_BUILD=true
+INSTALL_LOCALLY=true
+KILL_EXISTING=true
 
 # Parse optional arguments
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --no-launch) LAUNCH_AFTER_BUILD=false; shift ;;
+        --no-install) INSTALL_LOCALLY=false; LAUNCH_AFTER_BUILD=false; shift ;;
+        --no-kill) KILL_EXISTING=false; shift ;;
+        --release-only) INSTALL_LOCALLY=false; LAUNCH_AFTER_BUILD=false; KILL_EXISTING=false; shift ;;
         --version) APP_VERSION="$2"; shift 2 ;;
         --build) APP_BUILD="$2"; shift 2 ;;
         *) echo "Unknown option: $1"; exit 1 ;;
@@ -46,10 +51,14 @@ echo "      🚀 Mooziac All-in-One Build         "
 echo "      Version: $APP_VERSION ($APP_BUILD)  "
 echo "=========================================="
 
-echo "[1/7] Terminating old running processes..."
-killall "Mooziac" 2>/dev/null || true
-pkill -9 -f "Mooziac" 2>/dev/null || true
-sleep 0.5
+if [ "$KILL_EXISTING" = true ]; then
+    echo "[1/7] Terminating old running processes..."
+    killall "Mooziac" 2>/dev/null || true
+    pkill -9 -f "Mooziac" 2>/dev/null || true
+    sleep 0.5
+else
+    echo "[1/7] Preserving running processes..."
+fi
 
 # Clean previous build artifacts
 rm -rf "$STAGING_DIR" "$TEMP_DMG"
@@ -272,14 +281,18 @@ if [ -f "Resources/AppIcon.icns" ]; then
     swift -e "import AppKit; if let img = NSImage(byReferencingFile: \"Resources/AppIcon.icns\") { NSWorkspace.shared.setIcon(img, forFile: \"$FINAL_DMG\", options: []) }" 2>/dev/null || true
 fi
 
-echo "[7/7] Installing to ~/Applications & Launching..."
-mkdir -p "$HOME/Applications"
-rm -rf "$LOCAL_APP_DEST"
-cp -R "$TARGET_APP" "$LOCAL_APP_DEST"
+if [ "$INSTALL_LOCALLY" = true ]; then
+    echo "[7/7] Installing to ~/Applications & Launching..."
+    mkdir -p "$HOME/Applications"
+    rm -rf "$LOCAL_APP_DEST"
+    cp -R "$TARGET_APP" "$LOCAL_APP_DEST"
 
-if [ "$LAUNCH_AFTER_BUILD" = true ]; then
-    echo "    Launching $LOCAL_APP_DEST..."
-    open "$LOCAL_APP_DEST"
+    if [ "$LAUNCH_AFTER_BUILD" = true ]; then
+        echo "    Launching $LOCAL_APP_DEST..."
+        open "$LOCAL_APP_DEST"
+    fi
+else
+    echo "[7/7] Skipping local installation & launch (--release-only / --no-install)..."
 fi
 
 DMG_SIZE=$(du -h "$FINAL_DMG" | cut -f1 | tr -d ' ')

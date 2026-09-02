@@ -193,12 +193,16 @@ public final class PlaylistSyncManager {
 
     private func pushUnsyncedPlaylists(completion: @escaping () -> Void) {
         let unsynced = LocalDatabaseManager.shared.fetchUnsyncedPlaylists()
-        guard !unsynced.isEmpty else {
+        pushUnsyncedPlaylists(remaining: unsynced, completion: completion)
+    }
+
+    private func pushUnsyncedPlaylists(remaining: [PlaylistRecord], completion: @escaping () -> Void) {
+        guard !remaining.isEmpty else {
             completion()
             return
         }
-        var remaining = unsynced
-        let playlist = remaining.removeFirst()
+        var nextList = remaining
+        let playlist = nextList.removeFirst()
 
         let videoIds = LocalDatabaseManager.shared.fetchPlaylistItems(playlistID: playlist.id)
             .compactMap { $0.ytVideoId }
@@ -212,27 +216,31 @@ public final class PlaylistSyncManager {
             case .failure(let error):
                 print("[PlaylistSyncManager] Push: failed to create playlist '\(playlist.name)': \(error)")
                 // Left unsynced so a later run retries it.
-                self.pushUnsyncedPlaylists(completion: completion)
+                self.pushUnsyncedPlaylists(remaining: nextList, completion: completion)
             case .success(let plId):
                 LocalDatabaseManager.shared.setPlaylistYTMID(id: playlist.id, ytPlaylistId: plId)
                 LocalDatabaseManager.shared.setPlaylistSynced(id: playlist.id)
                 print("[PlaylistSyncManager] Push: created YTM playlist '\(playlist.name)' (\(plId))")
-                self.pushUnsyncedPlaylists(completion: completion)
+                self.pushUnsyncedPlaylists(remaining: nextList, completion: completion)
             }
         }
     }
 
     private func pushDirtySyncedPlaylists(completion: @escaping () -> Void) {
         let dirty = LocalDatabaseManager.shared.fetchDirtySyncedPlaylists()
-        guard !dirty.isEmpty else {
+        pushDirtySyncedPlaylists(remaining: dirty, completion: completion)
+    }
+
+    private func pushDirtySyncedPlaylists(remaining: [PlaylistRecord], completion: @escaping () -> Void) {
+        guard !remaining.isEmpty else {
             completion()
             return
         }
-        var remaining = dirty
-        let playlist = remaining.removeFirst()
+        var nextList = remaining
+        let playlist = nextList.removeFirst()
 
         guard let ytId = playlist.ytPlaylistId else {
-            self.pushDirtySyncedPlaylists(completion: completion)
+            pushDirtySyncedPlaylists(remaining: nextList, completion: completion)
             return
         }
 
@@ -247,7 +255,7 @@ public final class PlaylistSyncManager {
             switch result {
             case .failure(let error):
                 print("[PlaylistSyncManager] Push: failed to fetch remote tracks for '\(playlist.name)': \(error)")
-                self.pushDirtySyncedPlaylists(completion: completion)
+                self.pushDirtySyncedPlaylists(remaining: nextList, completion: completion)
             case .success(let remoteTracks):
                 let remoteVids = Set(remoteTracks.map { $0.videoId })
                 let missing = localVids.filter { !remoteVids.contains($0) }
@@ -265,7 +273,7 @@ public final class PlaylistSyncManager {
                         }
                         LocalDatabaseManager.shared.setPlaylistSynced(id: playlist.id)
                     }
-                    self.pushDirtySyncedPlaylists(completion: completion)
+                    self.pushDirtySyncedPlaylists(remaining: nextList, completion: completion)
                 }
             }
         }
@@ -273,12 +281,16 @@ public final class PlaylistSyncManager {
 
     private func pushUnsyncedLikedSongs(completion: @escaping () -> Void) {
         let unsynced = LocalDatabaseManager.shared.fetchUnsyncedLikedSongs()
-        guard !unsynced.isEmpty else {
+        pushUnsyncedLikedSongs(remaining: unsynced, completion: completion)
+    }
+
+    private func pushUnsyncedLikedSongs(remaining: [LikedSongRecord], completion: @escaping () -> Void) {
+        guard !remaining.isEmpty else {
             completion()
             return
         }
-        var remaining = unsynced
-        let record = remaining.removeFirst()
+        var nextList = remaining
+        let record = nextList.removeFirst()
 
         YTMClient.shared.like(videoId: record.videoId, liked: true) { [weak self] result in
             guard let self = self else {
@@ -291,7 +303,7 @@ public final class PlaylistSyncManager {
             case .success:
                 LocalDatabaseManager.shared.setLikedSongSynced(videoId: record.videoId)
             }
-            self.pushUnsyncedLikedSongs(completion: completion)
+            self.pushUnsyncedLikedSongs(remaining: nextList, completion: completion)
         }
     }
 
