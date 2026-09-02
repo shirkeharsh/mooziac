@@ -44,7 +44,7 @@ Instead of running heavy web browser tabs or resource-hungry Electron wrappers, 
 <br>
 
 <p align="center">
-  <img src="Resources/gif.gif alt="Mooziac macOS Menu Bar Interface" width="700">
+  <img src="Resources/Animals.png" alt="Mooziac macOS Menu Bar Interface" width="700">
 
 ## 🌟 Core Features
 
