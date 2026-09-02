@@ -195,19 +195,6 @@ cd mooziac
 
 ---
 
-## 🗺️ Roadmap
-
-- [x] Native Dynamic Island menu bar player
-- [x] MultiTouch trackpad edge volume slider & corner taps
-- [x] Dual-engine (YouTube Music + Offline Local Audio)
-- [x] Real-time synchronized `.lrc` lyrics HUD
-- [x] Discord Rich Presence IPC
-- [ ] `MPRemoteCommandCenter` physical media keys & Control Center integration
-- [ ] Built-in persistent 10-band equalizer
-- [ ] AirPlay 2 audio output device selector
-
----
-
 ## 📄 License & Legal
 
 - **License:** Distributed under the [MIT License](LICENSE). Copyright © 2026 ThreeTen.
