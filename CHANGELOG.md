@@ -2,6 +2,13 @@
 
 All notable changes to Mooziac are documented in this file.
 
+## [1.1.3] - 2026-09-07
+
+### 🎵 Synced Lyrics & Engine Mode Isolation
+- **Offline / Online Session Flushing**: Fixed an issue where lyrics from an offline track's `.lrc` file persisted on screen and in memory after reconnecting to the internet and switching back to YouTube Music playback.
+- **Engine Mode Decoupling**: Gated `.lrc` sidecar candidates to offline playback mode only, preventing cross-engine lyric contamination.
+- **Tighter Timing & Drift Reduction**: Eliminated artificial lead offsets, decoupled pseudo-timestamps on plain lyrics, and increased WebKit observer frequency to 4 Hz when the HUD is active.
+
 ## [1.1.2] - 2026-09-03
 
 ### ⚡ Performance & Battery Optimization

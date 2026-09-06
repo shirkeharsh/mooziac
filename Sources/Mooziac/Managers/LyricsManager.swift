@@ -15,6 +15,11 @@ public final class LyricsManager {
     
     private init() {}
     
+    public func clearSession() {
+        currentTrackKey = ""
+        currentLRCLines = []
+    }
+    
     // Clean Title/Artist while preserving Native Scripts (Devanagari, CJK, Spanish accents, etc.)
     public static func cleanSongInfo(_ text: String) -> String {
         var clean = text
@@ -221,11 +226,20 @@ public final class LyricsManager {
 
         // Tier 0: Check Local .lrc files (Direct sidecars, Library tracks, and Music folder)
         var localLrcCandidates: [URL] = []
-        if let offlineTrack = NativeAudioPlayer.shared.currentTrack {
-            let sidecar = offlineTrack.fileURL.deletingPathExtension().appendingPathExtension("lrc")
-            localLrcCandidates.append(sidecar)
-            if let assigned = offlineTrack.lrcURL {
-                localLrcCandidates.append(assigned)
+        // ONLY check offline player sidecar if in offline mode AND the track matches
+        if NowPlayingManager.shared.engineMode == .offline,
+           let offlineTrack = NativeAudioPlayer.shared.currentTrack {
+            let cleanOfflineTitle = LyricsManager.cleanSongInfo(offlineTrack.title).lowercased()
+            let matchesTrack = !trackID.isEmpty
+                ? (trackID == offlineTrack.id || trackID == offlineTrack.ytVideoId)
+                : (cleanOfflineTitle == cleanTitle.lowercased() || offlineTrack.title.lowercased() == title.lowercased())
+
+            if matchesTrack {
+                let sidecar = offlineTrack.fileURL.deletingPathExtension().appendingPathExtension("lrc")
+                localLrcCandidates.append(sidecar)
+                if let assigned = offlineTrack.lrcURL {
+                    localLrcCandidates.append(assigned)
+                }
             }
         }
 

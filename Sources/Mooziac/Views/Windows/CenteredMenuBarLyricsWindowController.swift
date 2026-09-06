@@ -115,10 +115,36 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
             name: NSApplication.didChangeScreenParametersNotification,
             object: nil
         )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleEngineModeChanged(_:)),
+            name: NSNotification.Name("Mooziac_EngineModeChanged"),
+            object: nil
+        )
     }
 
     @objc private func handleDisplayChange() {
         repositionInCenter(contentWidth: window?.frame.width ?? 280)
+    }
+
+    @objc private func handleEngineModeChanged(_ notification: Notification) {
+        let mode = notification.userInfo?["mode"] as? String ?? ""
+        if mode == "online" {
+            currentTrackKey = ""
+            currentLRCLines = []
+            LyricsManager.shared.clearSession()
+            if !lastState.isPlaying {
+                displayTimer?.invalidate()
+                displayTimer = nil
+                if !isShowingVolumeOverlay {
+                    lyricsLabel.stringValue = ""
+                    window?.orderOut(nil)
+                }
+            } else {
+                updateLyricsFrame()
+            }
+        }
     }
 
     private func handleStateUpdate(_ state: PlaybackState) {
