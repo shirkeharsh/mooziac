@@ -297,14 +297,16 @@ public class GlassSearchField: NSSearchField {
         if ok && isFocusedState {
             isFocusedState = false
             onFocusChange?(false)
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.18
-                let isLight = (PlayerDesign.current == .glassMode || (PlayerDesign.current == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
-                let defaultIdleBorder = isLight ? NSColor(white: 0.0, alpha: 0.14).cgColor : NSColor(white: 1.0, alpha: 0.16).cgColor
-                let defaultIdleBg = isLight ? NSColor.white.cgColor : NSColor(white: 0.12, alpha: 0.35).cgColor
-                layer?.borderColor = customIdleBorderColor ?? defaultIdleBorder
-                layer?.backgroundColor = customIdleBgColor ?? defaultIdleBg
-                layer?.borderWidth = 1.0
+            if !isHidden && alphaValue > 0.05 {
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = 0.18
+                    let isLight = (PlayerDesign.current == .glassMode || (PlayerDesign.current == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
+                    let defaultIdleBorder = isLight ? NSColor(white: 0.0, alpha: 0.14).cgColor : NSColor(white: 1.0, alpha: 0.16).cgColor
+                    let defaultIdleBg = isLight ? NSColor.white.cgColor : NSColor(white: 0.12, alpha: 0.35).cgColor
+                    layer?.borderColor = customIdleBorderColor ?? defaultIdleBorder
+                    layer?.backgroundColor = customIdleBgColor ?? defaultIdleBg
+                    layer?.borderWidth = 1.0
+                }
             }
         }
         return ok

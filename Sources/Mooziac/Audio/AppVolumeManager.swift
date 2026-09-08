@@ -63,18 +63,19 @@ public final class AppVolumeManager {
     }
 
     public func applyMediaVolume(_ vol: Float) {
+        let safeVol = max(0.0, min(1.0, vol))
         // 1. Native Offline Audio (AVPlayer)
-        NativeAudioPlayer.shared.setVolume(vol)
+        NativeAudioPlayer.shared.setVolume(safeVol)
 
         // 2. Online Audio (WebKit video & HTML5 / #movie_player)
         let js = """
         (function() {
             var v = document.querySelector('video');
-            if (v) { v.volume = \(vol); }
+            if (v) { v.volume = \(safeVol); }
             try {
                 var p = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
                 if (p && typeof p.setVolume === 'function') {
-                    p.setVolume(\(Int(vol * 100)));
+                    p.setVolume(\(Int(round(safeVol * 100))));
                 }
             } catch(e) {}
         })();

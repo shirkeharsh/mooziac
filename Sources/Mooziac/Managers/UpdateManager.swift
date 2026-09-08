@@ -18,13 +18,14 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
     private var percentLabel: NSTextField?
     private var pendingNewVersion: String = ""
     private var pendingFallbackURL: URL?
+    private var pendingWebURL: URL?
 
     public override init() {
         super.init()
     }
 
     public var currentVersion: String {
-        return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1.3"
+        return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1.4"
     }
 
     private var releasesAPIURL: URL? {
@@ -213,7 +214,10 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
         alert.alertStyle = .informational
 
         alert.addButton(withTitle: "Update Now (In-App)")
-        alert.addButton(withTitle: "View on GitHub")
+        let starButton = alert.addButton(withTitle: "Star on GitHub ⭐")
+        self.pendingWebURL = webURL
+        starButton.target = self
+        starButton.action = #selector(starOnGitHubClicked(_:))
         alert.addButton(withTitle: "Later")
 
         let response = alert.runModal()
@@ -223,10 +227,12 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
             } else if let downloadURL = dmgURL {
                 NSWorkspace.shared.open(downloadURL)
             }
-        } else if response == .alertSecondButtonReturn {
-            if let githubURL = webURL {
-                NSWorkspace.shared.open(githubURL)
-            }
+        }
+    }
+
+    @objc private func starOnGitHubClicked(_ sender: NSButton) {
+        if let githubURL = pendingWebURL ?? URL(string: "https://github.com/\(repositoryOwner)/\(repositoryName)") {
+            NSWorkspace.shared.open(githubURL)
         }
     }
 

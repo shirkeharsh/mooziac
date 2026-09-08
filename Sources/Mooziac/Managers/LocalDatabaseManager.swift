@@ -1120,7 +1120,7 @@ public final class LocalDatabaseManager {
 
     public func reorderPlaylistItems(playlistID: String, orderedItemIDs: [String]) {
         guard let db = db else { return }
-        let sql = "UPDATE playlist_items SET sort_order = ? WHERE id = ? AND playlist_id = ?;"
+        let sql = "UPDATE playlist_items SET sort_order = ? WHERE id = ? AND playlist_id = ? AND sort_order != ?;"
         var stmt: OpaquePointer?
         executeRaw(sql: "BEGIN TRANSACTION;")
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
@@ -1131,6 +1131,7 @@ public final class LocalDatabaseManager {
                 sqlite3_bind_int(stmt, 1, Int32(index))
                 sqlite3_bind_text(stmt, 2, (itemID as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_text(stmt, 3, (playlistID as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_int(stmt, 4, Int32(index))
                 sqlite3_step(stmt)
             }
         }

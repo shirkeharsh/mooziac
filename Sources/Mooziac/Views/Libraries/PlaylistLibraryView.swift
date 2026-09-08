@@ -1324,16 +1324,17 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
 
             menu.addItem(NSMenuItem.separator())
 
+            let isSearch = !searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             let moveUpItem = NSMenuItem(title: "Move Up", action: #selector(handleContextMoveUpItem(_:)), keyEquivalent: "")
             moveUpItem.target = self
             moveUpItem.representedObject = ["index": row, "playlistID": playlist.id]
-            moveUpItem.isEnabled = row > 0
+            moveUpItem.isEnabled = row > 0 && !isSearch
             menu.addItem(moveUpItem)
 
             let moveDownItem = NSMenuItem(title: "Move Down", action: #selector(handleContextMoveDownItem(_:)), keyEquivalent: "")
             moveDownItem.target = self
             moveDownItem.representedObject = ["index": row, "playlistID": playlist.id]
-            moveDownItem.isEnabled = row < filteredPlaylistItems.count - 1
+            moveDownItem.isEnabled = (row < filteredPlaylistItems.count - 1) && !isSearch
             menu.addItem(moveDownItem)
 
             menu.addItem(NSMenuItem.separator())
@@ -1595,8 +1596,14 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
               let playlistID = dict["playlistID"] as? String,
               idx > 0, idx < allPlaylistItems.count else { return }
         allPlaylistItems.swapAt(idx, idx - 1)
-        PlaylistManager.shared.reorderItems(playlistID: playlistID, orderedItemIDs: allPlaylistItems.map { $0.id })
-        reload()
+        filteredPlaylistItems = allPlaylistItems
+        tableView.beginUpdates()
+        tableView.moveRow(at: idx, to: idx - 1)
+        tableView.endUpdates()
+        let itemIDs = allPlaylistItems.map { $0.id }
+        DispatchQueue.global(qos: .userInitiated).async {
+            PlaylistManager.shared.reorderItems(playlistID: playlistID, orderedItemIDs: itemIDs)
+        }
     }
 
     @objc private func handleContextMoveDownItem(_ sender: NSMenuItem) {
@@ -1605,8 +1612,14 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
               let playlistID = dict["playlistID"] as? String,
               idx >= 0, idx < allPlaylistItems.count - 1 else { return }
         allPlaylistItems.swapAt(idx, idx + 1)
-        PlaylistManager.shared.reorderItems(playlistID: playlistID, orderedItemIDs: allPlaylistItems.map { $0.id })
-        reload()
+        filteredPlaylistItems = allPlaylistItems
+        tableView.beginUpdates()
+        tableView.moveRow(at: idx, to: idx + 1)
+        tableView.endUpdates()
+        let itemIDs = allPlaylistItems.map { $0.id }
+        DispatchQueue.global(qos: .userInitiated).async {
+            PlaylistManager.shared.reorderItems(playlistID: playlistID, orderedItemIDs: itemIDs)
+        }
     }
 
     @objc private func handleContextRemoveItem(_ sender: NSMenuItem) {
@@ -2445,6 +2458,7 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
 
     public func tableView(_ tableView: NSTableView, writeRowsWith rowIndexes: IndexSet, to pboard: NSPasteboard) -> Bool {
         guard case .detail = mode else { return false }
+        guard searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         guard let row = rowIndexes.first else { return false }
         guard let data = try? NSKeyedArchiver.archivedData(withRootObject: [NSNumber(value: row)], requiringSecureCoding: false) else { return false }
         pboard.declareTypes([Self.dragType], owner: self)
@@ -2454,6 +2468,7 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
 
     public func tableView(_ tableView: NSTableView, validateDrop info: NSDraggingInfo, proposedRow row: Int, proposedDropOperation dropOperation: NSTableView.DropOperation) -> NSDragOperation {
         guard case .detail = mode else { return [] }
+        guard searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
         if dropOperation == .above {
             return .move
         }
@@ -2462,6 +2477,7 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
 
     public func tableView(_ tableView: NSTableView, acceptDrop info: NSDraggingInfo, row: Int, dropOperation: NSTableView.DropOperation) -> Bool {
         guard case .detail(let playlist) = mode else { return false }
+        guard searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         guard let pboard = info.draggingPasteboard.data(forType: Self.dragType),
               let rowNumbers = (try? NSKeyedUnarchiver.unarchivedObject(ofClasses: [NSArray.self, NSNumber.self], from: pboard)) as? [NSNumber],
               let sourceRowNumber = rowNumbers.first else { return false }
@@ -2471,13 +2487,22 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
         if targetRow > sourceRow {
             targetRow -= 1
         }
-        guard sourceRow != targetRow, sourceRow >= 0, sourceRow < allPlaylistItems.count, targetRow >= 0, targetRow < allPlaylistItems.count else { return false }
+        guard sourceRow != targetRow,
+              sourceRow >= 0, sourceRow < allPlaylistItems.count,
+              targetRow >= 0, targetRow < allPlaylistItems.count else { return false }
 
         let item = allPlaylistItems.remove(at: sourceRow)
         allPlaylistItems.insert(item, at: targetRow)
+        filteredPlaylistItems = allPlaylistItems
 
-        PlaylistManager.shared.reorderItems(playlistID: playlist.id, orderedItemIDs: allPlaylistItems.map { $0.id })
-        reload()
+        tableView.beginUpdates()
+        tableView.moveRow(at: sourceRow, to: targetRow)
+        tableView.endUpdates()
+
+        let itemIDs = allPlaylistItems.map { $0.id }
+        DispatchQueue.global(qos: .userInitiated).async {
+            PlaylistManager.shared.reorderItems(playlistID: playlist.id, orderedItemIDs: itemIDs)
+        }
         return true
     }
 }

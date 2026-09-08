@@ -2,6 +2,129 @@ import Foundation
 import WebKit
 import AppKit
 
+// MARK: - WebPlaybackAudioOutput
+/// Keeps WebKit's audio output open across short music playback transitions.
+/// When macOS detects that audio playback has paused and the window is occluded/hidden,
+/// WebKit revokes the foreground assertion and freezes/suspends the WebContent process (App Nap).
+/// This silent 0-gain AudioContext node guarantees WebKit continuously reports active audible media
+/// during the 100-300ms gap when songs advance or switch.
+enum WebPlaybackAudioOutput {
+    static let script = """
+    (() => {
+        if (window.__mooziacAudioOutput) return;
+        let output = null;
+        let releaseTimer = null;
+
+        function clearReleaseTimer() {
+            if (releaseTimer !== null) clearTimeout(releaseTimer);
+            releaseTimer = null;
+        }
+
+        function stop() {
+            clearReleaseTimer();
+            const previous = output;
+            output = null;
+            if (!previous) return;
+            try { previous.source.stop(); } catch (_) {}
+            try { previous.source.disconnect(); } catch (_) {}
+            try { previous.gain.disconnect(); } catch (_) {}
+            try { previous.context.close().catch(() => {}); } catch (_) {}
+        }
+
+        function start() {
+            const video = document.querySelector('video');
+            if (window.__mooziacPlaybackSuppressed || window.__mooziacBlockAutoplay
+                || (video && video.webkitCurrentPlaybackTargetIsWireless)) {
+                stop();
+                return;
+            }
+            clearReleaseTimer();
+            try {
+                if (!output) {
+                    const context = new AudioContext();
+                    output = { context, source: null, gain: null };
+                    const source = context.createOscillator();
+                    output.source = source;
+                    const gain = context.createGain();
+                    output.gain = gain;
+                    // No media is routed through this graph. Zero gain keeps the
+                    // output active without altering DRM playback or its volume.
+                    gain.gain.value = 0;
+                    source.connect(gain);
+                    gain.connect(context.destination);
+                    source.start();
+                }
+                const pending = output;
+                pending.context.resume().catch(() => {
+                    if (output === pending) stop();
+                });
+            } catch (_) {
+                stop();
+            }
+        }
+
+        function releaseAfterTransition() {
+            if (!output || releaseTimer !== null) return;
+            // A failed load or the end of the queue must not leave silent output
+            // running indefinitely. Normal transitions finish well within this.
+            releaseTimer = setTimeout(stop, 5000);
+        }
+
+        function prepare() {
+            start();
+            releaseAfterTransition();
+        }
+
+        function observe(event, handler) {
+            document.addEventListener(event, event => {
+                const video = event.target;
+                if (video && video.tagName === 'VIDEO'
+                    && video === document.querySelector('video')) handler(video);
+            }, true);
+        }
+
+        observe('play', prepare);
+        observe('playing', start);
+        observe('loadstart', () => {
+            if (window.__mooziacAutoplayPending) prepare();
+        });
+        observe('pause', video => {
+            if (!window.__mooziacPlaybackSuppressed && !window.__mooziacBlockAutoplay
+                && (video.ended || window.__mooziacAutoplayPending)) {
+                releaseAfterTransition();
+            } else {
+                stop();
+            }
+        });
+        observe('ended', releaseAfterTransition);
+        observe('emptied', releaseAfterTransition);
+        observe('error', stop);
+        observe('webkitcurrentplaybacktargetiswirelesschanged', video => {
+            if (video.webkitCurrentPlaybackTargetIsWireless) stop();
+            else if (!video.paused) start();
+        });
+        let currentVideo = document.querySelector('video');
+        const mediaObserver = new MutationObserver(() => {
+            const video = document.querySelector('video');
+            if (video === currentVideo) return;
+            currentVideo = video;
+            if (video && !video.paused && !video.ended && video.readyState >= 3) start();
+            else releaseAfterTransition();
+        });
+        mediaObserver.observe(document, { childList: true, subtree: true });
+        window.addEventListener('pagehide', () => {
+            mediaObserver.disconnect();
+            stop();
+        });
+        window.__mooziacAudioOutput = { prepare, stop };
+        if (window.__mooziacAutoplayPending) prepare();
+    })();
+    """
+
+    static let stopScript = "window.__mooziacAudioOutput?.stop();"
+    static let prepareScript = "window.__mooziacAudioOutput?.prepare();"
+}
+
 class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCookieStoreObserver {
     let webView: WKWebView
     private let progressView = NSProgressIndicator()
@@ -32,22 +155,105 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         prefs.allowsContentJavaScript = true
         config.defaultWebpagePreferences = prefs
         
+        if #available(macOS 14.0, *) {
+            config.preferences.inactiveSchedulingPolicy = .none
+        }
         config.preferences.setValue(false, forKey: "developerExtrasEnabled")
         
-        // Minimal CSS injection: collapse video elements out of layout completely (audio plays uninterrupted),
-        // hide cinematic background layers and video clutter, and format native song artwork.
-        // CSS is JSON-encoded below so the injected JS string literal is always valid.
+        // 🛡️ Page Visibility Shield: Prevents YouTube Music from pausing when the menu bar window is dismissed
+        let pageVisibilityShieldScript = WKUserScript(
+            source: """
+            (function() {
+                try {
+                    if (window.location && window.location.hostname.indexOf('music.youtube.com') !== -1) {
+                        // Override standard Page Visibility API properties to always report visible
+                        Object.defineProperty(document, 'hidden', { get: function() { return false; }, configurable: true });
+                        Object.defineProperty(document, 'visibilityState', { get: function() { return 'visible'; }, configurable: true });
+                        Object.defineProperty(document, 'webkitHidden', { get: function() { return false; }, configurable: true });
+                        Object.defineProperty(document, 'webkitVisibilityState', { get: function() { return 'visible'; }, configurable: true });
+                        
+                        // Prevent visibilitychange and blur events from triggering player pause handlers
+                        var blockEvent = function(e) {
+                            e.stopImmediatePropagation();
+                            e.stopPropagation();
+                        };
+                        window.addEventListener('visibilitychange', blockEvent, true);
+                        document.addEventListener('visibilitychange', blockEvent, true);
+                        window.addEventListener('webkitvisibilitychange', blockEvent, true);
+                        document.addEventListener('webkitvisibilitychange', blockEvent, true);
+                    }
+                } catch(e) {}
+            })();
+            """,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        )
+        config.userContentController.addUserScript(pageVisibilityShieldScript)
+        
+        // 🛡️ Pre-boot High Audio Quality Bootstrap Script (atDocumentStart, mainFrameOnly for OAuth safety)
+        let audioBootstrapScript = WKUserScript(
+            source: """
+            (function() {
+                try {
+                    if (window.location && window.location.hostname.indexOf('music.youtube.com') !== -1) {
+                        localStorage.setItem('mooziacPlaybackAudioQuality', 'high');
+                        localStorage.setItem('ytmusic_audio_quality', 'AUDIO_QUALITY_HIGH');
+                        window.__mooziacAudioQuality = 'AUDIO_QUALITY_HIGH';
+                    }
+                } catch(e) {}
+            })();
+            """,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        )
+        config.userContentController.addUserScript(audioBootstrapScript)
+
+        // 🛡️ MediaSession Remote Command Shield: Prevents web scripts from stealing native macOS media keys
+        let mediaSessionShieldScript = WKUserScript(
+            source: """
+            (function() {
+                try {
+                    var ms = navigator.mediaSession;
+                    if (ms && !ms.__mooziacWrapped) {
+                        var orig = ms.setActionHandler.bind(ms);
+                        ms.setActionHandler = function(type, handler) {
+                            if (type === 'seekforward' || type === 'seekbackward') {
+                                return orig(type, null);
+                            }
+                            return orig(type, handler);
+                        };
+                        ms.__mooziacWrapped = true;
+                    }
+                } catch(e) {}
+            })();
+            """,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        )
+        config.userContentController.addUserScript(mediaSessionShieldScript)
+
+        // 🛡️ WebPlaybackAudioOutput: Keeps WebKit audio graph active across short track transitions
+        let audioOutputScript = WKUserScript(
+            source: WebPlaybackAudioOutput.script,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        )
+        config.userContentController.addUserScript(audioOutputScript)
+
+        // 🛡️ BULLETPROOF STEALTH SIZING (No ABR throttle, Zero click blocking):
+        // Positioned offscreen at -9999px with standard 640x360 dimensions so YouTube never
+        // triggers adaptive bitrate emergency downgrades or buffer throttling.
         let cssString = """
         #song-video, #player-video, .html5-video-player, video {
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 1px !important;
-            height: 1px !important;
+            position: fixed !important;
+            left: -9999px !important;
+            top: -9999px !important;
+            width: 640px !important;
+            height: 360px !important;
             opacity: 0.0001 !important;
             pointer-events: none !important;
-            overflow: hidden !important;
-            z-index: -1 !important;
+            visibility: visible !important;
+            z-index: -999 !important;
         }
         #cinematics, .background-gradient, #background-gradient,
         paper-ripple, #cinematics-container, ytm-cinematics, .ytmusic-browse-response[background-gradient],
@@ -326,30 +532,18 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
     public func selectSongTab() {
         let js = """
         (function() {
-            var attempts = 0;
-            function ensureSongMode() {
-                attempts++;
-                try {
-                    var toggle = document.querySelector('ytmusic-av-toggle');
-                    if (!toggle) return false;
-                    var mode = toggle.getAttribute('playback-mode') || '';
-                    if (mode === 'OMV_PREFERRED') {
-                        var songBtn = toggle.querySelector('button.song-button');
-                        if (songBtn) { songBtn.click(); return true; }
-                    }
-                    return false;
-                } catch(e) {
-                    return false;
+            try {
+                // Dismiss any promo / upsell dialogs that pause playback
+                var dismissBtns = document.querySelectorAll(
+                    'ytmusic-mealbar-promo-renderer #dismiss-button button, ' +
+                    'ytmusic-dialog #dismiss-button button, ' +
+                    'ytmusic-you-there-renderer #button, ' +
+                    'tp-yt-paper-dialog #dismiss-button'
+                );
+                for (var i = 0; i < dismissBtns.length; i++) {
+                    if (dismissBtns[i]) dismissBtns[i].click();
                 }
-            }
-            
-            if (!ensureSongMode() || attempts < 4) {
-                var timer = setInterval(function() {
-                    if (ensureSongMode() || attempts > 5) {
-                        clearInterval(timer);
-                    }
-                }, 200);
-            }
+            } catch(e) {}
         })();
         """
         webView.evaluateJavaScript(js, completionHandler: nil)
@@ -527,6 +721,21 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
             var targetVideoId = "\(videoId)";
             var targetTime = \(targetTime);
             var resumePlayback = \(resumeFlag);
+            if (resumePlayback) {
+                window.__mooziacAutoplayPending = true;
+                window.__mooziacPlaybackSuppressed = false;
+                window.__mooziacBlockAutoplay = false;
+                if (window.__mooziacAudioOutput && typeof window.__mooziacAudioOutput.prepare === 'function') {
+                    window.__mooziacAudioOutput.prepare();
+                }
+            } else {
+                window.__mooziacAutoplayPending = false;
+                window.__mooziacPlaybackSuppressed = true;
+                window.__mooziacBlockAutoplay = true;
+                if (window.__mooziacAudioOutput && typeof window.__mooziacAudioOutput.stop === 'function') {
+                    window.__mooziacAudioOutput.stop();
+                }
+            }
             var attempts = 0;
             function enforceSong() {
                 try {
@@ -715,6 +924,247 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         }
         if let currentURL = webView.url?.absoluteString, !currentURL.contains("music.youtube.com") {
             loadMusicHome()
+        }
+    }
+
+    // MARK: - Instant Router Navigation (app.resolveCommand) with Watchdog & Generation Counter
+    private var navigationGeneration: UInt64 = 0
+    private var routerWatchdogItem: DispatchWorkItem?
+
+    public func navigateToVideo(videoId: String) {
+        guard !videoId.isEmpty else { return }
+        navigationGeneration &+= 1
+        let currentGeneration = navigationGeneration
+        
+        routerWatchdogItem?.cancel()
+        routerWatchdogItem = nil
+
+        let escapedVideoId = videoId.replacingOccurrences(of: "'", with: "\\'")
+        let routerJS = """
+        (function() {
+            var videoId = '\(escapedVideoId)';
+            var gen = \(currentGeneration);
+            window.__mooziacNavigationGeneration = gen;
+            window.__mooziacAutoplayPending = true;
+            window.__mooziacPlaybackSuppressed = false;
+            window.__mooziacBlockAutoplay = false;
+            window.__mooziacAutoplayAttempts = 0;
+            if (window.__mooziacAudioOutput && typeof window.__mooziacAudioOutput.prepare === 'function') {
+                window.__mooziacAudioOutput.prepare();
+            }
+
+            // Priority 1: YouTube Music native Polymer router (Instant 0ms track switch, zero page reload)
+            try {
+                var app = document.querySelector('ytmusic-app');
+                if (app && typeof app.resolveCommand === 'function') {
+                    app.resolveCommand({ watchEndpoint: { videoId: videoId } });
+                    setTimeout(function() {
+                        try {
+                            var p = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
+                            if (p && typeof p.playVideo === 'function') p.playVideo();
+                            var v = document.querySelector('video');
+                            if (v && v.paused) v.play().catch(function(){});
+                        } catch(e) {}
+                    }, 100);
+                    return { success: true, method: 'resolveCommand' };
+                }
+            } catch(e) {}
+
+            // Priority 2: HTML5 Player API loadVideoById
+            try {
+                var p = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
+                if (p && typeof p.loadVideoById === 'function') {
+                    p.loadVideoById(videoId);
+                    if (typeof p.playVideo === 'function') p.playVideo();
+                    return { success: true, method: 'loadVideoById' };
+                }
+            } catch(e) {}
+
+            return { success: false, method: 'none' };
+        })();
+        """
+
+        webView.evaluateJavaScript(routerJS) { [weak self] result, error in
+            guard let self = self else { return }
+            guard self.navigationGeneration == currentGeneration else { return }
+
+            let dict = result as? [String: Any]
+            let success = (dict?["success"] as? Bool) == true
+
+            if !success {
+                // If in-page routing was not available, immediately fall back
+                self.fallbackLoadVideo(videoId: videoId, generation: currentGeneration)
+                return
+            }
+
+            // In-page routing was dispatched. Arm 500ms watchdog to verify that the track actually loaded:
+            let watchdog = DispatchWorkItem { [weak self] in
+                guard let self = self else { return }
+                guard self.navigationGeneration == currentGeneration else { return }
+                self.verifyVideoSwitch(videoId: videoId, generation: currentGeneration)
+            }
+            self.routerWatchdogItem = watchdog
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: watchdog)
+        }
+    }
+
+    private func verifyVideoSwitch(videoId: String, generation: UInt64) {
+        guard navigationGeneration == generation else { return }
+        let checkJS = """
+        (function() {
+            try {
+                var p = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
+                if (p && typeof p.getVideoData === 'function') {
+                    var data = p.getVideoData();
+                    if (data && (data.video_id === '\(videoId)' || data.videoId === '\(videoId)')) {
+                        return true;
+                    }
+                }
+                var m = window.location.href.match(/[?&]v=([^&]+)/);
+                if (m && m[1] === '\(videoId)') {
+                    return true;
+                }
+            } catch(e) {}
+            return false;
+        })();
+        """
+        webView.evaluateJavaScript(checkJS) { [weak self] result, _ in
+            guard let self = self else { return }
+            guard self.navigationGeneration == generation else { return }
+            if (result as? Bool) != true {
+                print("[YTMWebView] Router navigation watchdog expired for \(videoId). Executing safe URL fallback.")
+                self.fallbackLoadVideo(videoId: videoId, generation: generation)
+            } else {
+                let playJS = """
+                (function() {
+                    try {
+                        var p = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
+                        if (p && typeof p.getPlayerState === 'function') {
+                            var st = p.getPlayerState();
+                            if (st === 2 || st === 5 || st === -1) {
+                                if (typeof p.playVideo === 'function') p.playVideo();
+                            }
+                        }
+                        var v = document.querySelector('video');
+                        if (v && v.paused) v.play().catch(function(){});
+                    } catch(e) {}
+                })();
+                """
+                self.webView.evaluateJavaScript(playJS, completionHandler: nil)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+                    self?.selectSongTab()
+                }
+            }
+        }
+    }
+
+    private func fallbackLoadVideo(videoId: String, generation: UInt64) {
+        guard navigationGeneration == generation else { return }
+        let targetUrlStr = "https://music.youtube.com/watch?v=\(videoId)&list=RDAMVM\(videoId)"
+        guard let url = URL(string: targetUrlStr) else { return }
+        
+        let replaceJS = "window.location.replace('\(targetUrlStr)');"
+        webView.evaluateJavaScript(replaceJS) { [weak self] _, error in
+            guard let self = self else { return }
+            guard self.navigationGeneration == generation else { return }
+            if error != nil {
+                self.webView.load(URLRequest(url: url))
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+                self?.selectSongTab()
+            }
+        }
+    }
+
+    // MARK: - Infinite Flow (Never-Ending Autoplay)
+    public func triggerInfiniteFlow(seededFrom videoId: String) {
+        guard !videoId.isEmpty else { return }
+        navigationGeneration &+= 1
+        let currentGeneration = navigationGeneration
+
+        routerWatchdogItem?.cancel()
+        routerWatchdogItem = nil
+
+        let escapedVideoId = videoId.replacingOccurrences(of: "'", with: "\\'")
+        let infiniteFlowJS = """
+        (function() {
+            var seedVid = '\(escapedVideoId)';
+            var gen = \(currentGeneration);
+            window.__mooziacNavigationGeneration = gen;
+            window.__mooziacAutoplayPending = true;
+            window.__mooziacPlaybackSuppressed = false;
+            window.__mooziacBlockAutoplay = false;
+            window.__mooziacAutoplayAttempts = 0;
+            if (window.__mooziacAudioOutput && typeof window.__mooziacAudioOutput.prepare === 'function') {
+                window.__mooziacAudioOutput.prepare();
+            }
+
+            // Priority 1: If player bar Next button is active and has queued items, click it for 0ms transition
+            try {
+                var nextBtn = document.querySelector('ytmusic-player-bar .next-button') ||
+                              document.querySelector('.next-button') ||
+                              document.querySelector('tp-yt-paper-icon-button.next-button');
+                if (nextBtn && !nextBtn.hasAttribute('disabled') && nextBtn.getAttribute('aria-disabled') !== 'true') {
+                    nextBtn.click();
+                    return { success: true, method: 'nextButton' };
+                }
+            } catch(e) {}
+
+            // Priority 2: HTML5 player nextVideo()
+            try {
+                var p = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
+                if (p && typeof p.nextVideo === 'function') {
+                    p.nextVideo();
+                    return { success: true, method: 'playerNext' };
+                }
+            } catch(e) {}
+
+            // Priority 3: Dispatch native radio resolveCommand seeded from the last track
+            try {
+                var app = document.querySelector('ytmusic-app');
+                if (app && typeof app.resolveCommand === 'function' && seedVid) {
+                    app.resolveCommand({
+                        watchEndpoint: {
+                            videoId: seedVid,
+                            playlistId: 'RDAMVM' + seedVid,
+                            params: 'wAEB'
+                        }
+                    });
+                    setTimeout(function() {
+                        try {
+                            var pl = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
+                            if (pl && typeof pl.nextVideo === 'function') {
+                                pl.nextVideo();
+                            }
+                            if (pl && typeof pl.playVideo === 'function') {
+                                pl.playVideo();
+                            }
+                        } catch(err) {}
+                    }, 250);
+                    return { success: true, method: 'resolveRadio' };
+                }
+            } catch(e) {}
+
+            // Priority 4: Direct URL replacement with radio list
+            if (seedVid) {
+                window.location.replace('https://music.youtube.com/watch?v=' + encodeURIComponent(seedVid) + '&list=RDAMVM' + encodeURIComponent(seedVid));
+                return { success: true, method: 'urlRadio' };
+            }
+
+            return { success: false, method: 'none' };
+        })();
+        """
+
+        webView.evaluateJavaScript(infiniteFlowJS) { [weak self] result, error in
+            guard let self = self else { return }
+            guard self.navigationGeneration == currentGeneration else { return }
+            let dict = result as? [String: Any]
+            let method = dict?["method"] as? String ?? "unknown"
+            print("[YTMWebView] Infinite Flow dispatched with method: \(method)")
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                self?.selectSongTab()
+            }
         }
     }
 

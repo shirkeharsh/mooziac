@@ -31,6 +31,8 @@ SYSTEM_DESIGN.md
 downloadreport.md
 nextupdatesync.md
 publish.md
+RELEASE_PLAYBOOK.md
+RELEASE_*.md
 mooziac.sh
 build_brain_watcher.sh
 build_studio.sh

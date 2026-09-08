@@ -155,26 +155,28 @@ public final class LyricsManager {
     // Collision-resistant identity: track/video ID when available, otherwise
     // normalized title + normalized artist + duration.
     private func strongTrackKey(trackID: String, title: String, artist: String, duration: Double) -> String {
-        if !trackID.isEmpty {
-            return "VID:" + trackID
-        }
         let t = LyricsManager.cleanSongInfo(title).lowercased()
         let a = LyricsManager.cleanSongInfo(artist).lowercased()
         let d = duration > 0 ? String(Int(duration)) : "0"
+        if !trackID.isEmpty {
+            return "VID:\(trackID)|\(t)"
+        }
         return "TRACK:\(t)|\(a)|\(d)"
     }
     
     private func strongCacheFilename(trackID: String, cleanTitle: String, cleanArtist: String, duration: Double) -> String {
         let sanitize: (String) -> String = { s in
-            s.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
+            s.replacingOccurrences(of: "/", with: "-")
+             .replacingOccurrences(of: ":", with: "-")
+             .replacingOccurrences(of: " ", with: "_")
         }
+        let t = sanitize(cleanTitle.isEmpty ? "untitled" : cleanTitle)
         if !trackID.isEmpty {
-            return "vid_" + sanitize(trackID) + ".lrc"
+            return "vid_\(sanitize(trackID))_\(t).lrc"
         }
-        let t = cleanTitle.isEmpty ? "untitled" : cleanTitle
-        let a = cleanArtist.isEmpty ? "unknown" : cleanArtist
+        let a = sanitize(cleanArtist.isEmpty ? "unknown" : cleanArtist)
         let d = duration > 0 ? String(Int(duration)) : "0"
-        return sanitize("\(t)_\(a)_\(d)") + ".lrc"
+        return "\(t)_\(a)_\(d).lrc"
     }
     
     // A local .lrc file only matches when its filename confidently corresponds to the track:
@@ -265,12 +267,39 @@ public final class LyricsManager {
         if let cacheDir = cacheDir {
             try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
             localLrcCandidates.append(cacheDir.appendingPathComponent(cacheFilename))
+            if !trackID.isEmpty {
+                let sanitize: (String) -> String = { s in
+                    s.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
+                }
+                localLrcCandidates.append(cacheDir.appendingPathComponent("vid_\(sanitize(trackID)).lrc"))
+            }
         }
 
         for candidate in localLrcCandidates {
             if FileManager.default.fileExists(atPath: candidate.path),
                let lrcContent = try? String(contentsOf: candidate, encoding: .utf8),
                !lrcContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                
+                // Cache validation: If the cached LRC has a [ti:...] tag, verify it matches cleanTitle
+                if let tiRange = lrcContent.range(of: "(?i)\\[ti:([^\\]]+)\\]", options: .regularExpression) {
+                    let tag = String(lrcContent[tiRange])
+                    let cachedTi = tag.replacingOccurrences(of: "(?i)\\[ti:\\s*", with: "", options: .regularExpression)
+                                      .replacingOccurrences(of: "\\]", with: "")
+                                      .trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !cachedTi.isEmpty && !cleanTitle.isEmpty {
+                        let titleTokens = Set(self.normalizeForMatch(cleanTitle))
+                        let cachedTokens = Set(self.normalizeForMatch(cachedTi))
+                        if !titleTokens.isEmpty && !cachedTokens.isEmpty {
+                            let sim = self.jaccard(titleTokens, cachedTokens)
+                            if sim < 0.4 {
+                                print("[LyricsManager] Evicting stale/mismatched LRC cache: \(candidate.lastPathComponent) (cached: '\(cachedTi)' vs track: '\(cleanTitle)')")
+                                try? FileManager.default.removeItem(at: candidate)
+                                continue
+                            }
+                        }
+                    }
+                }
+
                 let parsedLines = SyncedLyricsParser.parse(lrcText: lrcContent)
                 if !parsedLines.isEmpty {
                     print("[LyricsManager] Found local offline LRC file: \(candidate.lastPathComponent) with \(parsedLines.count) lines")
@@ -313,7 +342,7 @@ public final class LyricsManager {
                         if let syncedLyrics = json["syncedLyrics"] as? String, !syncedLyrics.isEmpty {
                             let parsedLines = SyncedLyricsParser.parse(lrcText: syncedLyrics)
                             self.currentLRCLines = parsedLines
-                            self.saveToLocalLyricsCache(filename: cacheFilename, lrcText: syncedLyrics)
+                            self.saveToLocalLyricsCache(filename: cacheFilename, title: cleanTitle, artist: cleanArtist, lrcText: syncedLyrics)
                             let cleanText = syncedLyrics.replacingOccurrences(of: "\\[\\d+:\\d+\\.\\d+\\]", with: "", options: .regularExpression)
                             DispatchQueue.main.async {
                                 self.onLyricsUpdated?(parsedLines)
@@ -323,7 +352,7 @@ public final class LyricsManager {
                         } else if let plainLyrics = json["plainLyrics"] as? String, !plainLyrics.isEmpty {
                             let parsedLines = LyricsManager.convertPlainToLRCLines(plainLyrics)
                             self.currentLRCLines = parsedLines
-                            self.saveToLocalLyricsCache(filename: cacheFilename, lrcText: plainLyrics)
+                            self.saveToLocalLyricsCache(filename: cacheFilename, title: cleanTitle, artist: cleanArtist, lrcText: plainLyrics)
                             DispatchQueue.main.async {
                                 self.onLyricsUpdated?(parsedLines)
                                 completion(plainLyrics.trimmingCharacters(in: .whitespacesAndNewlines), parsedLines)
@@ -457,13 +486,17 @@ public final class LyricsManager {
         }.resume()
     }
 
-    private func saveToLocalLyricsCache(filename: String, lrcText: String) {
+    private func saveToLocalLyricsCache(filename: String, title: String, artist: String, lrcText: String) {
         guard !lrcText.isEmpty else { return }
         let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?.appendingPathComponent("Mooziac/Lyrics", isDirectory: true)
         if let cacheDir = cacheDir {
             try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
             let cachedLrcURL = cacheDir.appendingPathComponent(filename)
-            try? lrcText.write(to: cachedLrcURL, atomically: true, encoding: .utf8)
+            var textToSave = lrcText
+            if !textToSave.contains("[ti:") && !title.isEmpty {
+                textToSave = "[ti:\(title)]\n[ar:\(artist)]\n" + textToSave
+            }
+            try? textToSave.write(to: cachedLrcURL, atomically: true, encoding: .utf8)
         }
     }
 

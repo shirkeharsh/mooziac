@@ -190,9 +190,20 @@ public final class PlaylistManager: NSObject {
         invalidateSummary(for: playlistID)
         if var ctx = activeContext, ctx.playlistID == playlistID {
             let currentTrackID = (ctx.currentIndex >= 0 && ctx.currentIndex < ctx.items.count) ? ctx.items[ctx.currentIndex].id : nil
-            let newItems = fetchPlaylistItems(playlistID: playlistID)
-            ctx.items = newItems
-            if let curID = currentTrackID, let newIdx = newItems.firstIndex(where: { $0.id == curID }) {
+            var itemMap: [String: PlaylistItemRecord] = [:]
+            itemMap.reserveCapacity(ctx.items.count)
+            for item in ctx.items { itemMap[item.id] = item }
+            var reorderedItems: [PlaylistItemRecord] = []
+            reorderedItems.reserveCapacity(orderedItemIDs.count)
+            for id in orderedItemIDs {
+                if let it = itemMap[id] { reorderedItems.append(it) }
+            }
+            if reorderedItems.count == ctx.items.count {
+                ctx.items = reorderedItems
+            } else {
+                ctx.items = fetchPlaylistItems(playlistID: playlistID)
+            }
+            if let curID = currentTrackID, let newIdx = ctx.items.firstIndex(where: { $0.id == curID }) {
                 ctx.currentIndex = newIdx
             }
             rebuildLocalQueue(for: &ctx)
@@ -612,6 +623,10 @@ public final class PlaylistManager: NSObject {
         }
 
         if !vid.isEmpty {
+            // When playing in online mode and network is reachable, preserve online streaming
+            if NowPlayingManager.shared.engineMode == .online && NetworkMonitor.shared.isReachable {
+                return .online(videoId: vid)
+            }
             if let track = index.byVideoId[vid] ?? index.byId[vid] {
                 return .local(track)
             }
@@ -896,8 +911,15 @@ public final class PlaylistManager: NSObject {
             playTrackAtCurrentContextIndex()
             return true
         } else {
-            // Playlist has ended! Let random/recommended autoplay take over smoothly
+            // Playlist has ended with Repeat OFF -> Let Infinite Flow take over smoothly
+            let lastItem = (ctx.currentIndex >= 0 && ctx.currentIndex < ctx.items.count) ? ctx.items[ctx.currentIndex] : nil
+            let seedVid = lastItem?.ytVideoId ?? (lastItem?.refID.count == 11 ? lastItem?.refID : nil)
             activeContext = nil
+
+            if let vid = seedVid, !vid.isEmpty {
+                triggerInfiniteFlow(seededFrom: vid)
+                return true
+            }
             return false
         }
     }
@@ -920,32 +942,30 @@ public final class PlaylistManager: NSObject {
         NowPlayingManager.shared.switchToOnlineMode()
         DispatchQueue.main.async {
             guard let mainVC = StatusItemManager.shared?.mainViewController else { return }
-            let loadVideoJS = """
-            (function() {
-                try {
-                    var player = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
-                    if (player && typeof player.loadVideoById === 'function') {
-                        player.loadVideoById('\(videoId)');
-                        if (typeof player.playVideo === 'function') player.playVideo();
-                        return true;
-                    }
-                } catch(e) {}
-                return false;
-            })();
-            """
-            mainVC.webViewContainer.webView.evaluateJavaScript(loadVideoJS) { res, _ in
-                if (res as? Bool) != true {
-                    guard let url = URL(string: "https://music.youtube.com/watch?v=\(videoId)&list=RDAMVM\(videoId)") else { return }
-                    mainVC.webViewContainer.webView.load(URLRequest(url: url))
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak mainVC] in
-                        mainVC?.webViewContainer.selectSongTab()
-                    }
-                } else {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak mainVC] in
-                        mainVC?.webViewContainer.selectSongTab()
-                    }
-                }
-            }
+            mainVC.webViewContainer.navigateToVideo(videoId: videoId)
+        }
+    }
+
+    // MARK: - Infinite Flow (Never-Ending Autoplay)
+    private var lastInfiniteFlowTimestamp: TimeInterval = 0
+
+    public func triggerInfiniteFlow(seededFrom videoId: String) {
+        guard !videoId.isEmpty else { return }
+        guard NetworkMonitor.shared.isReachable else { return }
+        guard NowPlayingManager.shared.engineMode == .online else { return }
+        guard NowPlayingManager.shared.repeatMode == .off else { return }
+
+        let now = CACurrentMediaTime()
+        guard now - lastInfiniteFlowTimestamp > 3.0 else {
+            print("[InfiniteFlow] Cooldown active (3s), skipping duplicate trigger")
+            return
+        }
+        lastInfiniteFlowTimestamp = now
+
+        print("[InfiniteFlow] Playlist/Queue ended. Seamlessly starting Infinite Flow radio for videoId: \(videoId)")
+        DispatchQueue.main.async {
+            guard let mainVC = StatusItemManager.shared?.mainViewController else { return }
+            mainVC.webViewContainer.triggerInfiniteFlow(seededFrom: videoId)
         }
     }
 

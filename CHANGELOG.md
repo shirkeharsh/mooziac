@@ -2,6 +2,16 @@
 
 All notable changes to Mooziac are documented in this file.
 
+## [1.1.4] - 2026-09-08
+
+### 🚀 Stability, Audio & UI Polish
+- **Background Playback & Anti-Pause Engine**: Implemented continuous Web Audio keepalive engine to prevent macOS WebKit process throttling from pausing music in the background or during menu bar interactions.
+- **Floating Synced Menu Bar Lyrics**: Added subtle centered floating lyrics HUD with instant song transitions, ad metadata suppression, and multi-script support.
+- **High-Fidelity Audio Stream Locking**: Forced high-bitrate stream selection (256 kbps AAC / 160 kbps Opus) with real-time `itag` diagnostics on the player's HQ badge.
+- **Playlist & Queue Reliability**: Improved autoplay recovery hooks, seamless sequential track advancements, and eliminated metadata synchronization lag.
+- **Search Bar Animation Polish**: Fixed horizontal squishing and flicker during search expansion and collapse with smooth two-phase transitions.
+- **In-App Updater Enhancements**: Decoupled "Star on GitHub ⭐" action so users can star the repo without dismissing the update dialog.
+
 ## [1.1.3] - 2026-09-07
 
 ### 🎵 Synced Lyrics & Engine Mode Isolation

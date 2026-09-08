@@ -19,6 +19,10 @@ struct PlaybackState {
     var isRepeatOn: Bool = false
     var repeatMode: RepeatMode = .off
     var engineMode: PlaybackEngineMode = .online
+    var currentAudioQuality: String = "Standard Quality"
+    var isHighQualityStream: Bool = false
+    var audioItag: String = ""
+    var isAd: Bool = false
     
     // Sub-millisecond exact audio time extrapolator
     func getAccurateTime() -> Double {

@@ -1214,6 +1214,7 @@ extension DynamicIslandPlayerView {
     public func refreshPlaylistsSection(filterQuery: String = "") {
         playlistBuildToken += 1
         pendingRowBuilders = []
+        pendingRowItemIDs = []
         playlistBuildStack = nil
         playlistMountedRows.removeAll()
         playlistIsReordering = false
@@ -1243,6 +1244,7 @@ extension DynamicIslandPlayerView {
         }
 
         var builders: [() -> NSView] = []
+        var itemIDs: [String] = []
         var emptyText: String?
 
         switch activeLibraryTab {
@@ -1254,6 +1256,7 @@ extension DynamicIslandPlayerView {
             if playlists.isEmpty {
                 emptyText = trimmedQuery.isEmpty ? "No playlists yet. Click '+ Create Playlist' below to make one." : "No matching playlists found"
             } else {
+                itemIDs = playlists.map { $0.id }
                 builders = playlists.map { playlist in
                     { [weak self] in self?.makePlaylistRow(playlist: playlist, tone: tone) ?? NSView() }
                 }
@@ -1270,6 +1273,7 @@ extension DynamicIslandPlayerView {
             if liked.isEmpty {
                 emptyText = trimmedQuery.isEmpty ? "No liked songs yet. Like songs while playing to see them here." : "No matching liked songs found"
             } else {
+                itemIDs = liked.map { "liked-\($0.videoId)" }
                 builders = liked.map { record in
                     { [weak self] in self?.makeLikedSongRow(record: record, tone: tone) ?? NSView() }
                 }
@@ -1287,6 +1291,7 @@ extension DynamicIslandPlayerView {
             if tracks.isEmpty {
                 emptyText = trimmedQuery.isEmpty ? "No downloaded songs yet." : "No matching downloaded songs found"
             } else {
+                itemIDs = tracks.map { "download-\($0.id)" }
                 builders = tracks.map { track in
                     { [weak self] in self?.makeDownloadRow(track: track, allTracks: all, tone: tone) ?? NSView() }
                 }
@@ -1303,6 +1308,7 @@ extension DynamicIslandPlayerView {
             if history.isEmpty {
                 emptyText = trimmedQuery.isEmpty ? "No listening history yet." : "No matching history found"
             } else {
+                itemIDs = history.map { "history-\($0.id)" }
                 builders = history.map { record in
                     { [weak self] in self?.makeHistoryRow(record: record, tone: tone) ?? NSView() }
                 }
@@ -1320,11 +1326,12 @@ extension DynamicIslandPlayerView {
             setPlaylistDocViewHeight(emptyLabel.fittingSize.height + 8)
             return
         }
-        scheduleIncrementalBuild(builders, into: playlistsStackView)
+        scheduleIncrementalBuild(builders, itemIDs: itemIDs, into: playlistsStackView)
     }
 
-    private func scheduleIncrementalBuild(_ builders: [() -> NSView], into stack: NSStackView, initialBatchSize: Int = 35) {
+    private func scheduleIncrementalBuild(_ builders: [() -> NSView], itemIDs: [String] = [], into stack: NSStackView, initialBatchSize: Int = 35) {
         pendingRowBuilders = builders
+        pendingRowItemIDs = itemIDs
         playlistBuildStack = stack
         playlistBuildChunkIndex = 0
         playlistMountedRows.removeAll()
@@ -1384,8 +1391,9 @@ extension DynamicIslandPlayerView {
 
     private func mountAllPlaylistRows() {
         guard let stack = playlistBuildStack else { return }
+        let limit = min(pendingRowBuilders.count, 40)
         var mountedIndices = playlistMountedRows.keys.sorted()
-        for idx in 0..<pendingRowBuilders.count where playlistMountedRows[idx] == nil {
+        for idx in 0..<limit where playlistMountedRows[idx] == nil {
             let row = pendingRowBuilders[idx]()
             row.translatesAutoresizingMaskIntoConstraints = false
             let insertPos = mountedIndices.filter { $0 < idx }.count
@@ -1395,7 +1403,6 @@ extension DynamicIslandPlayerView {
             mountedIndices.insert(idx, at: insertPos)
             applyMountedRowState(row)
         }
-        playlistActiveStackTopConstraint?.constant = 0
     }
 
     private func applyMountedRowState(_ row: NSView) {
@@ -1498,6 +1505,7 @@ extension DynamicIslandPlayerView {
     }
 
     func handleLibraryRowReorderPan(_ gesture: NSPanGestureRecognizer, keyPrefix: String?, storageKey: String?, playlistID: String?) {
+        guard !isLibrarySearchActive else { return }
         guard let gestureView = gesture.view else { return }
 
         var containerView: NSView = gestureView
@@ -1516,21 +1524,42 @@ extension DynamicIslandPlayerView {
             gestureView.layer?.shadowOffset = CGSize(width: 0, height: -2)
             gestureView.layer?.shadowRadius = 6
             playlistIsReordering = true
-            mountAllPlaylistRows()
 
         case .changed:
             let arranged = stack.arrangedSubviews
-            guard let currentIndex = arranged.firstIndex(of: containerView) else { return }
+            guard let currentArrangedIndex = arranged.firstIndex(of: containerView) else { return }
+            guard let currentID = (containerView as? SwipeToDeleteContainerView)?.identifier?.rawValue ?? containerView.identifier?.rawValue,
+                  let currentMasterIndex = pendingRowItemIDs.firstIndex(of: currentID) else { return }
 
-            for (idx, otherView) in arranged.enumerated() where otherView != containerView {
+            for (targetArrangedIndex, otherView) in arranged.enumerated() where otherView != containerView {
                 let otherFrame = otherView.frame
                 if location.y >= otherFrame.minY && location.y <= otherFrame.maxY {
-                    if idx != currentIndex {
+                    if targetArrangedIndex != currentArrangedIndex {
+                        guard let targetID = (otherView as? SwipeToDeleteContainerView)?.identifier?.rawValue ?? otherView.identifier?.rawValue,
+                              let targetMasterIndex = pendingRowItemIDs.firstIndex(of: targetID) else { break }
+
+                        let movedID = pendingRowItemIDs.remove(at: currentMasterIndex)
+                        pendingRowItemIDs.insert(movedID, at: targetMasterIndex)
+
+                        if currentMasterIndex < pendingRowBuilders.count && targetMasterIndex < pendingRowBuilders.count {
+                            let movedBuilder = pendingRowBuilders.remove(at: currentMasterIndex)
+                            pendingRowBuilders.insert(movedBuilder, at: targetMasterIndex)
+                        }
+
+                        var newMounted: [Int: NSView] = [:]
+                        for sub in stack.arrangedSubviews {
+                            if let sid = (sub as? SwipeToDeleteContainerView)?.identifier?.rawValue ?? sub.identifier?.rawValue,
+                               let sidx = pendingRowItemIDs.firstIndex(of: sid) {
+                                newMounted[sidx] = sub
+                            }
+                        }
+                        playlistMountedRows = newMounted
+
                         NSAnimationContext.runAnimationGroup { context in
-                            context.duration = 0.2
+                            context.duration = 0.15
                             context.allowsImplicitAnimation = true
                             stack.removeArrangedSubview(containerView)
-                            stack.insertArrangedSubview(containerView, at: idx)
+                            stack.insertArrangedSubview(containerView, at: targetArrangedIndex)
                             stack.layoutSubtreeIfNeeded()
                         }
                     }
@@ -1542,48 +1571,45 @@ extension DynamicIslandPlayerView {
             playlistIsReordering = false
             gestureView.layer?.zPosition = 0
             gestureView.layer?.shadowOpacity = 0
-            let newOrder = stack.arrangedSubviews.compactMap { view -> String? in
-                guard let container = view as? SwipeToDeleteContainerView else { return nil }
-                return container.identifier?.rawValue
+
+            guard !pendingRowItemIDs.isEmpty else { return }
+
+            var keys = pendingRowItemIDs
+            if let keyPrefix {
+                keys = keys.map { $0.hasPrefix(keyPrefix) ? String($0.dropFirst(keyPrefix.count)) : $0 }
             }
-            if !newOrder.isEmpty {
-                var keys = newOrder
-                if let keyPrefix {
-                    keys = newOrder.map { String($0.dropFirst(keyPrefix.count)) }
-                }
-                if let storageKey {
-                    UserDefaults.standard.set(keys, forKey: storageKey)
-                    if storageKey == self.downloadsOrderKey {
-                        let allTracks = LocalLibraryManager.shared.allTracks
-                        let ordered = self.applyCustomOrder(allTracks, storedOrder: keys) { $0.id }
-                        NativeAudioPlayer.shared.updateQueueOrder(newOrder: ordered)
-                    } else if storageKey == self.likedSongsOrderKey {
-                        let liked = LikedSongsManager.shared.fetchLikedSongs()
-                        let orderedLiked = self.applyCustomOrder(liked, storedOrder: keys) { $0.videoId }
-                        let allTracks = LocalLibraryManager.shared.allTracks
-                        let orderedTracks = orderedLiked.compactMap { item -> LocalTrack? in
-                            allTracks.first(where: {
-                                if let v = $0.ytVideoId, !v.isEmpty, v == item.videoId { return true }
-                                return $0.fileURL.path == item.videoId
-                            })
-                        }
-                        if !orderedTracks.isEmpty {
-                            NativeAudioPlayer.shared.updateQueueOrder(newOrder: orderedTracks)
-                        }
-                    } else if storageKey == self.historyOrderKey {
-                        let history = HistoryManager.shared.fetchHistory(limit: 100)
-                        let orderedHistory = self.applyCustomOrder(history, storedOrder: keys) { $0.id }
-                        let orderedTracks = self.resolveHistoryTracks(orderedHistory)
-                        if !orderedTracks.isEmpty {
-                            NativeAudioPlayer.shared.updateQueueOrder(newOrder: orderedTracks)
-                        }
+
+            if let storageKey {
+                UserDefaults.standard.set(keys, forKey: storageKey)
+                if storageKey == self.downloadsOrderKey {
+                    let allTracks = LocalLibraryManager.shared.allTracks
+                    let ordered = self.applyCustomOrder(allTracks, storedOrder: keys) { $0.id }
+                    NativeAudioPlayer.shared.updateQueueOrder(newOrder: ordered)
+                } else if storageKey == self.likedSongsOrderKey {
+                    let liked = LikedSongsManager.shared.fetchLikedSongs()
+                    let orderedLiked = self.applyCustomOrder(liked, storedOrder: keys) { $0.videoId }
+                    let allTracks = LocalLibraryManager.shared.allTracks
+                    let orderedTracks = orderedLiked.compactMap { item -> LocalTrack? in
+                        allTracks.first(where: {
+                            if let v = $0.ytVideoId, !v.isEmpty, v == item.videoId { return true }
+                            return $0.fileURL.path == item.videoId
+                        })
                     }
-                    refreshPlaylistsSection()
+                    if !orderedTracks.isEmpty {
+                        NativeAudioPlayer.shared.updateQueueOrder(newOrder: orderedTracks)
+                    }
+                } else if storageKey == self.historyOrderKey {
+                    let history = HistoryManager.shared.fetchHistory(limit: 100)
+                    let orderedHistory = self.applyCustomOrder(history, storedOrder: keys) { $0.id }
+                    let orderedTracks = self.resolveHistoryTracks(orderedHistory)
+                    if !orderedTracks.isEmpty {
+                        NativeAudioPlayer.shared.updateQueueOrder(newOrder: orderedTracks)
+                    }
                 }
-                if let playlistID {
-                    PlaylistManager.shared.reorderItems(playlistID: playlistID, orderedItemIDs: keys)
-                    refreshPlaylistsSection()
-                }
+            }
+
+            if let playlistID {
+                PlaylistManager.shared.reorderItems(playlistID: playlistID, orderedItemIDs: keys)
             }
 
         default:
@@ -1636,10 +1662,11 @@ extension DynamicIslandPlayerView {
                 setPlaylistDocViewHeight(emptyLabel.fittingSize.height + 8)
                 return
             }
+            let itemIDs = tracks.map { $0.id }
             let builders = tracks.map { track in
                 { [weak self] in self?.makeAddSongRow(track: track, tone: tone) ?? NSView() }
             }
-            scheduleIncrementalBuild(builders, into: detailStackView)
+            scheduleIncrementalBuild(builders, itemIDs: itemIDs, into: detailStackView)
             return
         }
 
@@ -1670,10 +1697,11 @@ extension DynamicIslandPlayerView {
             return
         }
         let total = items.count
+        let itemIDs = items.map { $0.id }
         let builders = items.enumerated().map { (idx, item) in
             { [weak self] in self?.makeDetailItemRow(item: item, index: idx, total: total, tone: tone) ?? NSView() }
         }
-        scheduleIncrementalBuild(builders, into: detailStackView)
+        scheduleIncrementalBuild(builders, itemIDs: itemIDs, into: detailStackView)
     }
 
     private func playlistFirstTrack(_ playlist: PlaylistRecord) -> LocalTrack? {
@@ -1703,7 +1731,6 @@ extension DynamicIslandPlayerView {
             return
         }
         PlaylistManager.shared.startPlaylist(playlistID: id, startingAt: nil, shuffle: false)
-        showToastBanner(message: "▶ Playing \"\(playlist.name)\"")
     }
 
     private func makePlaylistRow(playlist: PlaylistRecord, tone: SettingsTone) -> NSView {
@@ -1761,7 +1788,6 @@ extension DynamicIslandPlayerView {
                     return false
                 }
                 PlaylistManager.shared.startPlaylist(playlistID: playlist.id, startingAt: nil, shuffle: false)
-                self.showToastBanner(message: "▶ Playing \"\(playlist.name)\"")
                 return true
             }
         }
@@ -2167,14 +2193,12 @@ extension DynamicIslandPlayerView {
         guard let record = sender.representedObject as? LikedSongRecord else { return }
         let records = likedSongsForPlayback()
         PlaylistManager.shared.startLikedSongsPlayback(records: records, startingAt: record.videoId, shuffle: false)
-        showToastBanner(message: "▶ Playing \"\(record.title)\"")
     }
 
     @objc func handlePlayDownloadedTrack(_ sender: ReactiveIconButton) {
         guard let track = sender.representedObject as? LocalTrack else { return }
         let tracks = downloadedTracksForPlayback()
         NowPlayingManager.shared.playOfflineTrack(track, in: tracks)
-        showToastBanner(message: "▶ Playing \"\(track.title)\"")
     }
 
     func confirmAndDeleteDownloadedTrack(_ track: LocalTrack) {
@@ -2227,7 +2251,6 @@ extension DynamicIslandPlayerView {
             return
         }
         NowPlayingManager.shared.playOfflineTrack(tracks[0], in: tracks)
-        showToastBanner(message: "▶ Playing all downloaded tracks")
     }
 
     @objc func handleDownloadsShuffleTapped() {
@@ -2238,7 +2261,6 @@ extension DynamicIslandPlayerView {
         }
         let shuffled = tracks.shuffled()
         NowPlayingManager.shared.playOfflineTrack(shuffled[0], in: shuffled)
-        showToastBanner(message: "🔀 Shuffling downloaded tracks")
     }
 
     @objc func handleLikedSongsPlayAllTapped() {
@@ -2248,7 +2270,6 @@ extension DynamicIslandPlayerView {
             return
         }
         PlaylistManager.shared.startLikedSongsPlayback(records: records, startingAt: nil, shuffle: false)
-        showToastBanner(message: "▶ Playing all liked songs")
     }
 
     @objc func handleLikedSongsShuffleTapped() {
@@ -2258,7 +2279,6 @@ extension DynamicIslandPlayerView {
             return
         }
         PlaylistManager.shared.startLikedSongsPlayback(records: records, startingAt: nil, shuffle: true)
-        showToastBanner(message: "🔀 Shuffling liked songs")
     }
 
     private func likedSongsForPlayback() -> [LikedSongRecord] {
@@ -2305,7 +2325,6 @@ extension DynamicIslandPlayerView {
         } else {
             NowPlayingManager.shared.playOfflineTrack(tracks[0], in: tracks)
         }
-        showToastBanner(message: "▶ Playing all listening history")
     }
 
     @objc func handleHistoryShuffleTapped() {
@@ -2326,7 +2345,6 @@ extension DynamicIslandPlayerView {
         } else {
             NowPlayingManager.shared.playOfflineTrack(tracks[0], in: tracks)
         }
-        showToastBanner(message: "🔀 Shuffling listening history")
     }
 
     private func resolveHistoryTracks(_ records: [HistoryRecord]) -> [LocalTrack] {
@@ -2645,7 +2663,6 @@ extension DynamicIslandPlayerView {
     @objc private func handleDrawerPlayDownloadItem(_ sender: NSMenuItem) {
         guard let track = sender.representedObject as? LocalTrack else { return }
         NowPlayingManager.shared.playOfflineTrack(track, in: LocalLibraryManager.shared.allTracks)
-        showToastBanner(message: "▶ Playing \"\(track.title)\"")
     }
 
     @objc private func handleDrawerPlayNextDownloadItem(_ sender: NSMenuItem) {
@@ -2991,7 +3008,6 @@ extension DynamicIslandPlayerView {
         } else {
             HistoryManager.shared.playHistoryItem(record)
         }
-        showToastBanner(message: "▶ Playing \"\(record.title)\"")
     }
 
     @objc func handleDownloadHistoryButtonTapped(_ sender: ReactiveIconButton) {
@@ -3032,14 +3048,18 @@ extension DynamicIslandPlayerView {
     @objc private func handlePlayPlaylistFromRow(_ sender: ReactiveIconButton) {
         guard let playlist = sender.representedObject as? PlaylistRecord else { return }
         PlaylistManager.shared.play(playlistID: playlist.id) { [weak self] res in
-            self?.showToastBanner(message: res.message, isWarning: !res.started)
+            if !res.started {
+                self?.showToastBanner(message: res.message, isWarning: true)
+            }
         }
     }
 
     @objc private func handleShufflePlaylistFromRow(_ sender: ReactiveIconButton) {
         guard let playlist = sender.representedObject as? PlaylistRecord else { return }
         PlaylistManager.shared.shufflePlay(playlistID: playlist.id) { [weak self] res in
-            self?.showToastBanner(message: res.message, isWarning: !res.started)
+            if !res.started {
+                self?.showToastBanner(message: res.message, isWarning: true)
+            }
         }
     }
 
@@ -4415,8 +4435,10 @@ private class DetailItemRowView: NSView {
             downloadBtn.centerYAnchor.constraint(equalTo: centerYAnchor)
         ])
 
-        let pan = VerticalPanGestureRecognizer(target: self, action: #selector(handlePanGesture(_:)))
-        addGestureRecognizer(pan)
+        if let delegate, !delegate.isLibrarySearchActive {
+            let pan = VerticalPanGestureRecognizer(target: self, action: #selector(handlePanGesture(_:)))
+            addGestureRecognizer(pan)
+        }
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {

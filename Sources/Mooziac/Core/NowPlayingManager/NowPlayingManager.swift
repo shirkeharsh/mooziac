@@ -57,10 +57,23 @@ class NowPlayingManager: NSObject, WKScriptMessageHandler {
         NotificationCenter.default.addObserver(forName: NetworkMonitor.statusChangedNotification, object: nil, queue: .main) { [weak self] _ in
             guard let self = self else { return }
             if !NetworkMonitor.shared.isReachable {
+                // If WebKit is actively playing an online song, do not interrupt it or overwrite metadata.
+                // WebKit buffers audio ahead and will continue smoothly through brief connection glitches.
+                if self.engineMode == .online && self.currentState.isPlaying {
+                    print("[NowPlayingManager] Network hiccup detected while online track is playing. Preserving playback.")
+                    return
+                }
                 print("[NowPlayingManager] Network went OFFLINE: switching to offline engine mode")
                 self.engineMode = .offline
                 if NativeAudioPlayer.shared.currentTrack == nil && !LocalLibraryManager.shared.allTracks.isEmpty {
                     NativeAudioPlayer.shared.primeLastOrFirstTrack()
+                }
+            } else {
+                // Network restored: if no offline audio is actively playing, restore online engine mode
+                if self.engineMode == .offline && !NativeAudioPlayer.shared.isPlaying {
+                    print("[NowPlayingManager] Network restored and offline audio idle. Restoring online engine mode.")
+                    self.engineMode = .online
+                    NotificationCenter.default.post(name: NSNotification.Name("Mooziac_EngineModeChanged"), object: nil, userInfo: ["mode": self.engineMode.rawValue])
                 }
             }
         }

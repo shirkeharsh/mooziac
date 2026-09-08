@@ -437,6 +437,13 @@ extension NowPlayingManager {
     public func playAutomixItem(at index: Int) {
         let js = """
         (function() {
+            window.__mooziacAutoplayPending = true;
+            window.__mooziacPlaybackSuppressed = false;
+            window.__mooziacBlockAutoplay = false;
+            window.__mooziacAutoplayAttempts = 0;
+            if (window.__mooziacAudioOutput && typeof window.__mooziacAudioOutput.prepare === 'function') {
+                window.__mooziacAudioOutput.prepare();
+            }
             try {
                 var targetIdx = \(index);
                 var nodes = Array.from(document.querySelectorAll('ytmusic-automix-preview-video-renderer')).filter(function(el) {
@@ -474,6 +481,13 @@ extension NowPlayingManager {
     public func playQueueItem(at index: Int) {
         let js = """
         (function() {
+            window.__mooziacAutoplayPending = true;
+            window.__mooziacPlaybackSuppressed = false;
+            window.__mooziacBlockAutoplay = false;
+            window.__mooziacAutoplayAttempts = 0;
+            if (window.__mooziacAudioOutput && typeof window.__mooziacAudioOutput.prepare === 'function') {
+                window.__mooziacAudioOutput.prepare();
+            }
             try {
                 var targetIdx = \(index);
                 function simulateClick(el) {

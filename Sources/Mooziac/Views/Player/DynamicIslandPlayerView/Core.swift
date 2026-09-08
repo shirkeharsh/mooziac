@@ -25,6 +25,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     let artworkImageView = NSImageView()
     let titleLabel = NSTextField(labelWithString: "Not Playing")
     let artistLabel = NSTextField(labelWithString: "YouTube Music")
+    let hqBadgeLabel = NSTextField(labelWithString: "HQ")
     
     let addToPlaylistButton = ReactiveIconButton()
     let previousButton = ReactiveIconButton()
@@ -123,6 +124,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     var createFieldStateToken: Int = 0
     var playlistBuildToken = 0
     var pendingRowBuilders: [() -> NSView] = []
+    var pendingRowItemIDs: [String] = []
     var playlistBuildStack: NSStackView?
     var playlistBuildChunkIndex = 0
     var playlistsStackTopConstraint: NSLayoutConstraint?
@@ -455,7 +457,27 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
             btn.setContentHuggingPriority(.required, for: .horizontal)
         }
         
-        let topRightStack = NSStackView(views: [downloadButton, fullScreenButton, browserButton])
+        hqBadgeLabel.translatesAutoresizingMaskIntoConstraints = false
+        hqBadgeLabel.font = NSFont.systemFont(ofSize: 8.5, weight: .bold)
+        hqBadgeLabel.textColor = NSColor(white: 0.95, alpha: 0.95)
+        hqBadgeLabel.backgroundColor = NSColor(white: 1.0, alpha: 0.14)
+        hqBadgeLabel.drawsBackground = true
+        hqBadgeLabel.wantsLayer = true
+        hqBadgeLabel.layer?.cornerRadius = 4
+        hqBadgeLabel.layer?.masksToBounds = true
+        hqBadgeLabel.layer?.borderWidth = 0.5
+        hqBadgeLabel.layer?.borderColor = NSColor(white: 1.0, alpha: 0.25).cgColor
+        hqBadgeLabel.alignment = .center
+        hqBadgeLabel.isEditable = false
+        hqBadgeLabel.isSelectable = false
+        hqBadgeLabel.refusesFirstResponder = true
+        hqBadgeLabel.isHidden = true
+        NSLayoutConstraint.activate([
+            hqBadgeLabel.widthAnchor.constraint(equalToConstant: 24),
+            hqBadgeLabel.heightAnchor.constraint(equalToConstant: 16)
+        ])
+        
+        let topRightStack = NSStackView(views: [hqBadgeLabel, downloadButton, fullScreenButton, browserButton])
         topRightStack.orientation = .horizontal
         topRightStack.spacing = 6
         topRightStack.alignment = .centerY
@@ -674,6 +696,17 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
                 artistLabel.stringValue = "YouTube Music"
                 artistLabel.toolTip = nil
             }
+        }
+
+        // 🛡️ Real-Time Audio Quality HQ Badge
+        let showHQ = state.isHighQualityStream && state.isPlaying
+        if hqBadgeLabel.isHidden == showHQ {
+            hqBadgeLabel.isHidden = !showHQ
+        }
+        if showHQ {
+            hqBadgeLabel.toolTip = state.currentAudioQuality
+        } else {
+            hqBadgeLabel.toolTip = nil
         }
 
         let playIcon = state.isPlaying ? "pause.fill" : "play.fill"
@@ -904,8 +937,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     }
     
     func expandSearchField() {
-        searchField.isHidden = false
-        searchField.alphaValue = 0.0
+        guard searchField.isHidden || searchField.alphaValue < 0.5 else { return }
         
         let xConfig = NSImage.SymbolConfiguration(pointSize: 14.3, weight: .bold)
         if let image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "Close Search")?.withSymbolConfiguration(xConfig) {
@@ -913,25 +945,29 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         }
         searchIconButton.toolTip = "Close Search"
         
+        searchField.alphaValue = 0.0
+        searchField.isHidden = false
+        
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.30
+            context.duration = 0.28
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             context.allowsImplicitAnimation = true
             
             self.controlsStackCenterX?.isActive = false
             self.controlsStackLeading?.isActive = true
-            self.searchField.animator().alphaValue = 1.0
-            
             self.containerPill.layoutSubtreeIfNeeded()
+            
+            self.searchField.animator().alphaValue = 1.0
         }, completionHandler: { [weak self] in
-            self?.window?.makeFirstResponder(self?.searchField)
+            guard let self = self else { return }
+            self.window?.makeFirstResponder(self.searchField)
         })
     }
     
     var isCollapsingSearch = false
     
     func collapseSearchField() {
-        guard !isCollapsingSearch else { return }
+        guard !isCollapsingSearch && (!searchField.isHidden || searchField.alphaValue > 0.05) else { return }
         isCollapsingSearch = true
         
         let searchConfig = NSImage.SymbolConfiguration(pointSize: 16.0, weight: .semibold)
@@ -940,23 +976,33 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         }
         searchIconButton.toolTip = "Search YouTube Music"
         
-        if window?.firstResponder == searchField {
+        // 1. Resign first responder cleanly if search field currently has focus
+        if let responder = window?.firstResponder as? NSView,
+           responder == searchField || responder.isDescendant(of: searchField) {
             window?.makeFirstResponder(nil)
         }
         
+        // 2. Fade out searchField quickly (0.10s) so it dissolves BEFORE controlsStack moves
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.28
-            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            context.allowsImplicitAnimation = true
-            
-            self.controlsStackLeading?.isActive = false
-            self.controlsStackCenterX?.isActive = true
+            context.duration = 0.10
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             self.searchField.animator().alphaValue = 0.0
-            
-            self.containerPill.layoutSubtreeIfNeeded()
         }, completionHandler: { [weak self] in
-            self?.searchField.isHidden = true
-            self?.isCollapsingSearch = false
+            guard let self = self else { return }
+            self.searchField.isHidden = true
+            
+            // 3. Now animate controlsStack back to center smoothly without search field squishing
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = 0.22
+                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                context.allowsImplicitAnimation = true
+                
+                self.controlsStackLeading?.isActive = false
+                self.controlsStackCenterX?.isActive = true
+                self.containerPill.layoutSubtreeIfNeeded()
+            }, completionHandler: { [weak self] in
+                self?.isCollapsingSearch = false
+            })
         })
     }
     
@@ -970,6 +1016,14 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     }
 
     public func showToastBanner(message: String, isWarning: Bool = false) {
+        // Never disturb the player with track playback or queue notifications
+        if !isWarning {
+            let lower = message.lowercased()
+            if message.hasPrefix("▶") || lower.contains("playing") || lower.contains("shuffling") {
+                return
+            }
+        }
+
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             self.toastDismissTimer?.invalidate()
@@ -977,7 +1031,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
             self.toastLabel.stringValue = message
             self.toastView.layer?.borderColor = isWarning ?
                 NSColor(red: 1.0, green: 0.40, blue: 0.40, alpha: 0.70).cgColor :
-                NSColor(red: 0.30, green: 0.85, blue: 0.40, alpha: 0.70).cgColor
+                NSColor(white: 1.0, alpha: 0.25).cgColor
             
             self.toastView.isHidden = false
             NSAnimationContext.runAnimationGroup { context in

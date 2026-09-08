@@ -83,10 +83,7 @@ extension NowPlayingManager {
     
     // Playback Controls Injection using native #movie_player API or NativeAudioPlayer
     func togglePlayPause() {
-        if engineMode == .offline || !NetworkMonitor.shared.isReachable {
-            if engineMode != .offline {
-                engineMode = .offline
-            }
+        if engineMode == .offline {
             if NativeAudioPlayer.shared.currentTrack == nil {
                 NativeAudioPlayer.shared.playLastOrFirstTrack()
                 return
@@ -116,6 +113,31 @@ extension NowPlayingManager {
 
         let js = """
         (function() {
+            var video = document.querySelector('video');
+            var isCurrentlyPlaying = video ? (!video.paused && !video.ended) : false;
+            var wantsPlay = !isCurrentlyPlaying;
+
+            window.__mooziacAutoplayPending = wantsPlay;
+            window.__mooziacPlaybackSuppressed = !wantsPlay;
+            if (wantsPlay) {
+                window.__mooziacBlockAutoplay = false;
+                window.__mooziacAutoplayAttempts = 0;
+                window.__mooziacAutoplayRetryScheduled = false;
+                if (window.__mooziacAudioOutput && typeof window.__mooziacAudioOutput.prepare === 'function') {
+                    window.__mooziacAudioOutput.prepare();
+                }
+                if (video && typeof window.__mooziacAttemptAutoplayRecovery === 'function') {
+                    var btn = document.querySelector('.play-pause-button.ytmusic-player-bar') ||
+                              document.querySelector('ytmusic-player-bar #play-pause-button') ||
+                              document.querySelector('#play-pause-button');
+                    window.__mooziacAttemptAutoplayRecovery(video, btn);
+                }
+            } else {
+                if (window.__mooziacAudioOutput && typeof window.__mooziacAudioOutput.stop === 'function') {
+                    window.__mooziacAudioOutput.stop();
+                }
+            }
+
             function triggerClick(element) {
                 if (!element) return false;
                 try {
@@ -218,12 +240,17 @@ extension NowPlayingManager {
     }
     
     func pause() {
-        if engineMode == .offline || !NetworkMonitor.shared.isReachable {
+        if engineMode == .offline {
             NativeAudioPlayer.shared.pause()
             return
         }
         let js = """
         (function() {
+            window.__mooziacAutoplayPending = false;
+            window.__mooziacPlaybackSuppressed = true;
+            if (window.__mooziacAudioOutput && typeof window.__mooziacAudioOutput.stop === 'function') {
+                window.__mooziacAudioOutput.stop();
+            }
             try {
                 var player = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
                 if (player && typeof player.pauseVideo === 'function') {
@@ -241,10 +268,7 @@ extension NowPlayingManager {
     }
     
     func play() {
-        if engineMode == .offline || !NetworkMonitor.shared.isReachable {
-            if engineMode != .offline {
-                engineMode = .offline
-            }
+        if engineMode == .offline {
             if NativeAudioPlayer.shared.currentTrack == nil {
                 NativeAudioPlayer.shared.playLastOrFirstTrack()
                 return
@@ -265,6 +289,22 @@ extension NowPlayingManager {
 
         let js = """
         (function() {
+            window.__mooziacAutoplayPending = true;
+            window.__mooziacPlaybackSuppressed = false;
+            window.__mooziacBlockAutoplay = false;
+            window.__mooziacAutoplayAttempts = 0;
+            window.__mooziacAutoplayRetryScheduled = false;
+            if (window.__mooziacAudioOutput && typeof window.__mooziacAudioOutput.prepare === 'function') {
+                window.__mooziacAudioOutput.prepare();
+            }
+            var video = document.querySelector('video');
+            if (video && typeof window.__mooziacAttemptAutoplayRecovery === 'function') {
+                var btn = document.querySelector('.play-pause-button.ytmusic-player-bar') ||
+                          document.querySelector('ytmusic-player-bar #play-pause-button') ||
+                          document.querySelector('#play-pause-button');
+                window.__mooziacAttemptAutoplayRecovery(video, btn);
+            }
+
             function triggerClick(element) {
                 if (!element) return false;
                 try {
@@ -320,7 +360,7 @@ extension NowPlayingManager {
                 var player = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
                 if (player && typeof player.getPlayerState === 'function') {
                     var state = player.getPlayerState();
-                    if (state === 2 || state === 3 || state === 5) {
+                    if (state === 2 || state === 3 || state === 5 || state === -1) {
                         player.playVideo();
                         return;
                     } else if (state === 1) {
@@ -356,10 +396,7 @@ extension NowPlayingManager {
             }
         }
 
-        if engineMode == .offline || !NetworkMonitor.shared.isReachable {
-            if engineMode != .offline {
-                engineMode = .offline
-            }
+        if engineMode == .offline {
             if NativeAudioPlayer.shared.currentTrack == nil {
                 NativeAudioPlayer.shared.playLastOrFirstTrack()
                 return
@@ -369,31 +406,51 @@ extension NowPlayingManager {
         }
         let js = """
         (function() {
+            window.__mooziacAutoplayPending = true;
+            window.__mooziacPlaybackSuppressed = false;
+            window.__mooziacBlockAutoplay = false;
+            window.__mooziacAutoplayAttempts = 0;
+            window.__mooziacAutoplayRetryScheduled = false;
+            if (window.__mooziacAudioOutput && typeof window.__mooziacAudioOutput.prepare === 'function') {
+                window.__mooziacAudioOutput.prepare();
+            }
+
             function simulateClick(el) {
                 if (!el) return false;
-                var targets = [
-                    el.querySelector('button'),
-                    el.querySelector('tp-yt-paper-icon-button'),
-                    el.querySelector('paper-icon-button'),
-                    el.querySelector('ytmusic-play-button-renderer'),
-                    el.querySelector('#play-button'),
-                    el.querySelector('.play-button'),
-                    el
-                ];
-                for (var i = 0; i < targets.length; i++) {
-                    var t = targets[i];
-                    if (t) {
-                        try {
-                            var opts = { bubbles: true, cancelable: true, view: window };
-                            t.dispatchEvent(new MouseEvent('mousedown', opts));
-                            t.dispatchEvent(new MouseEvent('mouseup', opts));
-                            t.dispatchEvent(new MouseEvent('click', opts));
-                            if (typeof t.click === 'function') t.click();
-                            return true;
-                        } catch(e) {}
+                var btn = el.querySelector('button') || el;
+                try {
+                    if (typeof btn.click === 'function') {
+                        btn.click();
+                        return true;
                     }
+                    var opts = { bubbles: true, cancelable: true, view: window };
+                    btn.dispatchEvent(new MouseEvent('mousedown', opts));
+                    btn.dispatchEvent(new MouseEvent('mouseup', opts));
+                    btn.dispatchEvent(new MouseEvent('click', opts));
+                    return true;
+                } catch(e) {
+                    try { btn.click(); return true; } catch(err) { return false; }
                 }
-                return false;
+            }
+
+            function ensurePlayingSoon() {
+                [250, 600, 1200].forEach(function(delay) {
+                    setTimeout(function() {
+                        try {
+                            var p = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
+                            if (p && typeof p.getPlayerState === 'function') {
+                                var state = p.getPlayerState();
+                                if (state === 2 || state === 5 || state === -1) {
+                                    if (typeof p.playVideo === 'function') p.playVideo();
+                                }
+                            }
+                            var v = document.querySelector('video');
+                            if (v && v.paused) {
+                                v.play().catch(function(){});
+                            }
+                        } catch(e) {}
+                    }, delay);
+                });
             }
 
             // Priority 1: Click YouTube Music's official player bar Next button
@@ -404,7 +461,10 @@ extension NowPlayingManager {
                               document.querySelector('tp-yt-paper-icon-button.next-button') ||
                               document.querySelector('button[aria-label*="Next"]') ||
                               document.querySelector('[title*="Next"]');
-                if (nextBtn && simulateClick(nextBtn)) return;
+                if (nextBtn && simulateClick(nextBtn)) {
+                    ensurePlayingSoon();
+                    return;
+                }
             } catch(e) {}
 
             // Priority 2: Click the next item in the DOM queue
@@ -426,6 +486,7 @@ extension NowPlayingManager {
                             if (queueResult && queueResult.tier > 0) {
                                 window.webkit.messageHandlers.nowPlayingHandler.postMessage({ selectorFallbackUsed: true, feature: "queue", tier: queueResult.tier });
                             }
+                            ensurePlayingSoon();
                             return;
                         }
                     }
@@ -437,6 +498,8 @@ extension NowPlayingManager {
                 var player = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
                 if (player && typeof player.nextVideo === 'function') {
                     player.nextVideo();
+                    if (typeof player.playVideo === 'function') player.playVideo();
+                    ensurePlayingSoon();
                     return;
                 }
             } catch(e) {}
@@ -452,10 +515,7 @@ extension NowPlayingManager {
             }
         }
 
-        if engineMode == .offline || !NetworkMonitor.shared.isReachable {
-            if engineMode != .offline {
-                engineMode = .offline
-            }
+        if engineMode == .offline {
             if NativeAudioPlayer.shared.currentTrack == nil {
                 NativeAudioPlayer.shared.playLastOrFirstTrack()
                 return
@@ -465,31 +525,51 @@ extension NowPlayingManager {
         }
         let js = """
         (function() {
+            window.__mooziacAutoplayPending = true;
+            window.__mooziacPlaybackSuppressed = false;
+            window.__mooziacBlockAutoplay = false;
+            window.__mooziacAutoplayAttempts = 0;
+            window.__mooziacAutoplayRetryScheduled = false;
+            if (window.__mooziacAudioOutput && typeof window.__mooziacAudioOutput.prepare === 'function') {
+                window.__mooziacAudioOutput.prepare();
+            }
+
             function simulateClick(el) {
                 if (!el) return false;
-                var targets = [
-                    el.querySelector('button'),
-                    el.querySelector('tp-yt-paper-icon-button'),
-                    el.querySelector('paper-icon-button'),
-                    el.querySelector('ytmusic-play-button-renderer'),
-                    el.querySelector('#play-button'),
-                    el.querySelector('.play-button'),
-                    el
-                ];
-                for (var i = 0; i < targets.length; i++) {
-                    var t = targets[i];
-                    if (t) {
-                        try {
-                            var opts = { bubbles: true, cancelable: true, view: window };
-                            t.dispatchEvent(new MouseEvent('mousedown', opts));
-                            t.dispatchEvent(new MouseEvent('mouseup', opts));
-                            t.dispatchEvent(new MouseEvent('click', opts));
-                            if (typeof t.click === 'function') t.click();
-                            return true;
-                        } catch(e) {}
+                var btn = el.querySelector('button') || el;
+                try {
+                    if (typeof btn.click === 'function') {
+                        btn.click();
+                        return true;
                     }
+                    var opts = { bubbles: true, cancelable: true, view: window };
+                    btn.dispatchEvent(new MouseEvent('mousedown', opts));
+                    btn.dispatchEvent(new MouseEvent('mouseup', opts));
+                    btn.dispatchEvent(new MouseEvent('click', opts));
+                    return true;
+                } catch(e) {
+                    try { btn.click(); return true; } catch(err) { return false; }
                 }
-                return false;
+            }
+
+            function ensurePlayingSoon() {
+                [250, 600, 1200].forEach(function(delay) {
+                    setTimeout(function() {
+                        try {
+                            var p = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
+                            if (p && typeof p.getPlayerState === 'function') {
+                                var state = p.getPlayerState();
+                                if (state === 2 || state === 5 || state === -1) {
+                                    if (typeof p.playVideo === 'function') p.playVideo();
+                                }
+                            }
+                            var v = document.querySelector('video');
+                            if (v && v.paused) {
+                                v.play().catch(function(){});
+                            }
+                        } catch(e) {}
+                    }, delay);
+                });
             }
 
             // Priority 1: Click YouTube Music's official player bar Previous button
@@ -500,7 +580,10 @@ extension NowPlayingManager {
                               document.querySelector('tp-yt-paper-icon-button.previous-button') ||
                               document.querySelector('button[aria-label*="Previous"]') ||
                               document.querySelector('[title*="Previous"]');
-                if (prevBtn && simulateClick(prevBtn)) return;
+                if (prevBtn && simulateClick(prevBtn)) {
+                    ensurePlayingSoon();
+                    return;
+                }
             } catch(e) {}
 
             // Priority 2: Click the previous item in the DOM queue
@@ -522,6 +605,7 @@ extension NowPlayingManager {
                             if (queueResult && queueResult.tier > 0) {
                                 window.webkit.messageHandlers.nowPlayingHandler.postMessage({ selectorFallbackUsed: true, feature: "queue", tier: queueResult.tier });
                             }
+                            ensurePlayingSoon();
                             return;
                         }
                     }
@@ -533,6 +617,8 @@ extension NowPlayingManager {
                 var player = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
                 if (player && typeof player.previousVideo === 'function') {
                     player.previousVideo();
+                    if (typeof player.playVideo === 'function') player.playVideo();
+                    ensurePlayingSoon();
                     return;
                 }
             } catch(e) {}
@@ -712,7 +798,7 @@ extension NowPlayingManager {
     }
     
     func toggleLike() {
-        if engineMode == .offline || !NetworkMonitor.shared.isReachable {
+        if engineMode == .offline {
             NativeAudioPlayer.shared.toggleLike()
             if let track = NativeAudioPlayer.shared.currentTrack {
                 LikedSongsManager.shared.mirrorOfflineLike(trackID: track.id)

@@ -148,6 +148,9 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
     }
 
     private func handleStateUpdate(_ state: PlaybackState) {
+        if state.isAd {
+            return
+        }
         self.lastState = state
 
         if isEnabled && state.isPlaying && !state.title.isEmpty && state.title != "Not Playing" {
@@ -163,11 +166,18 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
 
         guard isEnabled else { return }
 
-        let trackKey = state.trackID.isEmpty ? "\(state.title.lowercased())|\(state.artist.lowercased())" : "VID:" + state.trackID
+        let cleanTitle = LyricsManager.cleanSongInfo(state.title).lowercased()
+        let cleanArtist = LyricsManager.cleanSongInfo(state.artist).lowercased()
+        let trackKey = state.trackID.isEmpty ? "\(cleanTitle)|\(cleanArtist)" : "VID:\(state.trackID)|\(cleanTitle)"
+
         if trackKey != currentTrackKey && !state.title.isEmpty && state.title != "Not Playing" {
             currentTrackKey = trackKey
             currentLRCLines = []
             let requestKey = trackKey
+
+            // Immediately clear stale lyrics from previous song and show new track info
+            lyricsLabel.stringValue = ""
+            updateLyricsFrame()
 
             LyricsManager.shared.fetchLyrics(artist: state.artist, title: state.title, duration: state.duration, trackID: state.trackID) { [weak self] _, lrcLines in
                 // Silently discard completions that no longer belong to the displayed track
@@ -301,13 +311,22 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
         volumeOverlayTimer = nil
         isShowingVolumeOverlay = false
 
-        if !(isEnabled && lastState.isPlaying) && window?.isVisible == true {
+        if isEnabled && lastState.isPlaying && !lastState.title.isEmpty && lastState.title != "Not Playing" {
+            lyricsLabel.stringValue = ""
+            updateLyricsFrame()
+        } else if window?.isVisible == true {
             window?.orderOut(nil)
         }
     }
 
     public func repositionInCenter(contentWidth: CGFloat) {
-        guard let screen = NSScreen.main else { return }
+        let targetScreen: NSScreen? = {
+            if let buttonScreen = StatusItemManager.shared?.statusItem.button?.window?.screen {
+                return buttonScreen
+            }
+            return NSScreen.screens.first ?? NSScreen.main
+        }()
+        guard let screen = targetScreen else { return }
         let screenRect = screen.frame
         let visibleRect = screen.visibleFrame
         let menuBarHeight = max(24, screenRect.maxY - visibleRect.maxY)
