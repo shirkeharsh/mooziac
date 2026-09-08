@@ -231,7 +231,7 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
     }
 
     @objc private func starOnGitHubClicked(_ sender: NSButton) {
-        if let githubURL = URL(string: "https://github.com/\(repositoryOwner)/\(repositoryName)") {
+        if let githubURL = URL(string: "https://github.com/shirkeharsh/mooziac") {
             NSWorkspace.shared.open(githubURL)
         }
     }
