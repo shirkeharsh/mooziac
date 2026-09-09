@@ -1,0 +1,4 @@
+# Exclude build scripts and embedded offline assets from language statistics
+build_app.sh linguist-vendored linguist-detectable=false
+Resources/trackpad.html linguist-documentation linguist-detectable=false
+Resources/Terminal/** linguist-vendored linguist-detectable=false
