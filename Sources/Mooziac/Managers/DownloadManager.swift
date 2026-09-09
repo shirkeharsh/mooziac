@@ -75,12 +75,19 @@ public final class DownloadManager: NSObject {
         let musicDir = LocalLibraryManager.shared.musicFolderURL
         let folder = musicDir.appendingPathComponent(".downloading", isDirectory: true)
         if !FileManager.default.fileExists(atPath: folder.path) {
-            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            do {
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            } catch {
+                Log.download.error("Failed to create download cache directory: \(error.localizedDescription)")
+            }
         }
         return folder
     }
 
-    private override init() {
+    private let dependencyManager: DependencyManager
+
+    public init(dependencyManager: DependencyManager = DependencyManager()) {
+        self.dependencyManager = dependencyManager
         super.init()
         cleanupStaleDownloads()
         observeQueueChanges()
@@ -138,9 +145,7 @@ public final class DownloadManager: NSObject {
             )
         }
 
-        print(
-            "[DownloadManager] Resumed \(jobs.count) pending download(s) from previous session."
-        )
+        Log.download.info("Resumed \(jobs.count) pending download(s) from previous session")
     }
 
     // MARK: - Startup Stale Downloads Cleanup
@@ -150,13 +155,20 @@ public final class DownloadManager: NSObject {
             let baseDir = self.downloadingBaseURL
             guard FileManager.default.fileExists(atPath: baseDir.path) else { return }
 
-            if let subdirs = try? FileManager.default.contentsOfDirectory(at: baseDir, includingPropertiesForKeys: nil) {
+            do {
+                let subdirs = try FileManager.default.contentsOfDirectory(at: baseDir, includingPropertiesForKeys: nil)
                 for dir in subdirs {
                     if dir != self.currentActiveJobDirURL {
-                        try? FileManager.default.removeItem(at: dir)
-                        print("[DownloadManager] Cleaned stale download sandbox: \(dir.lastPathComponent)")
+                        do {
+                            try FileManager.default.removeItem(at: dir)
+                            Log.download.debug("Cleaned stale download sandbox: \(dir.lastPathComponent)")
+                        } catch {
+                            Log.download.warning("Failed to clean stale download sandbox \(dir.lastPathComponent): \(error.localizedDescription)")
+                        }
                     }
                 }
+            } catch {
+                Log.download.warning("Failed to inspect download sandbox directory: \(error.localizedDescription)")
             }
         }
     }
@@ -398,7 +410,7 @@ public final class DownloadManager: NSObject {
         queueLock.unlock()
         guard isActive, let process = process else { return }
 
-        print("[DownloadManager] Download timed out after \(Int(DownloadManager.downloadTimeout))s, terminating yt-dlp")
+        Log.download.error("Download timed out after \(Int(DownloadManager.downloadTimeout))s, terminating yt-dlp")
         let pid = process.processIdentifier
         kill(pid, SIGTERM)
         DispatchQueue.global().asyncAfter(deadline: .now() + 3.0) {
@@ -467,7 +479,7 @@ public final class DownloadManager: NSObject {
             self.onDownloadStatusChanged?(true, "Setting up helper...")
             self.broadcastProgress(id: task.id, videoId: videoId, title: cleanT, progress: 0.05, eta: "", speed: "Installing helper...", status: .downloading(progress: 0.05, eta: "", speed: "Installing helper..."))
             
-            DependencyManager.shared.installHelper(progress: { [weak self] pct in
+            self.dependencyManager.installHelper(progress: { [weak self] pct in
                 self?.broadcastProgress(id: task.id, videoId: videoId, title: cleanT, progress: pct, eta: "", speed: "\(Int(pct * 100))%", status: .downloading(progress: pct, eta: "", speed: "Helper Setup"))
             }) { [weak self] success, error in
                 guard let self = self else { return }
@@ -561,9 +573,9 @@ public final class DownloadManager: NSObject {
             guard success else {
                 cleanupJobDir(jobDir)
                 let errorMsg = DownloadManager.extractErrorMessage(from: allOutputLines) ?? "Download failed. Check connection."
-                print("[DownloadManager] yt-dlp failed (exit code \(process.terminationStatus)): \(errorMsg)")
+                Log.download.error("yt-dlp failed (exit code \(process.terminationStatus)): \(errorMsg)")
                 for l in allOutputLines.suffix(15) {
-                    print("[DownloadManager | yt-dlp] \(l)")
+                    Log.download.debug("yt-dlp: \(l)")
                 }
                 finishTask(task: task, success: false, message: errorMsg)
                 return
@@ -576,11 +588,16 @@ public final class DownloadManager: NSObject {
                 return
             }
 
-            // 3. Stage Artwork
+            // 3. Stage Artwork (best effort fetch)
             let tempArtworkURL = jobDir.appendingPathComponent("\(safeFilename).jpg")
             if !task.artworkUrl.isEmpty, let artURL = URL(string: task.artworkUrl), artURL.scheme?.hasPrefix("http") == true {
-                if let imgData = try? Data(contentsOf: artURL), !imgData.isEmpty {
-                    try? imgData.write(to: tempArtworkURL, options: .atomic)
+                do {
+                    let imgData = try Data(contentsOf: artURL)
+                    if !imgData.isEmpty {
+                        try imgData.write(to: tempArtworkURL, options: .atomic)
+                    }
+                } catch {
+                    Log.download.debug("Artwork staging skipped: \(error.localizedDescription)")
                 }
             }
 
@@ -597,9 +614,13 @@ public final class DownloadManager: NSObject {
 
                 if FileManager.default.fileExists(atPath: tempArtworkURL.path) {
                     if FileManager.default.fileExists(atPath: finalArtworkURL.path) {
-                        try? FileManager.default.removeItem(at: finalArtworkURL)
+                        try FileManager.default.removeItem(at: finalArtworkURL)
                     }
-                    try? FileManager.default.moveItem(at: tempArtworkURL, to: finalArtworkURL)
+                    do {
+                        try FileManager.default.moveItem(at: tempArtworkURL, to: finalArtworkURL)
+                    } catch {
+                        Log.download.warning("Could not persist artwork file: \(error.localizedDescription)")
+                    }
                 }
             } catch {
                 cleanupJobDir(jobDir)
@@ -614,10 +635,14 @@ public final class DownloadManager: NSObject {
                 LyricsManager.shared.fetchRawSyncedLRC(artist: cleanA, title: cleanT) { lrc in
                     guard let lrc = lrc, !lrc.isEmpty else { return }
                     DispatchQueue.global(qos: .utility).async {
-                        if FileManager.default.fileExists(atPath: finalLrcURL.path) {
-                            try? FileManager.default.removeItem(at: finalLrcURL)
+                        do {
+                            if FileManager.default.fileExists(atPath: finalLrcURL.path) {
+                                try FileManager.default.removeItem(at: finalLrcURL)
+                            }
+                            try lrc.write(to: finalLrcURL, atomically: true, encoding: .utf8)
+                        } catch {
+                            Log.download.warning("Could not persist synced lyrics: \(error.localizedDescription)")
                         }
-                        try? lrc.write(to: finalLrcURL, atomically: true, encoding: .utf8)
                     }
                 }
             }
@@ -844,7 +869,7 @@ public final class DownloadManager: NSObject {
         }
 
         // 0. Check Application Support / Mooziac helper location first
-        let helperPath = DependencyManager.shared.ytDlpExecutableURL.path
+        let helperPath = dependencyManager.ytDlpExecutableURL.path
         if FileManager.default.isExecutableFile(atPath: helperPath) {
             ytDlpPath = helperPath
             return helperPath
@@ -1039,7 +1064,11 @@ public final class DownloadManager: NSObject {
 
     // MARK: - Audio File Validation
     private func validateJobAudioFile(in jobDir: URL) -> URL? {
-        guard let items = try? FileManager.default.contentsOfDirectory(at: jobDir, includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey], options: [.skipsHiddenFiles]) else {
+        let items: [URL]
+        do {
+            items = try FileManager.default.contentsOfDirectory(at: jobDir, includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey], options: [.skipsHiddenFiles])
+        } catch {
+            Log.download.warning("Failed to inspect job directory for audio output: \(error.localizedDescription)")
             return nil
         }
 
@@ -1079,7 +1108,11 @@ public final class DownloadManager: NSObject {
             currentActiveJobDirURL = nil
         }
         if FileManager.default.fileExists(atPath: jobDir.path) {
-            try? FileManager.default.removeItem(at: jobDir)
+            do {
+                try FileManager.default.removeItem(at: jobDir)
+            } catch {
+                Log.download.warning("Failed to clean up job directory \(jobDir.lastPathComponent): \(error.localizedDescription)")
+            }
         }
     }
 

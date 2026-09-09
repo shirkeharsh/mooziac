@@ -2,52 +2,6 @@ import AppKit
 import WebKit
 import MediaPlayer
 
-// Loads artwork for the system media player from a remote URL, caching the
-// result keyed by the track's videoId (stable) so rotating YTM thumbnail
-// URLs reuse the same image, and refusing to apply a stale load once the
-// track has changed.
-private final class NowPlayingArtworkLoader {
-    static let shared = NowPlayingArtworkLoader()
-
-    private var inFlight = Set<String>()
-    private var currentKey = ""
-
-    func applyArtwork(urlString: String, videoId: String) {
-        let key = videoId.isEmpty ? urlString : videoId
-        currentKey = key
-        if let img = AppArtworkHelper.shared.getMemoryCachedImage(forKey: key) {
-            apply(img, key: key)
-            return
-        }
-        guard !inFlight.contains(key) else { return }
-        inFlight.insert(key)
-        guard let url = URL(string: urlString) else { return }
-        let request = URLRequest(url: url, cachePolicy: .returnCacheDataElseLoad, timeoutInterval: 15)
-        URLSession.shared.dataTask(with: request) { [weak self] data, _, error in
-            guard let self = self, let data = data, error == nil, let img = NSImage(data: data) else {
-                self?.inFlight.remove(key)
-                return
-            }
-            DispatchQueue.main.async {
-                AppArtworkHelper.shared.setMemoryCachedImage(img, forKey: key)
-                self.inFlight.remove(key)
-                self.apply(img, key: key)
-            }
-        }.resume()
-    }
-
-    func cancelCurrent() {
-        currentKey = ""
-    }
-
-    private func apply(_ img: NSImage, key: String) {
-        guard currentKey == key else { return }
-        let center = MPNowPlayingInfoCenter.default()
-        var info = center.nowPlayingInfo ?? [:]
-        info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: img.size) { _ in img }
-        center.nowPlayingInfo = info
-    }
-}
 
 extension NowPlayingManager {
     func updateSystemNowPlayingInfo(_ state: PlaybackState) {
@@ -453,6 +407,24 @@ extension NowPlayingManager {
                 });
             }
 
+            // Priority 0: If an ad is actively playing or interrupting, skip the ad immediately
+            try {
+                var mp = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
+                var isAd = !!(mp && mp.classList && (mp.classList.contains('ad-showing') || mp.classList.contains('ad-interrupting')));
+                if (isAd) {
+                    var skipBtns = document.querySelectorAll(
+                        '.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button, ' +
+                        '.ytp-ad-skip-button-container button, button.ytp-ad-skip-button-modern, ' +
+                        'button.ytp-skip-ad-button, button[aria-label*="Skip" i]'
+                    );
+                    for (var s = 0; s < skipBtns.length; s++) {
+                        try { skipBtns[s].click(); } catch(e) {}
+                    }
+                    ensurePlayingSoon();
+                    return;
+                }
+            } catch(e) {}
+
             // Priority 1: Click YouTube Music's official player bar Next button
             try {
                 var nextBtn = document.querySelector('ytmusic-player-bar .next-button') ||
@@ -806,7 +778,15 @@ extension NowPlayingManager {
             return
         }
         let desiredLiked = !currentState.isLiked
-        let videoId = currentState.videoId.isEmpty ? (DownloadManager.extractVideoID(from: currentState.pageUrl) ?? "") : currentState.videoId
+        var videoId = currentState.videoId.isEmpty ? (DownloadManager.extractVideoID(from: currentState.pageUrl) ?? "") : currentState.videoId
+        if videoId.isEmpty, let watchId = DownloadManager.extractVideoID(from: currentState.trackID) {
+            videoId = watchId
+        }
+
+        lastUserLikeToggleTime = CACurrentMediaTime()
+        lastUserToggledVideoId = videoId
+        lastUserDesiredLiked = desiredLiked
+
         if !videoId.isEmpty {
             LikedSongsManager.shared.recordOnlineLikeToggle(
                 desiredLiked: desiredLiked,
@@ -818,47 +798,62 @@ extension NowPlayingManager {
                 duration: currentState.duration
             )
         }
+
+        // Optimistically set like state so UI updates immediately and remains stable
+        currentState.isLiked = desiredLiked
+        observers.forEach { $0(currentState) }
+
+        // Also notify YTMClient via InnerTube if signed in
+        if LikedSongsManager.shared.isSignedIn, !videoId.isEmpty {
+            YTMClient.shared.like(videoId: videoId, liked: desiredLiked) { result in
+                switch result {
+                case .success:
+                    Log.sync.info("Successfully synced like=\(desiredLiked) for \(videoId) via InnerTube")
+                case .failure(let error):
+                    Log.sync.debug("InnerTube like sync error (DOM fallback will handle): \(error)")
+                }
+            }
+        }
+
         // Only click YTM's button when signed in, so likes reach the account.
         guard LikedSongsManager.shared.isSignedIn else {
-            // Signed out: keep the optimistic heart state consistent in the app.
-            currentState.isLiked = desiredLiked
-            observers.forEach { $0(currentState) }
             return
         }
         let js = """
         (function() {
             var playerBar = document.querySelector('ytmusic-player-bar') || document.querySelector('#player-bar');
-            var likeRenderer = playerBar ? (playerBar.querySelector('ytmusic-like-button-renderer') || playerBar.querySelector('#like-button-renderer')) : null;
-            var likeResult = null;
-            if (likeRenderer && typeof mooziacQuery === 'function') {
-                likeResult = mooziacQuery(['#button-shape-like button, .like-button'], likeRenderer);
-            }
-            if (!likeResult && likeRenderer) {
-                var btns = likeRenderer.querySelectorAll('button');
-                for (var i = 0; i < btns.length; i++) {
-                    var label = (btns[i].getAttribute('aria-label') || btns[i].getAttribute('title') || '').toLowerCase();
-                    if (!label.includes('dislike') && (label.includes('like') || label.includes('thumbs up'))) {
-                        likeResult = { element: btns[i], tier: 1 };
+            if (!playerBar) return;
+            var likeRenderer = playerBar.querySelector('ytmusic-like-button-renderer') || playerBar.querySelector('#like-button-renderer');
+            if (!likeRenderer) return;
+
+            var likeBtn = likeRenderer.querySelector('#button-shape-like button, .like-button');
+            if (!likeBtn) {
+                var candidates = likeRenderer.querySelectorAll('button, tp-yt-paper-icon-button, yt-icon-button');
+                for (var i = 0; i < candidates.length; i++) {
+                    var c = candidates[i];
+                    var label = (c.getAttribute('aria-label') || c.getAttribute('title') || '').toLowerCase();
+                    if (label.includes('dislike')) continue;
+                    if (label.includes('like') || label.includes('thumbs up') || label.includes('undo') || label.includes('remove')) {
+                        likeBtn = c;
                         break;
                     }
                 }
             }
-            if (!likeResult && typeof mooziacQuery === 'function') {
-                likeResult = mooziacQuery([
-                    'ytmusic-like-button-renderer button[aria-label*="Like"], #like-button-renderer button[aria-label*="Like"]',
-                    'button[aria-label="Like"], button[aria-label*="thumbs up"]'
-                ]);
-                if (likeResult) {
-                    var lbl = (likeResult.element.getAttribute('aria-label') || likeResult.element.getAttribute('title') || '').toLowerCase();
-                    if (lbl.includes('dislike')) likeResult = null;
+            if (!likeBtn) {
+                var allBtns = likeRenderer.querySelectorAll('button');
+                for (var j = 0; j < allBtns.length; j++) {
+                    var lbl = (allBtns[j].getAttribute('aria-label') || '').toLowerCase();
+                    if (!lbl.includes('dislike')) {
+                        likeBtn = allBtns[j];
+                        break;
+                    }
                 }
             }
-            if (likeResult) {
-                likeResult.element.click();
-                if (likeResult.tier > 0) {
-                    window.webkit.messageHandlers.nowPlayingHandler.postMessage({ selectorFallbackUsed: true, feature: "like", tier: likeResult.tier });
-                }
-                setTimeout(function() { if (typeof updateNowPlaying === 'function') updateNowPlaying(true); }, 250);
+            if (likeBtn) {
+                likeBtn.click();
+                setTimeout(function() {
+                    if (typeof updateNowPlaying === 'function') updateNowPlaying(true);
+                }, 600);
             }
         })();
         """

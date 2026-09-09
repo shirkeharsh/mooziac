@@ -3,8 +3,14 @@ import QuartzCore
 import ImageIO
 
 extension DynamicIslandPlayerView {
-    func loadArtwork(urlStr: String) {
+    func loadArtwork(urlStr: String, trackKey: String = "", isNewTrack: Bool = false) {
         guard let url = URL(string: urlStr) else { return }
+
+        let resolvedTrackKey = trackKey.isEmpty ? lastArtworkTrackID : trackKey
+
+        // Cancel previous in-flight artwork request so previous song doesn't overwrite new song
+        currentArtworkDataTask?.cancel()
+        currentArtworkDataTask = nil
 
         if let cached = AppArtworkHelper.shared.getMemoryCachedImage(forKey: urlStr) {
             applyArtworkAnimation { [weak self] in self?.artworkImageView.image = cached }
@@ -14,25 +20,35 @@ extension DynamicIslandPlayerView {
             return
         }
 
+        // If it's a new track, immediately clear the previous song's image so it doesn't linger
+        if isNewTrack {
+            self.artworkImageView.image = AppArtworkHelper.defaultArtwork
+        }
+
         let request = URLRequest(url: url, cachePolicy: .returnCacheDataElseLoad, timeoutInterval: 15)
-        URLSession.shared.dataTask(with: request) { [weak self] data, _, error in
+        let task = URLSession.shared.dataTask(with: request) { [weak self] data, _, error in
             guard let self = self, let artworkData = data, error == nil else { return }
 
-            let options: [CFString: Any] = [
-                kCGImageSourceCreateThumbnailFromImageAlways: true,
-                kCGImageSourceCreateThumbnailWithTransform: true,
-                kCGImageSourceThumbnailMaxPixelSize: 128
-            ]
-            guard let source = CGImageSourceCreateWithData(artworkData as CFData, nil),
-                  let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return }
-            let thumbnail = NSImage(cgImage: cgImage, size: NSSize(width: 44, height: 44))
-
             DispatchQueue.main.async {
+                // Ensure this artwork response still matches the currently active track and URL
+                guard self.lastArtworkTrackID == resolvedTrackKey && self.lastArtworkUrl == urlStr else { return }
+
+                let options: [CFString: Any] = [
+                    kCGImageSourceCreateThumbnailFromImageAlways: true,
+                    kCGImageSourceCreateThumbnailWithTransform: true,
+                    kCGImageSourceThumbnailMaxPixelSize: 128
+                ]
+                guard let source = CGImageSourceCreateWithData(artworkData as CFData, nil),
+                      let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return }
+                let thumbnail = NSImage(cgImage: cgImage, size: NSSize(width: 44, height: 44))
+
                 AppArtworkHelper.shared.setMemoryCachedImage(thumbnail, forKey: urlStr)
                 self.applyArtworkAnimation { self.artworkImageView.image = thumbnail }
                 self.updateAmbientGlow(cgImage: cgImage)
             }
-        }.resume()
+        }
+        currentArtworkDataTask = task
+        task.resume()
     }
 
     func applyArtworkAnimation(_ updates: @escaping () -> Void) {

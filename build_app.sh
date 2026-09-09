@@ -9,8 +9,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-APP_VERSION="1.1.4"
-APP_BUILD="14"
+APP_VERSION="1.1.5"
+APP_BUILD="15"
 APP_NAME="Mooziac.app"
 APP_BUNDLE_ID="app.mooziac.mac"
 APP_COPYRIGHT="Copyright © 2026 ThreeTen. All rights reserved."
@@ -47,7 +47,7 @@ Version $APP_VERSION (Build $APP_BUILD)
 $APP_COPYRIGHT"
 
 echo "=========================================="
-echo "      🚀 Mooziac All-in-One Build         "
+echo "      Mooziac All-in-One Build            "
 echo "      Version: $APP_VERSION ($APP_BUILD)  "
 echo "=========================================="
 
@@ -81,18 +81,18 @@ echo "    [1/2] Compiling Apple Silicon (arm64)..."
 if swift build --triple arm64-apple-macosx -c release --product Mooziac && \
    echo "    [2/2] Compiling Intel (x86_64)..." && \
    swift build --triple x86_64-apple-macosx -c release --product Mooziac; then
-    echo "    ✔ Merging arm64 and x86_64 into Universal 2 binary via lipo..."
+    echo "    Merging arm64 and x86_64 into Universal 2 binary via lipo..."
     lipo -create -output "$UNIVERSAL_BIN" "$ARM_BIN" "$INTEL_BIN"
     BIN_PATH="$UNIVERSAL_BIN"
 else
-    echo "    ⚠️ Universal build failed. Compiling for native architecture..."
+    echo "    Universal build failed. Compiling for native architecture..."
     swift build -c release --product Mooziac
     BIN_DIR=$(swift build -c release --show-bin-path)
     BIN_PATH="$BIN_DIR/Mooziac"
 fi
 
 if [ ! -f "$BIN_PATH" ]; then
-    echo "❌ Error: Mooziac binary not found at $BIN_PATH"
+    echo "Error: Mooziac binary not found at $BIN_PATH"
     exit 1
 fi
 
@@ -304,7 +304,7 @@ ZIP_SIZE=$(du -h "$DIST_DIR/$ZIP_NAME" | cut -f1 | tr -d ' ')
 
 echo ""
 echo "=========================================="
-echo "  🎉 Mooziac Build Complete!"
+echo "  Mooziac Build Complete"
 echo "=========================================="
 echo "  • Version:        $APP_VERSION (Build $APP_BUILD)"
 echo "  • Bundle ID:      $APP_BUNDLE_ID"

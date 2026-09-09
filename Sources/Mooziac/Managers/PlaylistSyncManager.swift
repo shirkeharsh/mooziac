@@ -67,7 +67,7 @@ public final class PlaylistSyncManager {
             }
             switch result {
             case .failure(let error):
-                print("[PlaylistSyncManager] Pull: failed to fetch account playlists: \(error)")
+                Log.sync.error("Pull: failed to fetch account playlists: \(error)")
                 self.pullLikedSongs(completion: completion)
             case .success(let playlists):
                 self.importPlaylists(playlists) {
@@ -101,7 +101,7 @@ public final class PlaylistSyncManager {
         YTMClient.shared.fetchTracks(browseId: summary.browseId) { result in
             switch result {
             case .failure(let error):
-                print("[PlaylistSyncManager] Pull: failed to fetch tracks for '\(summary.title)': \(error)")
+                Log.sync.error("Pull: failed to fetch tracks for '\(summary.title)': \(error)")
                 completion()
             case .success(let tracks):
                 let currentItems = LocalDatabaseManager.shared.fetchPlaylistItems(playlistID: localID)
@@ -128,7 +128,7 @@ public final class PlaylistSyncManager {
                     added += 1
                 }
                 if added > 0 {
-                    print("[PlaylistSyncManager] Pull: imported \(added) new track(s) into '\(summary.title)'")
+                    Log.sync.info("Pull: imported \(added) new track(s) into '\(summary.title)'")
                 }
                 completion()
             }
@@ -144,7 +144,7 @@ public final class PlaylistSyncManager {
             defer { self.isPullInProgress = false }
             switch result {
             case .failure(let error):
-                print("[PlaylistSyncManager] Pull: failed to fetch liked songs: \(error)")
+                Log.sync.error("Pull: failed to fetch liked songs: \(error)")
                 completion()
             case .success(let tracks):
                 let now = Date().timeIntervalSince1970
@@ -166,7 +166,10 @@ public final class PlaylistSyncManager {
                     added += 1
                 }
                 if added > 0 {
-                    print("[PlaylistSyncManager] Pull: imported \(added) liked song(s)")
+                    Log.sync.info("Pull: imported \(added) liked song(s)")
+                    DispatchQueue.main.async {
+                        NotificationCenter.default.post(name: LikedSongsManager.likedSongsUpdatedNotification, object: nil)
+                    }
                 }
                 completion()
             }
@@ -214,13 +217,13 @@ public final class PlaylistSyncManager {
             }
             switch result {
             case .failure(let error):
-                print("[PlaylistSyncManager] Push: failed to create playlist '\(playlist.name)': \(error)")
+                Log.sync.error("Push: failed to create playlist '\(playlist.name)': \(error)")
                 // Left unsynced so a later run retries it.
                 self.pushUnsyncedPlaylists(remaining: nextList, completion: completion)
             case .success(let plId):
                 LocalDatabaseManager.shared.setPlaylistYTMID(id: playlist.id, ytPlaylistId: plId)
                 LocalDatabaseManager.shared.setPlaylistSynced(id: playlist.id)
-                print("[PlaylistSyncManager] Push: created YTM playlist '\(playlist.name)' (\(plId))")
+                Log.sync.info("Push: created YTM playlist '\(playlist.name)' (\(plId))")
                 self.pushUnsyncedPlaylists(remaining: nextList, completion: completion)
             }
         }
@@ -254,7 +257,7 @@ public final class PlaylistSyncManager {
             }
             switch result {
             case .failure(let error):
-                print("[PlaylistSyncManager] Push: failed to fetch remote tracks for '\(playlist.name)': \(error)")
+                Log.sync.error("Push: failed to fetch remote tracks for '\(playlist.name)': \(error)")
                 self.pushDirtySyncedPlaylists(remaining: nextList, completion: completion)
             case .success(let remoteTracks):
                 let remoteVids = Set(remoteTracks.map { $0.videoId })
@@ -266,10 +269,10 @@ public final class PlaylistSyncManager {
                     }
                     switch result {
                     case .failure(let error):
-                        print("[PlaylistSyncManager] Push: failed to add tracks to '\(playlist.name)': \(error)")
+                        Log.sync.error("Push: failed to add tracks to '\(playlist.name)': \(error)")
                     case .success:
                         if !missing.isEmpty {
-                            print("[PlaylistSyncManager] Push: added \(missing.count) track(s) to YTM playlist '\(playlist.name)'")
+                            Log.sync.info("Push: added \(missing.count) track(s) to YTM playlist '\(playlist.name)'")
                         }
                         LocalDatabaseManager.shared.setPlaylistSynced(id: playlist.id)
                     }
@@ -299,7 +302,7 @@ public final class PlaylistSyncManager {
             }
             switch result {
             case .failure(let error):
-                print("[PlaylistSyncManager] Push: failed to like '\(record.title)': \(error)")
+                Log.sync.error("Push: failed to like '\(record.title)': \(error)")
             case .success:
                 LocalDatabaseManager.shared.setLikedSongSynced(videoId: record.videoId)
             }

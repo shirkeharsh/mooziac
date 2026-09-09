@@ -91,7 +91,11 @@ public final class AppArtworkHelper {
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: NSTemporaryDirectory())
         let folder = caches.appendingPathComponent("Mooziac/Thumbnails", isDirectory: true)
         if !FileManager.default.fileExists(atPath: folder.path) {
-            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            do {
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            } catch {
+                Log.general.error("Failed to create thumbnail cache directory: \(error.localizedDescription)")
+            }
         }
         return folder
     }
@@ -101,6 +105,7 @@ public final class AppArtworkHelper {
         var effectiveTimestamp = dateAdded.timeIntervalSince1970
         let jpgSidecar = fileURL.deletingPathExtension().appendingPathExtension("jpg")
         let pngSidecar = fileURL.deletingPathExtension().appendingPathExtension("png")
+        // Intentionally try? because artwork sidecars are optional and commonly absent
         if let jpgDate = (try? jpgSidecar.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate {
             effectiveTimestamp = max(effectiveTimestamp, jpgDate.timeIntervalSince1970)
         } else if let pngDate = (try? pngSidecar.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate {
@@ -145,7 +150,11 @@ public final class AppArtworkHelper {
             memoryCache.removeObject(forKey: key as NSString)
             let diskURL = thumbnailCacheFolderURL.appendingPathComponent("\(key).jpg")
             if FileManager.default.fileExists(atPath: diskURL.path) {
-                try? FileManager.default.removeItem(at: diskURL)
+                do {
+                    try FileManager.default.removeItem(at: diskURL)
+                } catch {
+                    Log.general.warning("Failed to remove cached thumbnail file: \(error.localizedDescription)")
+                }
             }
         }
     }
@@ -306,6 +315,10 @@ public final class AppArtworkHelper {
               let jpegData = bitmapRep.representation(using: .jpeg, properties: [.compressionFactor: 0.85]) else {
             return
         }
-        try? jpegData.write(to: diskURL, options: .atomic)
+        do {
+            try jpegData.write(to: diskURL, options: .atomic)
+        } catch {
+            Log.general.warning("Failed to write thumbnail to disk: \(error.localizedDescription)")
+        }
     }
 }

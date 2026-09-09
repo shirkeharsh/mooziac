@@ -2,8 +2,6 @@ import Foundation
 import AppKit
 
 public final class DependencyManager: NSObject, URLSessionDownloadDelegate {
-    public static let shared = DependencyManager()
-
     public let binDirectory: URL
     public let ytDlpExecutableURL: URL
 
@@ -12,14 +10,18 @@ public final class DependencyManager: NSObject, URLSessionDownloadDelegate {
     private var completionCallback: ((Bool, String?) -> Void)?
     private var isInstalling: Bool = false
 
-    private override init() {
+    public override init() {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let mooziacDir = appSupport.appendingPathComponent("Mooziac", isDirectory: true)
         self.binDirectory = mooziacDir.appendingPathComponent("bin", isDirectory: true)
         self.ytDlpExecutableURL = binDirectory.appendingPathComponent("yt-dlp")
         super.init()
 
-        try? FileManager.default.createDirectory(at: binDirectory, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(at: binDirectory, withIntermediateDirectories: true)
+        } catch {
+            Log.general.error("Failed to create bin directory: \(error.localizedDescription)")
+        }
     }
 
     public var isHelperInstalled: Bool {
@@ -82,7 +84,7 @@ public final class DependencyManager: NSObject, URLSessionDownloadDelegate {
         didFinishDownloadingTo location: URL
     ) {
         do {
-            try? FileManager.default.createDirectory(at: binDirectory, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: binDirectory, withIntermediateDirectories: true)
 
             if FileManager.default.fileExists(atPath: ytDlpExecutableURL.path) {
                 try FileManager.default.removeItem(at: ytDlpExecutableURL)
@@ -96,7 +98,7 @@ public final class DependencyManager: NSObject, URLSessionDownloadDelegate {
                 ofItemAtPath: ytDlpExecutableURL.path
             )
 
-            // Strip quarantine attribute if macOS added it
+            // Strip quarantine attribute if macOS added it (best effort)
             let xattrProcess = Process()
             xattrProcess.executableURL = URL(fileURLWithPath: "/usr/bin/xattr")
             xattrProcess.arguments = ["-d", "com.apple.quarantine", ytDlpExecutableURL.path]

@@ -185,29 +185,82 @@ public final class PlaylistManager: NSObject {
     }
 
     public func reorderItems(playlistID: String, orderedItemIDs: [String]) {
-        LocalDatabaseManager.shared.reorderPlaylistItems(playlistID: playlistID, orderedItemIDs: orderedItemIDs)
-        markSyncedDirtyIfNeeded(playlistID: playlistID)
-        invalidateSummary(for: playlistID)
+        if playlistID != "liked_songs" && playlistID != "downloads" {
+            LocalDatabaseManager.shared.reorderPlaylistItems(playlistID: playlistID, orderedItemIDs: orderedItemIDs)
+            markSyncedDirtyIfNeeded(playlistID: playlistID)
+            invalidateSummary(for: playlistID)
+        } else if playlistID == "liked_songs" {
+            UserDefaults.standard.set(orderedItemIDs, forKey: "MooziacLikedSongsCustomOrder")
+        } else if playlistID == "downloads" {
+            UserDefaults.standard.set(orderedItemIDs, forKey: "MooziacDownloadsCustomOrder")
+        }
+
         if var ctx = activeContext, ctx.playlistID == playlistID {
-            let currentTrackID = (ctx.currentIndex >= 0 && ctx.currentIndex < ctx.items.count) ? ctx.items[ctx.currentIndex].id : nil
+            let anchorID: String?
+            if let existingAnchor = currentAnchorTrackID {
+                anchorID = existingAnchor
+            } else if NowPlayingManager.shared.engineMode == .offline {
+                if let local = NativeAudioPlayer.shared.currentTrack {
+                    anchorID = ctx.items.first(where: {
+                        if case .local(let t) = resolve($0) {
+                            return t.id == local.id || t.fileURL == local.fileURL
+                        }
+                        return false
+                    })?.id ?? ((ctx.currentIndex >= 0 && ctx.currentIndex < ctx.items.count) ? ctx.items[ctx.currentIndex].id : nil)
+                } else {
+                    anchorID = (ctx.currentIndex >= 0 && ctx.currentIndex < ctx.items.count) ? ctx.items[ctx.currentIndex].id : nil
+                }
+            } else {
+                let vid = NowPlayingManager.shared.currentState.videoId
+                if !vid.isEmpty {
+                    anchorID = ctx.items.first(where: {
+                        ($0.ytVideoId != nil && $0.ytVideoId == vid) || $0.refID == vid
+                    })?.id ?? ((ctx.currentIndex >= 0 && ctx.currentIndex < ctx.items.count) ? ctx.items[ctx.currentIndex].id : nil)
+                } else {
+                    anchorID = (ctx.currentIndex >= 0 && ctx.currentIndex < ctx.items.count) ? ctx.items[ctx.currentIndex].id : nil
+                }
+            }
+
             var itemMap: [String: PlaylistItemRecord] = [:]
             itemMap.reserveCapacity(ctx.items.count)
-            for item in ctx.items { itemMap[item.id] = item }
+            for item in ctx.items {
+                itemMap[item.id] = item
+                if !item.refID.isEmpty { itemMap[item.refID] = item }
+                if let vid = item.ytVideoId, !vid.isEmpty { itemMap[vid] = item }
+            }
+
             var reorderedItems: [PlaylistItemRecord] = []
             reorderedItems.reserveCapacity(orderedItemIDs.count)
+            var seen = Set<String>()
             for id in orderedItemIDs {
-                if let it = itemMap[id] { reorderedItems.append(it) }
+                if let it = itemMap[id], !seen.contains(it.id) {
+                    seen.insert(it.id)
+                    reorderedItems.append(it)
+                }
             }
+            for item in ctx.items {
+                if !seen.contains(item.id) {
+                    seen.insert(item.id)
+                    reorderedItems.append(item)
+                }
+            }
+
             if reorderedItems.count == ctx.items.count {
                 ctx.items = reorderedItems
-            } else {
+            } else if playlistID != "liked_songs" && playlistID != "downloads" {
                 ctx.items = fetchPlaylistItems(playlistID: playlistID)
             }
-            if let curID = currentTrackID, let newIdx = ctx.items.firstIndex(where: { $0.id == curID }) {
+
+            if let aID = anchorID, let newIdx = ctx.items.firstIndex(where: {
+                $0.id == aID || $0.refID == aID || (aID.count == 11 && $0.ytVideoId == aID)
+            }) {
                 ctx.currentIndex = newIdx
+                currentAnchorTrackID = ctx.items[newIdx].id
             }
+
             rebuildLocalQueue(for: &ctx)
             activeContext = ctx
+
             if NowPlayingManager.shared.engineMode == .offline && !ctx.localQueue.isEmpty {
                 NativeAudioPlayer.shared.updateQueueOrder(newOrder: ctx.localQueue)
             }
@@ -609,6 +662,20 @@ public final class PlaylistManager: NSObject {
                let track = index.byVideoId[vid] {
                 return .local(track)
             }
+            if FileManager.default.fileExists(atPath: item.refID) {
+                let url = URL(fileURLWithPath: item.refID)
+                let t = LocalTrack(
+                    id: item.id,
+                    title: item.title,
+                    artist: item.artist,
+                    album: "",
+                    duration: 0,
+                    fileURL: url,
+                    isLiked: item.isLiked,
+                    ytVideoId: item.ytVideoId
+                )
+                return .local(t)
+            }
             return .unavailable
         }
 
@@ -627,8 +694,22 @@ public final class PlaylistManager: NSObject {
             if NowPlayingManager.shared.engineMode == .online && NetworkMonitor.shared.isReachable {
                 return .online(videoId: vid)
             }
-            if let track = index.byVideoId[vid] ?? index.byId[vid] {
+            if let track = index.byVideoId[vid] ?? index.byId[vid] ?? index.byFilePath[vid] {
                 return .local(track)
+            }
+            if FileManager.default.fileExists(atPath: vid) {
+                let url = URL(fileURLWithPath: vid)
+                let t = LocalTrack(
+                    id: item.id,
+                    title: item.title,
+                    artist: item.artist,
+                    album: "",
+                    duration: 0,
+                    fileURL: url,
+                    isLiked: item.isLiked,
+                    ytVideoId: item.ytVideoId
+                )
+                return .local(t)
             }
             if NetworkMonitor.shared.isReachable {
                 return .online(videoId: vid)
@@ -764,6 +845,7 @@ public final class PlaylistManager: NSObject {
     }
 
     public private(set) var activeContext: ActivePlaylistPlaybackContext?
+    public private(set) var currentAnchorTrackID: String?
 
     public var hasActiveContext: Bool {
         return activeContext != nil
@@ -771,7 +853,14 @@ public final class PlaylistManager: NSObject {
 
     public func clearActiveContext() {
         activeContext = nil
+        currentAnchorTrackID = nil
     }
+
+    #if DEBUG
+    public func setActiveContextForTesting(_ ctx: ActivePlaylistPlaybackContext?) {
+        activeContext = ctx
+    }
+    #endif
 
     private func buildLocalQueue(for items: [PlaylistItemRecord], index: PlaylistLibraryIndex) -> (queue: [LocalTrack], map: [String: Int]) {
         var queue: [LocalTrack] = []
@@ -820,6 +909,7 @@ public final class PlaylistManager: NSObject {
             localQueue: localQueue,
             localQueueIndexByItemID: localMap
         )
+        currentAnchorTrackID = items[startIndex].id
 
         playTrackAtCurrentContextIndex()
     }
@@ -827,14 +917,22 @@ public final class PlaylistManager: NSObject {
     public func startLikedSongsPlayback(records: [LikedSongRecord], startingAt videoId: String? = nil, shuffle: Bool = false) {
         guard !records.isEmpty else { return }
 
+        let allLocal = LocalLibraryManager.shared.allTracks
         var items: [PlaylistItemRecord] = records.enumerated().map { index, record in
             let durStr = record.duration > 0 ? "\(Int(record.duration) / 60):\(String(format: "%02d", Int(record.duration) % 60))" : ""
+            let localTrack = allLocal.first(where: {
+                ($0.ytVideoId != nil && $0.ytVideoId == record.videoId) || $0.fileURL.path == record.videoId || $0.id == record.videoId
+            })
+            let isLocal = record.sourceType == "local" || localTrack != nil
+            let refType = isLocal ? "local" : "yt"
+            let refID = localTrack?.fileURL.path ?? record.videoId
+
             return PlaylistItemRecord(
                 id: record.videoId,
                 playlistID: "liked_songs",
                 sortOrder: index,
-                refType: "yt",
-                refID: record.videoId,
+                refType: refType,
+                refID: refID,
                 ytVideoId: record.videoId,
                 title: record.title,
                 artist: record.artist,
@@ -846,8 +944,8 @@ public final class PlaylistManager: NSObject {
         }
 
         if shuffle {
-            if let startID = videoId, let startItem = items.first(where: { $0.id == startID || $0.ytVideoId == startID }) {
-                items.removeAll(where: { $0.id == startID || $0.ytVideoId == startID })
+            if let startID = videoId, let startItem = items.first(where: { $0.id == startID || $0.ytVideoId == startID || $0.refID == startID }) {
+                items.removeAll(where: { $0.id == startID || $0.ytVideoId == startID || $0.refID == startID })
                 items.shuffle()
                 items.insert(startItem, at: 0)
             } else {
@@ -856,7 +954,7 @@ public final class PlaylistManager: NSObject {
         }
 
         var startIndex = 0
-        if let startID = videoId, !shuffle, let idx = items.firstIndex(where: { $0.id == startID || $0.ytVideoId == startID }) {
+        if let startID = videoId, !shuffle, let idx = items.firstIndex(where: { $0.id == startID || $0.ytVideoId == startID || $0.refID == startID }) {
             startIndex = idx
         }
 
@@ -869,6 +967,57 @@ public final class PlaylistManager: NSObject {
             localQueue: localQueue,
             localQueueIndexByItemID: localMap
         )
+        currentAnchorTrackID = items[startIndex].id
+
+        playTrackAtCurrentContextIndex()
+    }
+
+    public func startDownloadsPlayback(tracks: [LocalTrack], startingAt trackID: String? = nil, shuffle: Bool = false) {
+        guard !tracks.isEmpty else { return }
+
+        var items: [PlaylistItemRecord] = tracks.enumerated().map { index, track in
+            let durStr = PlaylistManager.formattedDuration(track.duration)
+            return PlaylistItemRecord(
+                id: track.id,
+                playlistID: "downloads",
+                sortOrder: index,
+                refType: "local",
+                refID: track.fileURL.path,
+                ytVideoId: track.ytVideoId,
+                title: track.title,
+                artist: track.artist,
+                artworkUrl: track.artworkURL?.path ?? "",
+                duration: durStr,
+                isLiked: track.isLiked,
+                dateAdded: track.dateAdded.timeIntervalSince1970
+            )
+        }
+
+        if shuffle {
+            if let startID = trackID, let startItem = items.first(where: { $0.id == startID || $0.refID == startID }) {
+                items.removeAll(where: { $0.id == startID || $0.refID == startID })
+                items.shuffle()
+                items.insert(startItem, at: 0)
+            } else {
+                items.shuffle()
+            }
+        }
+
+        var startIndex = 0
+        if let startID = trackID, !shuffle, let idx = items.firstIndex(where: { $0.id == startID || $0.refID == startID }) {
+            startIndex = idx
+        }
+
+        let index = libraryIndex()
+        let (localQueue, localMap) = buildLocalQueue(for: items, index: index)
+        activeContext = ActivePlaylistPlaybackContext(
+            playlistID: "downloads",
+            items: items,
+            currentIndex: startIndex,
+            localQueue: localQueue,
+            localQueueIndexByItemID: localMap
+        )
+        currentAnchorTrackID = items[startIndex].id
 
         playTrackAtCurrentContextIndex()
     }
@@ -876,10 +1025,13 @@ public final class PlaylistManager: NSObject {
     public func playTrackAtCurrentContextIndex() {
         guard let ctx = activeContext, ctx.currentIndex >= 0, ctx.currentIndex < ctx.items.count else {
             activeContext = nil
+            currentAnchorTrackID = nil
             return
         }
 
         let item = ctx.items[ctx.currentIndex]
+        currentAnchorTrackID = item.id
+
         switch resolve(item, index: libraryIndex()) {
         case .local(let track):
             let localIdx = ctx.localQueueIndexByItemID[item.id] ?? 0
@@ -904,19 +1056,34 @@ public final class PlaylistManager: NSObject {
             return true
         }
         guard var ctx = activeContext else { return false }
-        let nextIndex = ctx.currentIndex + 1
+
+        let currentPos: Int
+        if let anchorID = currentAnchorTrackID,
+           let idx = ctx.items.firstIndex(where: { $0.id == anchorID || $0.refID == anchorID || (anchorID.count == 11 && $0.ytVideoId == anchorID) }) {
+            currentPos = idx
+        } else {
+            currentPos = ctx.currentIndex
+        }
+
+        let nextIndex = currentPos + 1
         if nextIndex < ctx.items.count {
             ctx.currentIndex = nextIndex
             activeContext = ctx
             playTrackAtCurrentContextIndex()
             return true
+        } else if NowPlayingManager.shared.engineMode == .offline && !ctx.items.isEmpty {
+            ctx.currentIndex = 0
+            activeContext = ctx
+            playTrackAtCurrentContextIndex()
+            return true
         } else {
-            // Playlist has ended with Repeat OFF -> Let Infinite Flow take over smoothly
+            // Collection has ended with Repeat OFF -> Let Infinite Flow take over smoothly if online
             let lastItem = (ctx.currentIndex >= 0 && ctx.currentIndex < ctx.items.count) ? ctx.items[ctx.currentIndex] : nil
             let seedVid = lastItem?.ytVideoId ?? (lastItem?.refID.count == 11 ? lastItem?.refID : nil)
             activeContext = nil
+            currentAnchorTrackID = nil
 
-            if let vid = seedVid, !vid.isEmpty {
+            if let vid = seedVid, !vid.isEmpty, NetworkMonitor.shared.isReachable, NowPlayingManager.shared.engineMode == .online {
                 triggerInfiniteFlow(seededFrom: vid)
                 return true
             }
@@ -927,9 +1094,23 @@ public final class PlaylistManager: NSObject {
     @discardableResult
     public func playPreviousTrackInPlaylist() -> Bool {
         guard var ctx = activeContext else { return false }
-        let prevIndex = ctx.currentIndex - 1
+
+        let currentPos: Int
+        if let anchorID = currentAnchorTrackID,
+           let idx = ctx.items.firstIndex(where: { $0.id == anchorID || $0.refID == anchorID || (anchorID.count == 11 && $0.ytVideoId == anchorID) }) {
+            currentPos = idx
+        } else {
+            currentPos = ctx.currentIndex
+        }
+
+        let prevIndex = currentPos - 1
         if prevIndex >= 0 {
             ctx.currentIndex = prevIndex
+            activeContext = ctx
+            playTrackAtCurrentContextIndex()
+            return true
+        } else if !ctx.items.isEmpty {
+            ctx.currentIndex = ctx.items.count - 1
             activeContext = ctx
             playTrackAtCurrentContextIndex()
             return true
@@ -949,20 +1130,19 @@ public final class PlaylistManager: NSObject {
     // MARK: - Infinite Flow (Never-Ending Autoplay)
     private var lastInfiniteFlowTimestamp: TimeInterval = 0
 
-    public func triggerInfiniteFlow(seededFrom videoId: String) {
-        guard !videoId.isEmpty else { return }
+    public func triggerInfiniteFlow(seededFrom videoId: String = "") {
         guard NetworkMonitor.shared.isReachable else { return }
         guard NowPlayingManager.shared.engineMode == .online else { return }
         guard NowPlayingManager.shared.repeatMode == .off else { return }
 
         let now = CACurrentMediaTime()
-        guard now - lastInfiniteFlowTimestamp > 3.0 else {
-            print("[InfiniteFlow] Cooldown active (3s), skipping duplicate trigger")
+        guard now - lastInfiniteFlowTimestamp > 2.5 else {
+            Log.playback.debug("InfiniteFlow cooldown active, skipping duplicate trigger")
             return
         }
         lastInfiniteFlowTimestamp = now
 
-        print("[InfiniteFlow] Playlist/Queue ended. Seamlessly starting Infinite Flow radio for videoId: \(videoId)")
+        Log.playback.info("Track ended. Triggering auto-advance/Infinite Flow (seed: '\(videoId)')")
         DispatchQueue.main.async {
             guard let mainVC = StatusItemManager.shared?.mainViewController else { return }
             mainVC.webViewContainer.triggerInfiniteFlow(seededFrom: videoId)

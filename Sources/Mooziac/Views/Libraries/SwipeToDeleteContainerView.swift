@@ -57,6 +57,7 @@ public class SwipeContentCardView: NSView {
     private var initialOffset: CGFloat = 0.0
     private var isMouseDragging = false
     private var dragThresholdPassed = false
+    private var didInitiateRowClick = false
 
     public override var isFlipped: Bool { return true }
 
@@ -78,6 +79,7 @@ public class SwipeContentCardView: NSView {
 
         // If clicking a dedicated child button (like Options or Like), let the button handle it
         if isInteractiveButton(hitView) {
+            didInitiateRowClick = false
             if let container = container, container.isSwipedOpen {
                 container.close(animated: true)
                 return
@@ -87,6 +89,7 @@ public class SwipeContentCardView: NSView {
         }
 
         guard let container = container else {
+            didInitiateRowClick = false
             super.mouseDown(with: event)
             return
         }
@@ -95,6 +98,7 @@ public class SwipeContentCardView: NSView {
         initialOffset = container.currentOffset
         isMouseDragging = false
         dragThresholdPassed = false
+        didInitiateRowClick = true
 
         // If already open, intercept click so mouseUp snaps it closed
         if container.isSwipedOpen {
@@ -118,10 +122,13 @@ public class SwipeContentCardView: NSView {
             if abs(deltaX) >= 3.0 && abs(deltaX) > (abs(deltaY) * 0.7) {
                 isMouseDragging = true
                 dragThresholdPassed = true
+                didInitiateRowClick = false
                 SwipeActionCoordinator.shared.closeAll(except: container)
                 container.beginDragging()
             } else if abs(deltaY) > 6.0 {
-                // Predominantly vertical drag -> forward to table view for scrolling
+                // Predominantly vertical drag -> forward to table view for scrolling or reordering
+                dragThresholdPassed = true
+                didInitiateRowClick = false
                 super.mouseDragged(with: event)
                 return
             }
@@ -141,6 +148,9 @@ public class SwipeContentCardView: NSView {
             return
         }
 
+        let shouldTriggerClick = didInitiateRowClick && !isMouseDragging && !container.isSwipedOpen && !dragThresholdPassed
+        didInitiateRowClick = false
+
         let localPoint = convert(event.locationInWindow, from: nil)
         let hitView = hitTest(localPoint)
 
@@ -155,8 +165,8 @@ public class SwipeContentCardView: NSView {
         } else if container.isSwipedOpen {
             // Clicking open row closes it with smooth fade away
             container.close(animated: true)
-        } else if !dragThresholdPassed {
-            // Normal click without dragging
+        } else if shouldTriggerClick {
+            // Normal click on row card without dragging or child buttons
             container.onRowClicked?()
         }
     }

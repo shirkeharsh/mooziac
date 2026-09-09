@@ -153,11 +153,14 @@ final class DiscordRPCManager {
             }
         }
         
-        if let subdirs = try? fm.contentsOfDirectory(atPath: tmpDir) {
+        do {
+            let subdirs = try fm.contentsOfDirectory(atPath: tmpDir)
             for sub in subdirs where sub.hasPrefix("discord-ipc-") {
                 let full = (tmpDir as NSString).appendingPathComponent(sub)
                 if fm.fileExists(atPath: full) { return full }
             }
+        } catch {
+            Log.general.debug("Unable to scan temporary directory for Discord socket: \(error.localizedDescription)")
         }
         
         return nil
@@ -417,11 +420,15 @@ final class DiscordRPCManager {
             "nonce": UUID().uuidString
         ]
         
-        if let data = try? JSONSerialization.data(withJSONObject: payload),
-           let jsonString = String(data: data, encoding: .utf8) {
-            if !sendFrame(opcode: .frame, payload: jsonString) {
-                closeSocketInternal()
+        do {
+            let data = try JSONSerialization.data(withJSONObject: payload)
+            if let jsonString = String(data: data, encoding: .utf8) {
+                if !sendFrame(opcode: .frame, payload: jsonString) {
+                    closeSocketInternal()
+                }
             }
+        } catch {
+            Log.general.error("Failed to serialize Discord activity payload: \(error.localizedDescription)")
         }
     }
     
@@ -442,11 +449,15 @@ final class DiscordRPCManager {
             ],
             "nonce": UUID().uuidString
         ]
-        if let data = try? JSONSerialization.data(withJSONObject: payload),
-           let jsonString = String(data: data, encoding: .utf8) {
-            if !sendFrame(opcode: .frame, payload: jsonString) {
-                closeSocketInternal()
+        do {
+            let data = try JSONSerialization.data(withJSONObject: payload)
+            if let jsonString = String(data: data, encoding: .utf8) {
+                if !sendFrame(opcode: .frame, payload: jsonString) {
+                    closeSocketInternal()
+                }
             }
+        } catch {
+            Log.general.error("Failed to serialize Discord clear payload: \(error.localizedDescription)")
         }
     }
 }

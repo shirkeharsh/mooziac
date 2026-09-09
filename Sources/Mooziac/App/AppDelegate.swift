@@ -4,6 +4,8 @@ import AppKit
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItemManager: StatusItemManager?
     private var signInObserver: NSObjectProtocol?
+    private let backgroundMediaController = BackgroundMediaController()
+    private var launchAnimationController: LaunchAnimationController?
 
     static func main() {
         let app = NSApplication.shared
@@ -42,7 +44,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         // Prevent music audio playback from stopping when display locks/sleeps
-        BackgroundMediaController.shared.startPreventingSleep()
+        backgroundMediaController.startPreventingSleep()
 
         // Initialize Trackpad Right-Edge Volume Control (0.01mm edge)
         EdgeVolumeEngine.shared.start()
@@ -64,7 +66,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItemManager = StatusItemManager()
         
         // Play visual launch animation (haptic feedback & sound disabled)
-        LaunchAnimationController.shared.play()
+        let animationController = LaunchAnimationController()
+        animationController.play()
+        self.launchAnimationController = animationController
 
         setupAutoSync()
 
@@ -82,7 +86,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         LikedSongsManager.shared.refreshSignInStatus()
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
-            guard let self = self, PlaylistSyncManager.shared.isSignedIn else { return }
+            guard self != nil, PlaylistSyncManager.shared.isSignedIn else { return }
             PlaylistSyncManager.shared.syncNow()
         }
 
@@ -121,7 +125,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        BackgroundMediaController.shared.stopPreventingSleep()
+        backgroundMediaController.stopPreventingSleep()
         if let observer = signInObserver {
             NotificationCenter.default.removeObserver(observer)
             signInObserver = nil

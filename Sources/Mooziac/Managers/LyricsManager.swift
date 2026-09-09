@@ -252,20 +252,27 @@ public final class LyricsManager {
         localLrcCandidates.append(titleOnlyFromMusic)
 
         // Confident match any .lrc file in ~/Music/Mooziac (no arbitrary substring matches)
-        if let items = try? FileManager.default.contentsOfDirectory(at: musicFolder, includingPropertiesForKeys: nil) {
+        do {
+            let items = try FileManager.default.contentsOfDirectory(at: musicFolder, includingPropertiesForKeys: nil)
             for item in items where item.pathExtension.lowercased() == "lrc" {
                 let fname = item.deletingPathExtension().lastPathComponent.lowercased()
                 if confidentLRCNameMatch(fname: fname, cleanTitle: cleanTitle.lowercased(), cleanArtist: cleanArtist.lowercased()) {
                     localLrcCandidates.append(item)
                 }
             }
+        } catch {
+            Log.playback.debug("Unable to inspect music folder for local lyrics: \(error.localizedDescription)")
         }
 
         // Tier 0.5: Check Local Cache directory (~/Library/Caches/Mooziac/Lyrics/)
         let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?.appendingPathComponent("Mooziac/Lyrics", isDirectory: true)
         let cacheFilename = strongCacheFilename(trackID: trackID, cleanTitle: cleanTitle, cleanArtist: cleanArtist, duration: duration)
         if let cacheDir = cacheDir {
-            try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
+            do {
+                try FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
+            } catch {
+                Log.playback.warning("Unable to create lyrics cache directory: \(error.localizedDescription)")
+            }
             localLrcCandidates.append(cacheDir.appendingPathComponent(cacheFilename))
             if !trackID.isEmpty {
                 let sanitize: (String) -> String = { s in
@@ -276,6 +283,7 @@ public final class LyricsManager {
         }
 
         for candidate in localLrcCandidates {
+            // Intentionally try? because candidate file might be invalid or non-UTF8 encoded
             if FileManager.default.fileExists(atPath: candidate.path),
                let lrcContent = try? String(contentsOf: candidate, encoding: .utf8),
                !lrcContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -292,8 +300,12 @@ public final class LyricsManager {
                         if !titleTokens.isEmpty && !cachedTokens.isEmpty {
                             let sim = self.jaccard(titleTokens, cachedTokens)
                             if sim < 0.4 {
-                                print("[LyricsManager] Evicting stale/mismatched LRC cache: \(candidate.lastPathComponent) (cached: '\(cachedTi)' vs track: '\(cleanTitle)')")
-                                try? FileManager.default.removeItem(at: candidate)
+                                Log.playback.debug("Evicting stale/mismatched LRC cache: \(candidate.lastPathComponent)")
+                                do {
+                                    try FileManager.default.removeItem(at: candidate)
+                                } catch {
+                                    Log.playback.warning("Unable to remove stale LRC cache: \(error.localizedDescription)")
+                                }
                                 continue
                             }
                         }
@@ -302,7 +314,7 @@ public final class LyricsManager {
 
                 let parsedLines = SyncedLyricsParser.parse(lrcText: lrcContent)
                 if !parsedLines.isEmpty {
-                    print("[LyricsManager] Found local offline LRC file: \(candidate.lastPathComponent) with \(parsedLines.count) lines")
+                    Log.playback.debug("Found local offline LRC file: \(candidate.lastPathComponent) with \(parsedLines.count) lines")
                     self.currentLRCLines = parsedLines
                     let cleanText = lrcContent.replacingOccurrences(of: "\\[\\d+:\\d+[\\.:]?\\d*\\]", with: "", options: .regularExpression)
                     DispatchQueue.main.async {
@@ -315,7 +327,7 @@ public final class LyricsManager {
         }
         
         guard NetworkMonitor.shared.isReachable else {
-            print("[LyricsManager] Offline: skipping network lyrics fetch")
+            Log.playback.debug("Offline: skipping network lyrics fetch")
             completion("Offline: Internet connection required for lyrics", [])
             return
         }
@@ -490,13 +502,17 @@ public final class LyricsManager {
         guard !lrcText.isEmpty else { return }
         let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?.appendingPathComponent("Mooziac/Lyrics", isDirectory: true)
         if let cacheDir = cacheDir {
-            try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
-            let cachedLrcURL = cacheDir.appendingPathComponent(filename)
-            var textToSave = lrcText
-            if !textToSave.contains("[ti:") && !title.isEmpty {
-                textToSave = "[ti:\(title)]\n[ar:\(artist)]\n" + textToSave
+            do {
+                try FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
+                let cachedLrcURL = cacheDir.appendingPathComponent(filename)
+                var textToSave = lrcText
+                if !textToSave.contains("[ti:") && !title.isEmpty {
+                    textToSave = "[ti:\(title)]\n[ar:\(artist)]\n" + textToSave
+                }
+                try textToSave.write(to: cachedLrcURL, atomically: true, encoding: .utf8)
+            } catch {
+                Log.playback.warning("Failed to save lyrics to cache file: \(error.localizedDescription)")
             }
-            try? textToSave.write(to: cachedLrcURL, atomically: true, encoding: .utf8)
         }
     }
 

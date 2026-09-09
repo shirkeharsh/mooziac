@@ -207,6 +207,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     
     var lastArtworkUrl = ""
     var lastArtworkTrackID = ""
+    var currentArtworkDataTask: URLSessionDataTask?
     var lastTrackTitle = ""
     var lastTrackArtist = ""
 
@@ -248,7 +249,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         }
         if let savedArt = UserDefaults.standard.string(forKey: "YTM_lastArtwork"), !savedArt.isEmpty {
             lastArtworkUrl = savedArt
-            loadArtwork(urlStr: savedArt)
+            loadArtwork(urlStr: savedArt, trackKey: lastArtworkTrackID)
         }
         
         let savedIsLiked = UserDefaults.standard.bool(forKey: "YTM_lastIsLiked")
@@ -758,10 +759,11 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
             // changes even when the image is identical.
             if !state.artworkUrl.isEmpty {
                 let trackKey = state.videoId.isEmpty ? state.artworkUrl : state.videoId
-                if trackKey != lastArtworkTrackID || self.artworkImageView.image == nil {
+                if trackKey != lastArtworkTrackID || state.artworkUrl != lastArtworkUrl || self.artworkImageView.image == nil {
+                    let isNew = (trackKey != lastArtworkTrackID)
                     lastArtworkTrackID = trackKey
                     lastArtworkUrl = state.artworkUrl
-                    loadArtwork(urlStr: state.artworkUrl)
+                    loadArtwork(urlStr: state.artworkUrl, trackKey: trackKey, isNewTrack: isNew)
                 }
             } else if self.artworkImageView.image == nil {
                 self.artworkImageView.image = AppArtworkHelper.defaultArtwork

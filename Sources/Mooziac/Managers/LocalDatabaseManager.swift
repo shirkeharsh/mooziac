@@ -198,7 +198,11 @@ public final class LocalDatabaseManager {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: NSHomeDirectory())
         let folder = appSupport.appendingPathComponent("Mooziac", isDirectory: true)
         if !FileManager.default.fileExists(atPath: folder.path) {
-            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            do {
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            } catch {
+                Log.database.error("Failed to create database directory: \(error.localizedDescription)")
+            }
         }
         return folder.appendingPathComponent("library.sqlite3")
     }
@@ -220,7 +224,7 @@ public final class LocalDatabaseManager {
 
         let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX
         if sqlite3_open_v2(path, &dbPointer, flags, nil) != SQLITE_OK {
-            print("[LocalDatabaseManager] Failed to open SQLite database at \(path)")
+            Log.database.error("Failed to open SQLite database at \(path)")
             recoverCorruptDatabase()
             return
         }
@@ -253,22 +257,36 @@ public final class LocalDatabaseManager {
             .appendingPathComponent("\(Int(Date().timeIntervalSince1970))",
                                     isDirectory: true)
 
-        try? FileManager.default.createDirectory(
-            at: backupDir,
-            withIntermediateDirectories: true
-        )
-
-        if let dbData = try? Data(contentsOf: baseURL) {
-            try? dbData.write(
-                to: backupDir.appendingPathComponent(baseURL.lastPathComponent)
+        do {
+            try FileManager.default.createDirectory(
+                at: backupDir,
+                withIntermediateDirectories: true
             )
+            if FileManager.default.fileExists(atPath: baseURL.path) {
+                let dbData = try Data(contentsOf: baseURL)
+                try dbData.write(
+                    to: backupDir.appendingPathComponent(baseURL.lastPathComponent)
+                )
+            }
+        } catch {
+            Log.database.error("Failed to backup corrupt database: \(error.localizedDescription)")
         }
 
-        try? FileManager.default.removeItem(at: baseURL)
-        try? FileManager.default.removeItem(at: walURL)
-        try? FileManager.default.removeItem(at: shmURL)
+        do {
+            if FileManager.default.fileExists(atPath: baseURL.path) {
+                try FileManager.default.removeItem(at: baseURL)
+            }
+            if FileManager.default.fileExists(atPath: walURL.path) {
+                try FileManager.default.removeItem(at: walURL)
+            }
+            if FileManager.default.fileExists(atPath: shmURL.path) {
+                try FileManager.default.removeItem(at: shmURL)
+            }
+        } catch {
+            Log.database.error("Failed to remove corrupt database files: \(error.localizedDescription)")
+        }
 
-        print("[LocalDatabaseManager] Rebuilding database from scratch...")
+        Log.database.info("Rebuilding database from scratch")
 
         var dbPointer: OpaquePointer?
         let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX
@@ -384,7 +402,7 @@ public final class LocalDatabaseManager {
         """
         if executeRaw(sql: schema) {
             setUserVersion(2)
-            print("[LocalDatabaseManager] Schema migrated to v2 (playlists + yt_video_id)")
+            Log.database.info("Schema migrated to v2 (playlists + yt_video_id)")
         }
     }
 
@@ -408,7 +426,7 @@ public final class LocalDatabaseManager {
         """
         if executeRaw(sql: schema) {
             setUserVersion(3)
-            print("[LocalDatabaseManager] Schema migrated to v3 (listening_history)")
+            Log.database.info("Schema migrated to v3 (listening_history)")
         }
     }
 
@@ -429,7 +447,7 @@ public final class LocalDatabaseManager {
         """
         if executeRaw(sql: schema) {
             setUserVersion(4)
-            print("[LocalDatabaseManager] Schema migrated to v4 (liked_songs)")
+            Log.database.info("Schema migrated to v4 (liked_songs)")
         }
     }
 
@@ -446,7 +464,7 @@ public final class LocalDatabaseManager {
         }
         executeRaw(sql: "CREATE INDEX IF NOT EXISTS idx_playlists_yt_playlist_id ON playlists(yt_playlist_id);")
         setUserVersion(5)
-        print("[LocalDatabaseManager] Schema migrated to v5 (YTM sync columns)")
+        Log.database.info("Schema migrated to v5 (YTM sync columns)")
     }
 
     private func getUserVersion() -> Int32 {
@@ -472,7 +490,7 @@ public final class LocalDatabaseManager {
         if sqlite3_exec(db, sql, nil, nil, &errMsg) != SQLITE_OK {
             if let errMsg = errMsg {
                 let errStr = String(cString: errMsg)
-                print("[LocalDatabaseManager] SQL Error: \(errStr) in SQL: \(sql)")
+                Log.database.error("SQL Error: \(errStr) in SQL: \(sql)")
                 sqlite3_free(errMsg)
             }
             return false
@@ -588,7 +606,7 @@ public final class LocalDatabaseManager {
 
             if sqlite3_step(stmt) != SQLITE_DONE {
                 let msg = String(cString: sqlite3_errmsg(db))
-                print("[LocalDatabaseManager] step failed: \(msg)")
+                Log.database.error("step failed: \(msg)")
             }
         }
 
@@ -632,7 +650,7 @@ public final class LocalDatabaseManager {
                 }
                 if sqlite3_step(cleanupStmt) != SQLITE_DONE {
                     let msg = String(cString: sqlite3_errmsg(db))
-                    print("[LocalDatabaseManager] step failed: \(msg)")
+                    Log.database.error("step failed: \(msg)")
                 }
             }
 
@@ -641,7 +659,7 @@ public final class LocalDatabaseManager {
             sqlite3_bind_text(stmt, 1, (path as NSString).utf8String, -1, SQLITE_TRANSIENT)
             if sqlite3_step(stmt) != SQLITE_DONE {
                 let msg = String(cString: sqlite3_errmsg(db))
-                print("[LocalDatabaseManager] step failed: \(msg)")
+                Log.database.error("step failed: \(msg)")
             }
         }
 
@@ -655,13 +673,14 @@ public final class LocalDatabaseManager {
     // MARK: - Toggle / Set Liked
     public func setLiked(filePath: String, isLiked: Bool) {
         guard let db = db else { return }
-        let sql = "UPDATE tracks SET is_liked = ? WHERE file_path = ? OR id = ?;"
+        let sql = "UPDATE tracks SET is_liked = ? WHERE file_path = ? OR id = ? OR (yt_video_id = ? AND yt_video_id != '');"
         var stmt: OpaquePointer?
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
             let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
             sqlite3_bind_int(stmt, 1, isLiked ? 1 : 0)
             sqlite3_bind_text(stmt, 2, (filePath as NSString).utf8String, -1, SQLITE_TRANSIENT)
             sqlite3_bind_text(stmt, 3, (filePath as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(stmt, 4, (filePath as NSString).utf8String, -1, SQLITE_TRANSIENT)
             sqlite3_step(stmt)
         }
         sqlite3_finalize(stmt)
@@ -669,13 +688,14 @@ public final class LocalDatabaseManager {
 
     public func isLiked(filePath: String) -> Bool {
         guard let db = db else { return false }
-        let sql = "SELECT is_liked FROM tracks WHERE file_path = ? OR id = ? LIMIT 1;"
+        let sql = "SELECT is_liked FROM tracks WHERE file_path = ? OR id = ? OR (yt_video_id = ? AND yt_video_id != '') LIMIT 1;"
         var stmt: OpaquePointer?
         var liked = false
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
             let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
             sqlite3_bind_text(stmt, 1, (filePath as NSString).utf8String, -1, SQLITE_TRANSIENT)
             sqlite3_bind_text(stmt, 2, (filePath as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(stmt, 3, (filePath as NSString).utf8String, -1, SQLITE_TRANSIENT)
             if sqlite3_step(stmt) == SQLITE_ROW {
                 liked = sqlite3_column_int(stmt, 0) == 1
             }
@@ -694,7 +714,7 @@ public final class LocalDatabaseManager {
             for key in legacyKeys {
                 setLiked(filePath: key, isLiked: true)
             }
-            print("[LocalDatabaseManager] Successfully migrated \(legacyKeys.count) liked tracks from UserDefaults to SQLite")
+            Log.database.info("Successfully migrated \(legacyKeys.count) liked tracks from UserDefaults to SQLite")
         }
         UserDefaults.standard.set(true, forKey: migrationKey)
     }
@@ -1036,7 +1056,7 @@ public final class LocalDatabaseManager {
             sqlite3_bind_text(delStmt, 1, (playlistID as NSString).utf8String, -1, SQLITE_TRANSIENT)
             if sqlite3_step(delStmt) != SQLITE_DONE {
                 let msg = String(cString: sqlite3_errmsg(db))
-                print("[LocalDatabaseManager] step failed: \(msg)")
+                Log.database.error("step failed: \(msg)")
             }
         }
         sqlite3_finalize(delStmt)
@@ -1064,7 +1084,7 @@ public final class LocalDatabaseManager {
                 sqlite3_bind_double(insStmt, 12, item.dateAdded)
                 if sqlite3_step(insStmt) != SQLITE_DONE {
                     let msg = String(cString: sqlite3_errmsg(db))
-                    print("[LocalDatabaseManager] step failed: \(msg)")
+                    Log.database.error("step failed: \(msg)")
                 }
             }
         }
@@ -1120,7 +1140,7 @@ public final class LocalDatabaseManager {
 
     public func reorderPlaylistItems(playlistID: String, orderedItemIDs: [String]) {
         guard let db = db else { return }
-        let sql = "UPDATE playlist_items SET sort_order = ? WHERE id = ? AND playlist_id = ? AND sort_order != ?;"
+        let sql = "UPDATE playlist_items SET sort_order = ? WHERE id = ? AND playlist_id = ?;"
         var stmt: OpaquePointer?
         executeRaw(sql: "BEGIN TRANSACTION;")
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
@@ -1131,7 +1151,6 @@ public final class LocalDatabaseManager {
                 sqlite3_bind_int(stmt, 1, Int32(index))
                 sqlite3_bind_text(stmt, 2, (itemID as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_text(stmt, 3, (playlistID as NSString).utf8String, -1, SQLITE_TRANSIENT)
-                sqlite3_bind_int(stmt, 4, Int32(index))
                 sqlite3_step(stmt)
             }
         }

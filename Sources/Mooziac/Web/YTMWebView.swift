@@ -111,7 +111,10 @@ enum WebPlaybackAudioOutput {
             if (video && !video.paused && !video.ended && video.readyState >= 3) start();
             else releaseAfterTransition();
         });
-        mediaObserver.observe(document, { childList: true, subtree: true });
+        const targetNode = document.querySelector('ytmusic-player') || document.getElementById('player') || document.body;
+        if (targetNode) {
+            mediaObserver.observe(targetNode, { childList: true });
+        }
         window.addEventListener('pagehide', () => {
             mediaObserver.disconnect();
             stop();
@@ -156,11 +159,102 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         config.defaultWebpagePreferences = prefs
         
         if #available(macOS 14.0, *) {
-            config.preferences.inactiveSchedulingPolicy = .none
+            config.preferences.inactiveSchedulingPolicy = .throttle
         }
         config.preferences.setValue(false, forKey: "developerExtrasEnabled")
         
-        // 🛡️ Page Visibility Shield: Prevents YouTube Music from pausing when the menu bar window is dismissed
+        // YouTube Ad Shield Bootstrap Script (atDocumentStart, mainFrameOnly):
+        // Uses a Function.prototype.toString mask to remain undetected by YouTube's anti-adblock,
+        // and prunes ad placements in-place from ytInitialPlayerResponse, Response.prototype.json,
+        // and JSON.parse across SPA track transitions.
+        let adShieldScript = WKUserScript(
+            source: """
+            (function() {
+                'use strict';
+                try {
+                    var _toString = Function.prototype.toString;
+                    var _masks = new WeakMap();
+                    function mask(hooked, original) { try { _masks.set(hooked, original); } catch(e) {} return hooked; }
+                    var patchedToString = function toString() {
+                        var orig = _masks.get(this);
+                        return _toString.call(orig !== undefined ? orig : this);
+                    };
+                    mask(patchedToString, _toString);
+                    try {
+                        Object.defineProperty(Function.prototype, 'toString', {
+                            value: patchedToString, writable: true, configurable: true
+                        });
+                    } catch(e) { Function.prototype.toString = patchedToString; }
+
+                    var AD_KEYS = ['adPlacements', 'playerAds', 'adSlots', 'adBreakHeartbeatParams', 'adPlacementConfig'];
+                    function pruneObject(o) {
+                        if (!o || typeof o !== 'object') return o;
+                        if (Array.isArray(o)) {
+                            if (o.length <= 10) {
+                                for (var j = 0; j < o.length; j++) {
+                                    if (o[j] && typeof o[j] === 'object' && o[j].playerResponse) {
+                                        pruneObject(o[j].playerResponse);
+                                    }
+                                }
+                            }
+                            return o;
+                        }
+                        for (var i = 0; i < AD_KEYS.length; i++) {
+                            if (AD_KEYS[i] in o) { try { delete o[AD_KEYS[i]]; } catch(e) { o[AD_KEYS[i]] = undefined; } }
+                        }
+                        if (o.playerResponse && typeof o.playerResponse === 'object') { pruneObject(o.playerResponse); }
+                        return o;
+                    }
+
+                    var _ipr;
+                    try {
+                        Object.defineProperty(window, 'ytInitialPlayerResponse', {
+                            get: function() { return _ipr; },
+                            set: function(v) { _ipr = pruneObject(v); },
+                            configurable: true
+                        });
+                    } catch(e) {}
+
+                    if (window.Response && Response.prototype && Response.prototype.json) {
+                        var _origJson = Response.prototype.json;
+                        var patchedJson = function json() {
+                            return _origJson.apply(this, arguments).then(function(data) {
+                                return pruneObject(data);
+                            });
+                        };
+                        mask(patchedJson, _origJson);
+                        try {
+                            Object.defineProperty(Response.prototype, 'json', {
+                                value: patchedJson, writable: true, configurable: true
+                            });
+                        } catch(e) { Response.prototype.json = patchedJson; }
+                    }
+
+                    if (typeof JSON !== 'undefined' && JSON.parse) {
+                        var _origParse = JSON.parse;
+                        var patchedParse = function parse(text, reviver) {
+                            var res = _origParse.apply(this, arguments);
+                            if (res && typeof res === 'object') {
+                                pruneObject(res);
+                            }
+                            return res;
+                        };
+                        mask(patchedParse, _origParse);
+                        try {
+                            Object.defineProperty(JSON, 'parse', {
+                                value: patchedParse, writable: true, configurable: true
+                            });
+                        } catch(e) { JSON.parse = patchedParse; }
+                    }
+                } catch(e) {}
+            })();
+            """,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        )
+        config.userContentController.addUserScript(adShieldScript)
+
+        // Page Visibility Shield: Prevents YouTube Music from pausing when the menu bar window is dismissed
         let pageVisibilityShieldScript = WKUserScript(
             source: """
             (function() {
@@ -190,7 +284,7 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         )
         config.userContentController.addUserScript(pageVisibilityShieldScript)
         
-        // 🛡️ Pre-boot High Audio Quality Bootstrap Script (atDocumentStart, mainFrameOnly for OAuth safety)
+        // Pre-boot High Audio Quality Bootstrap Script (atDocumentStart, mainFrameOnly for OAuth safety)
         let audioBootstrapScript = WKUserScript(
             source: """
             (function() {
@@ -208,7 +302,7 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         )
         config.userContentController.addUserScript(audioBootstrapScript)
 
-        // 🛡️ MediaSession Remote Command Shield: Prevents web scripts from stealing native macOS media keys
+        // MediaSession Remote Command Shield: Prevents web scripts from stealing native macOS media keys
         let mediaSessionShieldScript = WKUserScript(
             source: """
             (function() {
@@ -232,7 +326,7 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         )
         config.userContentController.addUserScript(mediaSessionShieldScript)
 
-        // 🛡️ WebPlaybackAudioOutput: Keeps WebKit audio graph active across short track transitions
+        // WebPlaybackAudioOutput: Keeps WebKit audio graph active across short track transitions
         let audioOutputScript = WKUserScript(
             source: WebPlaybackAudioOutput.script,
             injectionTime: .atDocumentStart,
@@ -240,9 +334,8 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         )
         config.userContentController.addUserScript(audioOutputScript)
 
-        // 🛡️ BULLETPROOF STEALTH SIZING (No ABR throttle, Zero click blocking):
-        // Positioned offscreen at -9999px with standard 640x360 dimensions so YouTube never
-        // triggers adaptive bitrate emergency downgrades or buffer throttling.
+        // Stealth sizing: Positioned offscreen at -9999px with standard 640x360 dimensions so YouTube
+        // never triggers adaptive bitrate emergency downgrades or buffer throttling.
         let cssString = """
         #song-video, #player-video, .html5-video-player, video {
             position: fixed !important;
@@ -258,7 +351,9 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         #cinematics, .background-gradient, #background-gradient,
         paper-ripple, #cinematics-container, ytm-cinematics, .ytmusic-browse-response[background-gradient],
         .ytp-ce-element, .ytp-cards-teaser, .ytp-chrome-top, .ytp-gradient-top,
-        .ytp-gradient-bottom, .annotation, .ytp-pause-overlay {
+        .ytp-gradient-bottom, .annotation, .ytp-pause-overlay,
+        ytmusic-mealbar-promo-renderer, ytmusic-player-bar-promo-renderer,
+        ytmusic-banner-promo-renderer, #player-ads {
             display: none !important;
             visibility: hidden !important;
         }
@@ -289,10 +384,11 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         // JSON-encode the CSS so the injected JS string literal is always valid
         // (multi-line CSS embedded directly would break the script).
         let cssJSON: String
-        if let data = try? JSONEncoder().encode(cssString),
-           let str = String(data: data, encoding: .utf8) {
-            cssJSON = str
-        } else {
+        do {
+            let data = try JSONEncoder().encode(cssString)
+            cssJSON = String(data: data, encoding: .utf8) ?? "\"\""
+        } catch {
+            Log.web.error("Failed to encode custom CSS string: \(error.localizedDescription)")
             cssJSON = "\"\""
         }
         let cssScript = WKUserScript(
@@ -352,7 +448,7 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         
         NotificationCenter.default.addObserver(forName: NetworkMonitor.reconnectedNotification, object: nil, queue: .main) { [weak self] _ in
             guard let self = self else { return }
-            print("[YTMWebView] Reconnected to network, auto-reloading webview...")
+            Log.web.info("Reconnected to network, auto-reloading webview")
             self.hideOfflineOverlay()
             self.reloadPlayerEngine()
         }
@@ -369,7 +465,7 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
     public func loadMusicHome(autoPlayRandom: Bool = false) {
         self.autoPlayOnHomeLoad = autoPlayRandom
         if let defaultUrl = URL(string: "https://music.youtube.com/") {
-            print("[YTMWebView] Navigating to music site: \(defaultUrl.absoluteString)")
+            Log.web.info("Navigating to music site: \(defaultUrl.absoluteString)")
             webView.load(URLRequest(url: defaultUrl))
         }
     }
@@ -514,7 +610,7 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         self.videoToRestoreOnLaunch = targetVideoId
         
         if let finalUrlStr = targetUrlStr, let url = URL(string: finalUrlStr) {
-            print("[YTMWebView] Restoring last playing session track: \(url.absoluteString)")
+            Log.web.info("Restoring last playing session track: \(url.absoluteString)")
             shouldRestoreSavedTime = true
             webView.load(URLRequest(url: url))
         } else if let defaultUrl = URL(string: "https://music.youtube.com/") {
@@ -561,7 +657,7 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         if currentUrl.contains("myaccount.google.com") ||
            currentUrl.contains("accounts.google.com/ManageAccount") ||
            (currentUrl.contains("accounts.google.com") && !currentUrl.contains("ServiceLogin") && !currentUrl.contains("signin") && !currentUrl.contains("v3/signin")) {
-            print("[YTMWebView] Google auth completed or landed on account page; redirecting to music site")
+            Log.web.info("Google auth completed or landed on account page; redirecting to music site")
             loadMusicHome()
             return
         }
@@ -582,109 +678,7 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         }
         
         if currentUrl.contains("search?q=") {
-            let autoPlayJS = """
-            (function() {
-                function triggerClick(element) {
-                    if (!element) return false;
-                    try {
-                        element.scrollIntoView({ behavior: 'instant', block: 'center' });
-                        var opts = { bubbles: true, cancelable: true, view: window };
-                        element.dispatchEvent(new MouseEvent('mousedown', opts));
-                        element.dispatchEvent(new MouseEvent('mouseup', opts));
-                        element.dispatchEvent(new MouseEvent('click', opts));
-                        if (typeof element.click === 'function') { element.click(); }
-                        return true;
-                    } catch(e) {
-                        try { element.click(); return true; } catch(err) { return false; }
-                    }
-                }
-
-                function ensurePlaying() {
-                    try {
-                        var player = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
-                        if (player && typeof player.playVideo === 'function') {
-                            var state = typeof player.getPlayerState === 'function' ? player.getPlayerState() : -1;
-                            if (state !== 1 && state !== 3) {
-                                player.playVideo();
-                            }
-                        }
-                    } catch(e) {}
-
-                    try {
-                        var video = document.querySelector('video');
-                        if (video && video.paused && !video.ended && video.readyState >= 1) {
-                            video.play().catch(function(){});
-                        }
-                    } catch(e) {}
-
-                    try {
-                        var playBtn = document.querySelector('ytmusic-player-bar #play-pause-button[aria-label="Play"]') ||
-                                      document.querySelector('#play-pause-button[title="Play"]');
-                        if (playBtn) {
-                            triggerClick(playBtn);
-                        }
-                    } catch(e) {}
-                }
-
-                var clickedTrack = false;
-
-                function findAndPlayTopTrack() {
-                    if (!clickedTrack) {
-                        var topCardBtn = document.querySelector('ytmusic-card-shelf-renderer ytmusic-play-button-renderer #button') ||
-                                         document.querySelector('ytmusic-card-shelf-renderer ytmusic-play-button-renderer') ||
-                                         document.querySelector('ytmusic-card-shelf-renderer #play-button');
-                        if (topCardBtn && triggerClick(topCardBtn)) {
-                            clickedTrack = true;
-                            ensurePlaying();
-                            return true;
-                        }
-
-                        var songRows = document.querySelectorAll('ytmusic-responsive-list-item-renderer');
-                        for (var i = 0; i < songRows.length; i++) {
-                            var row = songRows[i];
-                            var btn = row.querySelector('ytmusic-play-button-renderer #button') ||
-                                      row.querySelector('ytmusic-play-button-renderer') ||
-                                      row.querySelector('.play-button') ||
-                                      row.querySelector('#play-button');
-                            if (btn && triggerClick(btn)) {
-                                clickedTrack = true;
-                                ensurePlaying();
-                                return true;
-                            }
-                            var link = row.querySelector('a.yt-simple-endpoint') || row.querySelector('.title a');
-                            if (link && triggerClick(link)) {
-                                clickedTrack = true;
-                                ensurePlaying();
-                                return true;
-                            }
-                        }
-
-                        var anyPlayBtn = document.querySelector('ytmusic-play-button-renderer #button') ||
-                                         document.querySelector('ytmusic-play-button-renderer');
-                        if (anyPlayBtn && triggerClick(anyPlayBtn)) {
-                            clickedTrack = true;
-                            ensurePlaying();
-                            return true;
-                        }
-                    } else {
-                        ensurePlaying();
-                    }
-
-                    return false;
-                }
-
-                var attempts = 0;
-                var timer = setInterval(function() {
-                    attempts++;
-                    findAndPlayTopTrack();
-                    ensurePlaying();
-                    if (attempts > 30) {
-                        clearInterval(timer);
-                    }
-                }, 250);
-            })();
-            """
-            webView.evaluateJavaScript(autoPlayJS, completionHandler: nil)
+            webView.evaluateJavaScript(MainViewController.safeSearchAutoPlayJS, completionHandler: nil)
         }
         
         if !hasRestoredInitialPosition {
@@ -704,10 +698,10 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
             isRecoveringFromTermination = false
             recoveryWatchdog?.cancel()
             recoveryWatchdog = nil
-            print("[YTMWebView] Recovery: WebView reloaded; re-applying last known track (video=\(vid)) at time \(time)s (resumePlayback=\(resume))")
+            Log.web.info("Recovery: WebView reloaded; re-applying last known track (video=\(vid)) at time \(time)s (resumePlayback=\(resume))")
             NowPlayingManager.shared.markTerminationRecoveryComplete()
             webView.evaluateJavaScript(buildRestorePlaybackJS(videoId: vid, targetTime: time, resume: resume), completionHandler: nil)
-            print("[YTMWebView] Recovery complete: player restored to normal working state")
+            Log.web.info("Recovery complete: player restored to normal working state")
         }
     }
     
@@ -802,10 +796,10 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
     // mechanisms (WKWebsiteDataStore.default() cookies + UserDefaults) and
     // re-applies the last known track/position so playback can continue.
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        print("[YTMWebView] ⚠️ WebContent process terminated - starting crash recovery")
+        Log.web.error("WebContent process terminated - starting crash recovery")
         
         guard !isRecoveringFromTermination else {
-            print("[YTMWebView] Recovery already in flight; ignoring duplicate termination callback")
+            Log.web.debug("Recovery already in flight; ignoring duplicate termination callback")
             return
         }
         isRecoveringFromTermination = true
@@ -814,7 +808,7 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         recoveryVideoId = UserDefaults.standard.string(forKey: "YTM_lastVideoId") ?? ""
         recoveryTime = UserDefaults.standard.double(forKey: "YTM_lastTime")
         recoveryResumePlayback = NowPlayingManager.shared.currentState.isPlaying
-        print("[YTMWebView] Recovery snapshot: video=\(recoveryVideoId) time=\(recoveryTime)s wasPlaying=\(recoveryResumePlayback)")
+        Log.web.debug("Recovery snapshot: video=\(self.recoveryVideoId) time=\(self.recoveryTime)s wasPlaying=\(self.recoveryResumePlayback)")
         
         // Drop stale callbacks from the dying process and re-wire the message
         // bridge so only the freshly restored WebContent can drive player state.
@@ -836,10 +830,10 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         hideOfflineOverlay()
         
         if let url = URL(string: targetUrlStr) {
-            print("[YTMWebView] WebView restoration: reloading \(url.absoluteString)")
+            Log.web.debug("WebView restoration: reloading \(url.absoluteString)")
             webView.load(URLRequest(url: url))
         } else {
-            print("[YTMWebView] WebView restoration: reloading current page")
+            Log.web.debug("WebView restoration: reloading current page")
             webView.reload()
         }
         
@@ -852,7 +846,7 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         let watchdog = DispatchWorkItem { [weak self] in
             guard let self = self else { return }
             guard self.isRecoveringFromTermination else { return }
-            print("[YTMWebView] ⚠️ WebContent recovery did not complete within watchdog window (page may be offline)")
+            Log.web.error("WebContent recovery did not complete within watchdog window")
             self.isRecoveringFromTermination = false
             self.recoveryWatchdog = nil
             NowPlayingManager.shared.markTerminationRecoveryComplete()
@@ -873,10 +867,10 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
     
     private func handleNavigationFailure(_ error: Error) {
         let nsError = error as NSError
-        print("[YTMWebView] Navigation failed: \(error.localizedDescription) (code: \(nsError.code))")
+        Log.web.error("Navigation failed: \(error.localizedDescription) (code: \(nsError.code))")
         
         if isRecoveringFromTermination {
-            print("[YTMWebView] ⚠️ WebContent recovery failed during navigation: \(error.localizedDescription)")
+            Log.web.error("WebContent recovery failed during navigation: \(error.localizedDescription)")
         }
         
         if nsError.code == NSURLErrorCancelled { return }
@@ -918,7 +912,7 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         if !watchUrlStr.isEmpty, watchUrlStr.contains("watch?v="),
            let url = URL(string: watchUrlStr) {
             if webView.url == url { return }
-            print("[YTMWebView] Parking player on watch page: \(url.absoluteString)")
+            Log.web.debug("Parking player on watch page: \(url.absoluteString)")
             webView.load(URLRequest(url: url))
             return
         }
@@ -997,14 +991,14 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
                 return
             }
 
-            // In-page routing was dispatched. Arm 500ms watchdog to verify that the track actually loaded:
+            // In-page routing was dispatched. Arm 1800ms watchdog to verify that the track actually loaded:
             let watchdog = DispatchWorkItem { [weak self] in
                 guard let self = self else { return }
                 guard self.navigationGeneration == currentGeneration else { return }
                 self.verifyVideoSwitch(videoId: videoId, generation: currentGeneration)
             }
             self.routerWatchdogItem = watchdog
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: watchdog)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.8, execute: watchdog)
         }
     }
 
@@ -1032,7 +1026,7 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
             guard let self = self else { return }
             guard self.navigationGeneration == generation else { return }
             if (result as? Bool) != true {
-                print("[YTMWebView] Router navigation watchdog expired for \(videoId). Executing safe URL fallback.")
+                Log.web.error("Router navigation watchdog expired for \(videoId). Executing safe URL fallback")
                 self.fallbackLoadVideo(videoId: videoId, generation: generation)
             } else {
                 let playJS = """
@@ -1077,8 +1071,7 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
     }
 
     // MARK: - Infinite Flow (Never-Ending Autoplay)
-    public func triggerInfiniteFlow(seededFrom videoId: String) {
-        guard !videoId.isEmpty else { return }
+    public func triggerInfiniteFlow(seededFrom videoId: String = "") {
         navigationGeneration &+= 1
         let currentGeneration = navigationGeneration
 
@@ -1118,6 +1111,23 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
                     return { success: true, method: 'playerNext' };
                 }
             } catch(e) {}
+
+            // Fallback seed extraction from player data or current URL if not provided
+            if (!seedVid) {
+                try {
+                    var pl = document.querySelector('#movie_player') || document.querySelector('ytmusic-player')?.playerApi;
+                    if (pl && typeof pl.getVideoData === 'function') {
+                        var vd = pl.getVideoData();
+                        if (vd && vd.video_id) seedVid = vd.video_id;
+                    }
+                } catch(e) {}
+                if (!seedVid) {
+                    try {
+                        var m = window.location.href.match(/[?&]v=([^&]+)/);
+                        if (m && m[1]) seedVid = m[1];
+                    } catch(e) {}
+                }
+            }
 
             // Priority 3: Dispatch native radio resolveCommand seeded from the last track
             try {
@@ -1160,7 +1170,7 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
             guard self.navigationGeneration == currentGeneration else { return }
             let dict = result as? [String: Any]
             let method = dict?["method"] as? String ?? "unknown"
-            print("[YTMWebView] Infinite Flow dispatched with method: \(method)")
+            Log.web.debug("Infinite Flow dispatched with method: \(method)")
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
                 self?.selectSongTab()

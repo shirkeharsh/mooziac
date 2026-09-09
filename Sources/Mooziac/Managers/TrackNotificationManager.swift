@@ -2,23 +2,22 @@ import AppKit
 import UserNotifications
 
 public class TrackNotificationManager: NSObject, UNUserNotificationCenterDelegate {
-    public static let shared = TrackNotificationManager()
-    
     private var lastNotifiedTrack = ""
     
-    override init() {
+    public override init() {
         super.init()
         setupNotifications()
     }
     
     public func setupNotifications() {
+        guard Bundle.main.bundleURL.pathExtension == "app" && NSClassFromString("XCTestCase") == nil else { return }
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         center.requestAuthorization(options: [.alert, .sound]) { granted, error in
             if granted {
-                print("[TrackNotificationManager] Notification permission granted.")
+                Log.general.debug("Notification permission granted")
             } else if let error = error {
-                print("[TrackNotificationManager] Permission error: \(error.localizedDescription)")
+                Log.general.error("Permission error: \(error.localizedDescription)")
             }
         }
     }
@@ -37,9 +36,13 @@ public class TrackNotificationManager: NSObject, UNUserNotificationCenterDelegat
         
         if let url = URL(string: artworkUrl) {
             downloadImage(from: url) { [weak self] localUrl in
-                if let localUrl = localUrl,
-                   let attachment = try? UNNotificationAttachment(identifier: "albumArt", url: localUrl, options: nil) {
-                    content.attachments = [attachment]
+                if let localUrl = localUrl {
+                    do {
+                        let attachment = try UNNotificationAttachment(identifier: "albumArt", url: localUrl, options: nil)
+                        content.attachments = [attachment]
+                    } catch {
+                        Log.general.debug("Could not create notification attachment: \(error.localizedDescription)")
+                    }
                 }
                 self?.postNotification(content: content)
             }
@@ -49,10 +52,11 @@ public class TrackNotificationManager: NSObject, UNUserNotificationCenterDelegat
     }
     
     private func postNotification(content: UNMutableNotificationContent) {
+        guard Bundle.main.bundleURL.pathExtension == "app" && NSClassFromString("XCTestCase") == nil else { return }
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
-                print("[TrackNotificationManager] Failed to post notification: \(error.localizedDescription)")
+                Log.general.error("Failed to post notification: \(error.localizedDescription)")
             }
         }
     }
@@ -66,10 +70,17 @@ public class TrackNotificationManager: NSObject, UNUserNotificationCenterDelegat
             let tempDir = FileManager.default.temporaryDirectory
             
             // Clean up previous notification temp files to prevent disk clutter
-            if let files = try? FileManager.default.contentsOfDirectory(at: tempDir, includingPropertiesForKeys: nil) {
+            do {
+                let files = try FileManager.default.contentsOfDirectory(at: tempDir, includingPropertiesForKeys: nil)
                 for file in files where file.lastPathComponent.hasPrefix("ytm_art_") {
-                    try? FileManager.default.removeItem(at: file)
+                    do {
+                        try FileManager.default.removeItem(at: file)
+                    } catch {
+                        Log.general.debug("Failed to remove stale notification art \(file.lastPathComponent): \(error.localizedDescription)")
+                    }
                 }
+            } catch {
+                Log.general.debug("Failed to inspect temp directory for notification art cleanup: \(error.localizedDescription)")
             }
             
             let fileUrl = tempDir.appendingPathComponent("ytm_art_" + UUID().uuidString + ".jpg")
@@ -77,6 +88,7 @@ public class TrackNotificationManager: NSObject, UNUserNotificationCenterDelegat
                 try data.write(to: fileUrl)
                 completion(fileUrl)
             } catch {
+                Log.general.warning("Failed to write notification art temp file: \(error.localizedDescription)")
                 completion(nil)
             }
         }

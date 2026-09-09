@@ -89,7 +89,7 @@ public final class GlobalHotKeyManager {
             }
         }
         
-        print("[GlobalHotKeyManager] Global shortcuts registered via native Carbon events.")
+        Log.general.debug("Global shortcuts registered via native Carbon events")
     }
     
     @discardableResult

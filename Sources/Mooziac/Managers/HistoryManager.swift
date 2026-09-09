@@ -167,10 +167,9 @@ public final class HistoryManager {
             // Fallback online search or playback
             NowPlayingManager.shared.switchToOnlineMode()
             let query = "\(item.title) \(item.artist)".trimmingCharacters(in: .whitespacesAndNewlines)
-            if let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-               let url = URL(string: "https://music.youtube.com/search?q=\(encoded)") {
+            if !query.isEmpty {
                 DispatchQueue.main.async {
-                    StatusItemManager.shared?.mainViewController.webViewContainer.webView.load(URLRequest(url: url))
+                    StatusItemManager.shared?.mainViewController.playSearchQuery(query)
                 }
             }
         }

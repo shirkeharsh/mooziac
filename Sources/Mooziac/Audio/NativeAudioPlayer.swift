@@ -175,7 +175,7 @@ public final class NativeAudioPlayer: NSObject {
     public func playLastOrFirstTrack() {
         let tracks = LocalLibraryManager.shared.allTracks
         guard !tracks.isEmpty else {
-            print("[NativeAudioPlayer] No offline tracks available in library")
+            Log.playback.info("No offline tracks available in library")
             return
         }
         self.currentQueue = tracks
@@ -279,6 +279,12 @@ public final class NativeAudioPlayer: NSObject {
     }
 
     public func nextTrack() {
+        if PlaylistManager.shared.hasActiveContext {
+            if PlaylistManager.shared.playNextTrackInPlaylist() {
+                return
+            }
+        }
+
         let activeList = isShuffleActive ? shuffledQueue : currentQueue
         guard !activeList.isEmpty else { return }
 
@@ -302,6 +308,12 @@ public final class NativeAudioPlayer: NSObject {
         if currTime > 3.0 {
             seek(to: 0)
             return
+        }
+
+        if PlaylistManager.shared.hasActiveContext {
+            if PlaylistManager.shared.playPreviousTrackInPlaylist() {
+                return
+            }
         }
 
         let activeList = isShuffleActive ? shuffledQueue : currentQueue
@@ -394,6 +406,11 @@ public final class NativeAudioPlayer: NSObject {
                 self.seek(to: 0)
                 self.play()
             } else {
+                if PlaylistManager.shared.hasActiveContext {
+                    if PlaylistManager.shared.playNextTrackInPlaylist() {
+                        return
+                    }
+                }
                 self.nextTrack()
             }
         }

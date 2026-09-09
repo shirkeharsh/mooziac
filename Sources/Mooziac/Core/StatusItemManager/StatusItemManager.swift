@@ -31,7 +31,10 @@ class StatusItemManager: NSObject {
         return nil
     }
     
-    override init() {
+    private let displayManager: DisplayManager
+
+    init(displayManager: DisplayManager = DisplayManager()) {
+        self.displayManager = displayManager
         super.init()
         StatusItemManager.shared = self
         setupStatusItem()
@@ -161,7 +164,7 @@ class StatusItemManager: NSObject {
         NotificationCenter.default.addObserver(self, selector: #selector(panelDidMove), name: NSWindow.didMoveNotification, object: panel)
         
         // Handle connected display changes (reconnect, disconnect, resolution change)
-        DisplayManager.shared.onDisplayConfigurationChanged = { [weak self] in
+        displayManager.onDisplayConfigurationChanged = { [weak self] in
             self?.handleDisplayConfigurationChanged()
         }
     }
@@ -176,9 +179,9 @@ class StatusItemManager: NSObject {
             let savedIDRaw = UserDefaults.standard.object(forKey: "YTM_savedDisplayID") as? UInt32
             let savedID = savedIDRaw != nil ? CGDirectDisplayID(savedIDRaw!) : nil
             
-            let targetScreen = DisplayManager.shared.findScreen(forSavedID: savedID, fallbackOrigin: CGPoint(x: savedX, y: savedY))
+            let targetScreen = displayManager.findScreen(forSavedID: savedID, fallbackOrigin: CGPoint(x: savedX, y: savedY))
             let unconstrainedFrame = NSRect(x: savedX, y: savedY, width: size.width, height: size.height)
-            let clampedFrame = DisplayManager.shared.clampFrameToVisibleBounds(unconstrainedFrame, on: targetScreen, margin: 12)
+            let clampedFrame = displayManager.clampFrameToVisibleBounds(unconstrainedFrame, on: targetScreen, margin: 12)
             
             panel.setFrame(clampedFrame, display: true, animate: true)
         } else {
@@ -242,7 +245,7 @@ class StatusItemManager: NSObject {
         dragDebounceTimer = Timer.scheduledTimer(withTimeInterval: 0.12, repeats: false) { [weak self] _ in
             guard let self = self, self.isDraggedFromDock else { return }
             let currentFrame = self.panel.frame
-            let clampedFrame = DisplayManager.shared.clampFrameToVisibleBounds(currentFrame, on: screen, margin: 8)
+            let clampedFrame = self.displayManager.clampFrameToVisibleBounds(currentFrame, on: screen, margin: 8)
             if currentFrame != clampedFrame {
                 self.isProgrammaticallyPositioning = true
                 self.panel.setFrame(clampedFrame, display: true, animate: true)
@@ -254,7 +257,7 @@ class StatusItemManager: NSObject {
             UserDefaults.standard.set(Double(clampedFrame.origin.x), forKey: "YTM_playerFrameX")
             UserDefaults.standard.set(Double(clampedFrame.origin.y), forKey: "YTM_playerFrameY")
             UserDefaults.standard.set(Double(topY), forKey: "YTM_playerTopY")
-            if let displayID = DisplayManager.shared.displayID(for: screen) {
+            if let displayID = self.displayManager.displayID(for: screen) {
                 UserDefaults.standard.set(displayID, forKey: "YTM_savedDisplayID")
             }
         }
@@ -300,9 +303,9 @@ class StatusItemManager: NSObject {
             let savedIDRaw = UserDefaults.standard.object(forKey: "YTM_savedDisplayID") as? UInt32
             let savedID = savedIDRaw != nil ? CGDirectDisplayID(savedIDRaw!) : nil
             
-            let targetScreen = DisplayManager.shared.findScreen(forSavedID: savedID, fallbackOrigin: CGPoint(x: desiredX, y: effectiveY))
+            let targetScreen = displayManager.findScreen(forSavedID: savedID, fallbackOrigin: CGPoint(x: desiredX, y: effectiveY))
             let rawFrame = NSRect(x: desiredX, y: effectiveY, width: effectiveWidth, height: effectiveHeight)
-            let clampedFrame = DisplayManager.shared.clampFrameToVisibleBounds(rawFrame, on: targetScreen, margin: 8)
+            let clampedFrame = displayManager.clampFrameToVisibleBounds(rawFrame, on: targetScreen, margin: 8)
             
             targetWindow.setFrame(clampedFrame, display: true)
             return
@@ -326,7 +329,7 @@ class StatusItemManager: NSObject {
         }
         
         let rawFrame = NSRect(x: targetX, y: targetY, width: width, height: height)
-        let clampedFrame = DisplayManager.shared.clampFrameToVisibleBounds(rawFrame, on: screen, margin: 0)
+        let clampedFrame = displayManager.clampFrameToVisibleBounds(rawFrame, on: screen, margin: 0)
         targetWindow.setFrame(clampedFrame, display: true)
     }
     

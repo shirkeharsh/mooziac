@@ -39,14 +39,22 @@ public final class LocalLibraryManager: NSObject {
         if let custom = UserDefaults.standard.string(forKey: "YTM_downloadsFolder"), !custom.isEmpty {
             let folder = URL(fileURLWithPath: custom, isDirectory: true)
             if !FileManager.default.fileExists(atPath: folder.path) {
-                try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                do {
+                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                } catch {
+                    Log.download.error("Failed to create custom music folder: \(error.localizedDescription)")
+                }
             }
             return folder
         }
         let musicDir = FileManager.default.urls(for: .musicDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: NSHomeDirectory())
         let folder = musicDir.appendingPathComponent("Mooziac", isDirectory: true)
         if !FileManager.default.fileExists(atPath: folder.path) {
-            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            do {
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            } catch {
+                Log.download.error("Failed to create default music folder: \(error.localizedDescription)")
+            }
         }
         return folder
     }
@@ -57,7 +65,11 @@ public final class LocalLibraryManager: NSObject {
     }
 
     public func setMusicFolder(_ url: URL) {
-        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        } catch {
+            Log.download.error("Failed to set music folder: \(error.localizedDescription)")
+        }
         UserDefaults.standard.set(url.path, forKey: "YTM_downloadsFolder")
         scanLibrary()
     }
@@ -71,7 +83,11 @@ public final class LocalLibraryManager: NSObject {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: NSHomeDirectory())
         let folder = appSupport.appendingPathComponent("Mooziac/Offline", isDirectory: true)
         if !FileManager.default.fileExists(atPath: folder.path) {
-            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            do {
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            } catch {
+                Log.download.error("Failed to create offline app support folder: \(error.localizedDescription)")
+            }
         }
         return folder
     }
@@ -403,7 +419,7 @@ public final class LocalLibraryManager: NSObject {
                     try FileManager.default.copyItem(at: src, to: targetURL)
                     if ext != "lrc" { importedCount += 1 }
                 } catch {
-                    print("[LocalLibraryManager] Error copying \(src.lastPathComponent): \(error)")
+                    Log.download.error("Error copying \(src.lastPathComponent): \(error)")
                 }
             }
 
@@ -466,7 +482,7 @@ public final class LocalLibraryManager: NSObject {
                 // 3. Remove sidecar .lrc if exists
                 let lrcSidecar = track.lrcURL ?? track.fileURL.deletingPathExtension().appendingPathExtension("lrc")
                 if FileManager.default.fileExists(atPath: lrcSidecar.path) {
-                    try? FileManager.default.removeItem(at: lrcSidecar)
+                    try FileManager.default.removeItem(at: lrcSidecar)
                 }
 
                 // 4. Remove record from SQLite
@@ -482,7 +498,7 @@ public final class LocalLibraryManager: NSObject {
                     }
                 }
             } catch {
-                print("[LocalLibraryManager] Failed to delete track: \(error)")
+                Log.download.error("Failed to delete track: \(error)")
                 LocalDatabaseManager.shared.deleteTracks(filePaths: [track.fileURL.path])
                 AppArtworkHelper.shared.removeCachedThumbnails(for: track)
                 self.scanLibrary { _ in

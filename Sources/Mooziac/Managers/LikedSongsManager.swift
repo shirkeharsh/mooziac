@@ -60,12 +60,31 @@ public class LikedSongsManager {
             self.isSignedIn = value
             if changed {
                 NotificationCenter.default.post(name: LikedSongsManager.signInStatusChangedNotification, object: nil)
-                print("[LikedSongsManager] isSignedIn = \(value)")
+                Log.sync.debug("LikedSongsManager isSignedIn = \(value)")
             }
         }
     }
 
     // MARK: - Toggle Core
+
+    public func removeLikedSong(videoId: String) {
+        LocalDatabaseManager.shared.removeLikedSong(videoId: videoId)
+        if isSignedIn && !videoId.isEmpty {
+            YTMClient.shared.like(videoId: videoId, liked: false) { result in
+                switch result {
+                case .success:
+                    Log.sync.info("Successfully synced unlike for \(videoId) via InnerTube")
+                case .failure(let error):
+                    Log.sync.debug("InnerTube unlike sync error: \(error)")
+                }
+            }
+        }
+        if NowPlayingManager.shared.currentState.videoId == videoId {
+            NowPlayingManager.shared.currentState.isLiked = false
+            NotificationCenter.default.post(name: NSNotification.Name("Mooziac_NowPlayingStateChanged"), object: nil)
+        }
+        NotificationCenter.default.post(name: LikedSongsManager.likedSongsUpdatedNotification, object: nil)
+    }
 
     public func recordOnlineLikeToggle(desiredLiked: Bool,
                                        videoId: String,
@@ -84,10 +103,10 @@ public class LikedSongsManager {
                 duration: duration,
                 synced: isSignedIn
             ))
+            NotificationCenter.default.post(name: LikedSongsManager.likedSongsUpdatedNotification, object: nil)
         } else {
-            LocalDatabaseManager.shared.removeLikedSong(videoId: videoId)
+            removeLikedSong(videoId: videoId)
         }
-        NotificationCenter.default.post(name: LikedSongsManager.likedSongsUpdatedNotification, object: nil)
     }
 
     public func mirrorOfflineLike(trackID: String) {
@@ -164,23 +183,36 @@ public class LikedSongsManager {
         let js = """
         (function() {
             var playerBar = document.querySelector('ytmusic-player-bar') || document.querySelector('#player-bar');
-            var likeRenderer = playerBar ? (playerBar.querySelector('ytmusic-like-button-renderer') || playerBar.querySelector('#like-button-renderer')) : null;
-            if (likeRenderer) {
-                var likeBtn = likeRenderer.querySelector('#button-shape-like button, .like-button');
-                if (!likeBtn) {
-                    var btns = likeRenderer.querySelectorAll('button');
-                    for (var i = 0; i < btns.length; i++) {
-                        var label = (btns[i].getAttribute('aria-label') || btns[i].getAttribute('title') || '').toLowerCase();
-                        if (!label.includes('dislike') && (label.includes('like') || label.includes('thumbs up'))) {
-                            likeBtn = btns[i];
-                            break;
-                        }
+            if (!playerBar) return false;
+            var likeRenderer = playerBar.querySelector('ytmusic-like-button-renderer') || playerBar.querySelector('#like-button-renderer');
+            if (!likeRenderer) return false;
+
+            var likeBtn = likeRenderer.querySelector('#button-shape-like button, .like-button');
+            if (!likeBtn) {
+                var candidates = likeRenderer.querySelectorAll('button, tp-yt-paper-icon-button, yt-icon-button');
+                for (var i = 0; i < candidates.length; i++) {
+                    var c = candidates[i];
+                    var label = (c.getAttribute('aria-label') || c.getAttribute('title') || '').toLowerCase();
+                    if (label.includes('dislike')) continue;
+                    if (label.includes('like') || label.includes('thumbs up') || label.includes('undo') || label.includes('remove')) {
+                        likeBtn = c;
+                        break;
                     }
                 }
-                if (likeBtn) {
-                    likeBtn.click();
-                    return true;
+            }
+            if (!likeBtn) {
+                var allBtns = likeRenderer.querySelectorAll('button');
+                for (var j = 0; j < allBtns.length; j++) {
+                    var lbl = (allBtns[j].getAttribute('aria-label') || '').toLowerCase();
+                    if (!lbl.includes('dislike')) {
+                        likeBtn = allBtns[j];
+                        break;
+                    }
                 }
+            }
+            if (likeBtn) {
+                likeBtn.click();
+                return true;
             }
             return false;
         })();
@@ -197,13 +229,21 @@ public class LikedSongsManager {
             var status = (likeRenderer.getAttribute('like-status') || '').toUpperCase();
             if (status === 'LIKE') return true;
             if (status === 'DISLIKE' || status === 'INDIFFERENT') return false;
-            var likeBtn = likeRenderer.querySelector('#button-shape-like button') ||
-                          likeRenderer.querySelector('button[aria-label*="Remove from your Liked Songs"]') ||
-                          likeRenderer.querySelector('button[aria-label*="Undo like"]');
+            var likeBtn = likeRenderer.querySelector('#button-shape-like button, .like-button, [aria-label*="Liked Songs" i], [aria-label*="Undo like" i]');
+            if (!likeBtn) {
+                var btns = likeRenderer.querySelectorAll('button, tp-yt-paper-icon-button, yt-icon-button');
+                for (var bi = 0; bi < btns.length; bi++) {
+                    var bLabel = (btns[bi].getAttribute('aria-label') || btns[bi].getAttribute('title') || '').toLowerCase();
+                    if (!bLabel.includes('dislike') && (bLabel.includes('like') || bLabel.includes('undo') || bLabel.includes('remove') || bLabel.includes('thumbs up'))) {
+                        likeBtn = btns[bi];
+                        break;
+                    }
+                }
+            }
             if (likeBtn) {
-                var ariaPressed = likeBtn.getAttribute('aria-pressed');
+                var ariaPressed = likeBtn.getAttribute('aria-pressed') === 'true' || likeBtn.getAttribute('aria-checked') === 'true' || likeBtn.classList.contains('active');
                 var label = (likeBtn.getAttribute('aria-label') || likeBtn.getAttribute('title') || '').toLowerCase();
-                return ariaPressed === 'true' || label.includes('undo like') || label.includes('remove from your liked');
+                return ariaPressed || label.includes('undo like') || label.includes('remove from your liked') || label.includes('remove from liked');
             }
             return false;
         })();

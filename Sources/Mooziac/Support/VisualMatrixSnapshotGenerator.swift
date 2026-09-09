@@ -3,14 +3,21 @@ import Foundation
 
 public final class VisualMatrixSnapshotGenerator {
     public static func run() {
-        print("\n📸 [Mooziac Snapshot Suite] Purging old snapshots and starting comprehensive matrix sweep...")
+        Log.general.info("Purging old snapshots and starting comprehensive matrix sweep")
         
         let outputDir = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Desktop/Mooziac_Screenshots")
         
         // 1. Delete old screenshots folder
-        try? FileManager.default.removeItem(at: outputDir)
-        try? FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
+        do {
+            if FileManager.default.fileExists(atPath: outputDir.path) {
+                try FileManager.default.removeItem(at: outputDir)
+            }
+            try FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
+        } catch {
+            Log.general.error("Failed to prepare snapshot output directory: \(error.localizedDescription)")
+            return
+        }
         
         let mockArtwork1 = createMockArtworkImage(title: "Ghost", subtitle: "Justin Bieber", colorA: NSColor.systemTeal, colorB: NSColor.systemIndigo)
         let mockArtwork2 = createMockArtworkImage(title: "Blinding Lights", subtitle: "The Weeknd", colorA: NSColor.systemRed, colorB: NSColor.systemOrange)
@@ -46,7 +53,11 @@ public final class VisualMatrixSnapshotGenerator {
                 PlayerDesign.current = themeItem.design
                 
                 let themeDir = outputDir.appendingPathComponent("\(themeItem.name)/\(appMode.name)")
-                try? FileManager.default.createDirectory(at: themeDir, withIntermediateDirectories: true)
+                do {
+                    try FileManager.default.createDirectory(at: themeDir, withIntermediateDirectories: true)
+                } catch {
+                    Log.general.warning("Failed to create theme directory: \(error.localizedDescription)")
+                }
                 
                 for styleItem in progressStyles {
                     ProgressStyle.current = styleItem.style
@@ -160,9 +171,7 @@ public final class VisualMatrixSnapshotGenerator {
         
         generateInteractiveHTMLGallery(generatedFiles: generatedFiles, outputDir: outputDir)
         
-        print("✅ [Mooziac Snapshot Suite] Successfully generated \(count) high-res permutations!")
-        print("📁 Saved to: \(outputDir.path)")
-        print("🌐 Interactive HTML Gallery: \(outputDir.appendingPathComponent("gallery.html").path)\n")
+        Log.general.info("Successfully generated \(count) permutations. Saved to: \(outputDir.path)")
     }
     
     // MARK: - View Creation Helpers
@@ -451,6 +460,10 @@ public final class VisualMatrixSnapshotGenerator {
         </html>
         """
         
-        try? html.write(to: outputDir.appendingPathComponent("gallery.html"), atomically: true, encoding: .utf8)
+        do {
+            try html.write(to: outputDir.appendingPathComponent("gallery.html"), atomically: true, encoding: .utf8)
+        } catch {
+            Log.general.error("Failed to write gallery HTML report: \(error.localizedDescription)")
+        }
     }
 }

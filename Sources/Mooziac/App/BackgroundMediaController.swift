@@ -4,8 +4,6 @@ import AVFoundation
 
 /// Keeps music audio playback active on macOS even when display locks or sleeps (while lid is open).
 final class BackgroundMediaController {
-    static let shared = BackgroundMediaController()
-
     private var assertionID: IOPMAssertionID = 0
     private var processActivity: NSObjectProtocol?
     private var audioEngine: AVAudioEngine?
@@ -27,7 +25,7 @@ final class BackgroundMediaController {
             &assertionID
         )
         if result == kIOReturnSuccess {
-            print("[BackgroundMediaController] IOPMAssertion created successfully! ID: \(assertionID)")
+            Log.playback.debug("IOPMAssertion created successfully, ID: \(self.assertionID)")
         }
 
         // 2. Prevent App Nap during screen lock

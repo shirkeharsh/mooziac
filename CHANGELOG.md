@@ -2,43 +2,55 @@
 
 All notable changes to Mooziac are documented in this file.
 
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+
+## [1.1.5] - 2026-09-08
+
+### Added
+- Unit test suite (`MooziacTests`) covering download URL extraction, queue persistence, synced LRC lyrics parsing, and query filters.
+- Continuous Integration workflow (`.github/workflows/ci.yml`) running headless debug and release builds and parallel unit tests on macOS 14 runners.
+- Apple Unified Logging (`os.Logger`) across network, database, audio, lyrics, and lifecycle subsystems.
+
+### Changed
+- Refactored `SettingsPanel` (4,790 lines) and `PlaylistLibraryView` (3,706 lines) into focused, modular components.
+- Reduced singleton footprint from 31 to 24 core services, migrating private helpers to dependency injection.
+- Audited all silent error sites (`try?`) with structured do-catch blocks and diagnostic logging.
+- Cleaned and updated documentation with accurate architectural maps and zero promotional hype.
+
+### Removed
+- Dead build target configurations and unused icon and graphic assets.
+
 ## [1.1.4] - 2026-09-08
 
-### 🚀 Stability, Audio & UI Polish
-- **Background Playback & Anti-Pause Engine**: Implemented continuous Web Audio keepalive engine to prevent macOS WebKit process throttling from pausing music in the background or during menu bar interactions.
-- **Floating Synced Menu Bar Lyrics**: Added subtle centered floating lyrics HUD with instant song transitions, ad metadata suppression, and multi-script support.
-- **High-Fidelity Audio Stream Locking**: Forced high-bitrate stream selection (256 kbps AAC / 160 kbps Opus) with real-time `itag` diagnostics on the player's HQ badge.
-- **Playlist & Queue Reliability**: Improved autoplay recovery hooks, seamless sequential track advancements, and eliminated metadata synchronization lag.
-- **Search Bar Animation Polish**: Fixed horizontal squishing and flicker during search expansion and collapse with smooth two-phase transitions.
-- **In-App Updater Enhancements**: Decoupled "Star on GitHub ⭐" action so users can star the repo without dismissing the update dialog.
+### Added
+- Floating Synced Menu Bar Lyrics HUD with instant song transitions, ad metadata suppression, and multi-script support.
+
+### Changed
+- Background playback engine with continuous Web Audio keepalive to prevent WebKit process throttling during menu bar interactions.
+- Forced high-bitrate stream selection (256 kbps AAC / 160 kbps Opus) with real-time stream diagnostics.
+- Playlist and queue reliability improvements for autoplay recovery and metadata synchronization.
+- Search bar animation transitions refined to eliminate horizontal flicker during expansion.
+- In-app update dialog decoupled from GitHub star button.
 
 ## [1.1.3] - 2026-09-07
 
-### 🎵 Synced Lyrics & Engine Mode Isolation
-- **Offline / Online Session Flushing**: Fixed an issue where lyrics from an offline track's `.lrc` file persisted on screen and in memory after reconnecting to the internet and switching back to YouTube Music playback.
-- **Engine Mode Decoupling**: Gated `.lrc` sidecar candidates to offline playback mode only, preventing cross-engine lyric contamination.
-- **Tighter Timing & Drift Reduction**: Eliminated artificial lead offsets, decoupled pseudo-timestamps on plain lyrics, and increased WebKit observer frequency to 4 Hz when the HUD is active.
+### Fixed
+- Fixed lyric persistence bug where offline LRC lyrics remained active after switching to online playback.
+- Decoupled LRC sidecar files strictly to offline playback mode to avoid cross-engine state contamination.
+- Reduced lyric synchronization drift and increased WebKit observer polling frequency to 4 Hz when HUD is visible.
 
 ## [1.1.2] - 2026-09-03
 
-### ⚡ Performance & Battery Optimization
-- **Near-Zero Idle CPU (< 0.4%)**: Fixed a critical background process issue where Mooziac consumed ~10%–11% CPU continuously even when playback was paused. Idle CPU now drops to `0.0% – 0.4%`, dramatically improving MacBook battery life.
-- **Active Playback Efficiency**: Reduced total system CPU usage during active music playback by ~50% (from ~17% down to ~8.5%).
-- **WebKit Low-Power Sleep**: WebKit rendering engines and process throttlers now properly enter low-power sleep when music is paused.
+### Changed
+- Reduced idle CPU usage to under 0.4% by allowing WebKit rendering engines to enter low-power sleep when playback is paused.
+- Reduced active playback CPU usage by approximately 50%.
 
-### 🐛 Bug Fixes
-- **Resolved Infinite Sync Loop**: Fixed a recursion bug in `PlaylistSyncManager` (`pushUnsyncedPlaylists`, `pushDirtySyncedPlaylists`, and `pushUnsyncedLikedSongs`) where failed cloud uploads (such as expired session tokens or 401s) re-queried the database in a rapid loop instead of passing remaining items.
-- **Graceful Sync Failure Handling**: Network and authentication failures during two-way sync now log once, safely preserve local playlists for future attempts, and terminate the sync cycle cleanly.
-
-### 🛡️ Stability
-- Zero impact on local SQLite database integrity, trackpad volume gestures, global media hotkeys, and native/online playback.
-
----
+### Fixed
+- Resolved recursive sync loop in `PlaylistSyncManager` on network errors or expired session tokens.
+- Graceful network error handling during playlist sync, preserving local database state for subsequent cycles.
 
 ## [1.1.1] - 2026-09-01
 
-### ✨ Highlights & Fixes
-- **Adaptive Artwork Theme in Light Mode**: Resolved contrast issues on light backgrounds.
-- **Dynamic Appearance Switching**: Real-time theme switching on macOS appearance change.
-- **Search Bar Polish**: Pure white inputs and cleaned focus rings.
-- **Contrast Rims**: Crisp perimeter borders in glass and liquid themes.
+### Added
+- Dynamic light and dark mode appearance switching with real-time theme updates.
+- Refined contrast rims and search field focus borders across glass and liquid themes.

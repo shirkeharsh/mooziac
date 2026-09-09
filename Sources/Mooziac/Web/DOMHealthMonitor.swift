@@ -1,15 +1,13 @@
 import AppKit
 
 final class DOMHealthMonitor {
-    static let shared = DOMHealthMonitor()
-
     private var consecutiveMisses = 0
     private var lastUpdateReceived = Date()
     private let missThreshold = 3
     private let expectedUpdateInterval: TimeInterval = 10.0
     private var monitorTimer: Timer?
 
-    private init() {}
+    init() {}
 
     func startMonitoring() {
         guard monitorTimer == nil else { return }

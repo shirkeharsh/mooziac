@@ -61,9 +61,14 @@ public final class YTMClient {
 
     // MARK: - Auth (cookies + SAPISIDHASH)
 
+    private struct AuthCredentials {
+        let authorization: String
+        let cookie: String
+    }
+
     /// Reads the session cookies from the shared WKWebView data store and returns
-    /// the `Authorization` header value for InnerTube requests.
-    private func authorizationHeader(completion: @escaping (Result<String, Error>) -> Void) {
+    /// the `Authorization` header value and `Cookie` string for InnerTube requests.
+    private func authCredentials(completion: @escaping (Result<AuthCredentials, Error>) -> Void) {
         WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
             let sapisid = cookies.first(where: { $0.name == "SAPISID" })?.value
             let apiSID = cookies.first(where: {
@@ -81,7 +86,13 @@ public final class YTMClient {
             let msg = "\(timestamp) \(authValue) \(origin)"
             let hash = Self.sha1Hex(msg)
             let header = "SAPISIDHASH \(timestamp)_\(hash)"
-            completion(.success(header))
+
+            let cookieString = cookies
+                .filter { $0.domain.contains("youtube.com") || $0.domain.contains("google.com") }
+                .map { "\($0.name)=\($0.value)" }
+                .joined(separator: "; ")
+
+            completion(.success(AuthCredentials(authorization: header, cookie: cookieString)))
         }
     }
 
@@ -114,9 +125,12 @@ public final class YTMClient {
         var body = payload
         body["context"] = Self.clientContext
 
-        authorizationHeader { result in
-            if case .success(let authHeader) = result {
-                request.setValue(authHeader, forHTTPHeaderField: "Authorization")
+        authCredentials { result in
+            if case .success(let creds) = result {
+                request.setValue(creds.authorization, forHTTPHeaderField: "Authorization")
+                if !creds.cookie.isEmpty {
+                    request.setValue(creds.cookie, forHTTPHeaderField: "Cookie")
+                }
             }
             do {
                 request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -131,12 +145,20 @@ public final class YTMClient {
                 }
                 guard let http = response as? HTTPURLResponse,
                       (200...299).contains(http.statusCode),
-                      let data = data,
-                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                      let data = data else {
                     completion(.failure(YTMError.badResponse))
                     return
                 }
-                completion(.success(json))
+                do {
+                    guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                        completion(.failure(YTMError.badResponse))
+                        return
+                    }
+                    completion(.success(json))
+                } catch {
+                    Log.sync.error("YTM JSON parse error: \(error.localizedDescription)")
+                    completion(.failure(YTMError.badResponse))
+                }
             }
             task.resume()
         }
@@ -232,9 +254,10 @@ public final class YTMClient {
         }
 
         let task = URLSession.shared.dataTask(with: oembedURL) { [weak self] data, response, error in
-            if let data = data,
-               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                let rawTitle = json["title"] as? String ?? "YouTube Track"
+            if let data = data {
+                do {
+                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                        let rawTitle = json["title"] as? String ?? "YouTube Track"
                 var author = json["author_name"] as? String ?? ""
                 var title = rawTitle
 
@@ -250,26 +273,30 @@ public final class YTMClient {
                     }
                 }
 
-                let cleanedTitle = title
-                    .replacingOccurrences(of: "(Official Video)", with: "", options: .caseInsensitive)
-                    .replacingOccurrences(of: "(Official Music Video)", with: "", options: .caseInsensitive)
-                    .replacingOccurrences(of: "[Official Music Video]", with: "", options: .caseInsensitive)
-                    .replacingOccurrences(of: "(Official Audio)", with: "", options: .caseInsensitive)
-                    .replacingOccurrences(of: "[Official Audio]", with: "", options: .caseInsensitive)
-                    .replacingOccurrences(of: "(Audio)", with: "", options: .caseInsensitive)
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                        let cleanedTitle = title
+                            .replacingOccurrences(of: "(Official Video)", with: "", options: .caseInsensitive)
+                            .replacingOccurrences(of: "(Official Music Video)", with: "", options: .caseInsensitive)
+                            .replacingOccurrences(of: "[Official Music Video]", with: "", options: .caseInsensitive)
+                            .replacingOccurrences(of: "(Official Audio)", with: "", options: .caseInsensitive)
+                            .replacingOccurrences(of: "[Official Audio]", with: "", options: .caseInsensitive)
+                            .replacingOccurrences(of: "(Audio)", with: "", options: .caseInsensitive)
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
 
-                let artworkUrl = (json["thumbnail_url"] as? String) ?? "https://i.ytimg.com/vi/\(videoId)/hqdefault.jpg"
+                        let artworkUrl = (json["thumbnail_url"] as? String) ?? "https://i.ytimg.com/vi/\(videoId)/hqdefault.jpg"
 
-                completion(.success(Track(
-                    videoId: videoId,
-                    title: cleanedTitle.isEmpty ? rawTitle : cleanedTitle,
-                    artist: author,
-                    album: "",
-                    artworkUrl: artworkUrl,
-                    duration: ""
-                )))
-                return
+                        completion(.success(Track(
+                            videoId: videoId,
+                            title: cleanedTitle.isEmpty ? rawTitle : cleanedTitle,
+                            artist: author,
+                            album: "",
+                            artworkUrl: artworkUrl,
+                            duration: ""
+                        )))
+                        return
+                    }
+                } catch {
+                    Log.sync.debug("oEmbed JSON parsing failed, falling back to player endpoint: \(error.localizedDescription)")
+                }
             }
 
             // Fallback to InnerTube player endpoint
@@ -298,6 +325,49 @@ public final class YTMClient {
             }
         }
         task.resume()
+    }
+
+    // MARK: - Search
+
+    /// Searches YouTube Music via the InnerTube API for the best matching song/video.
+    /// Returns the top track with its videoId, title, artist, and artwork.
+    public func searchTopTrack(query: String, completion: @escaping (Result<Track, Error>) -> Void) {
+        let cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanQuery.isEmpty else {
+            completion(.failure(YTMError.badResponse))
+            return
+        }
+
+        let payload: [String: Any] = ["query": cleanQuery]
+        post(endpoint: "search", payload: payload) { [weak self] result in
+            guard let self = self else { return }
+            switch result {
+            case .failure(let err):
+                completion(.failure(err))
+            case .success(let json):
+                if let track = Self.parseTopTrack(from: json) {
+                    completion(.success(track))
+                } else {
+                    // Fallback to searching with filtered "Songs" parameter
+                    let songPayload: [String: Any] = [
+                        "query": cleanQuery,
+                        "params": "EgWKAQIIAWoSEAUQDhAJEAMQEBAKEAQQFRAR"
+                    ]
+                    self.post(endpoint: "search", payload: songPayload) { secondResult in
+                        switch secondResult {
+                        case .failure(let secondErr):
+                            completion(.failure(secondErr))
+                        case .success(let secondJson):
+                            if let songTrack = Self.parseTopTrack(from: secondJson) {
+                                completion(.success(songTrack))
+                            } else {
+                                completion(.failure(YTMError.badResponse))
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// Loops through `continuation` tokens until the response stops returning one
@@ -398,12 +468,16 @@ public final class YTMClient {
     /// to a file in /tmp so response shape can be inspected while testing. Remove
     /// once the sync is confirmed working.
     private static func dumpDebugPage(_ json: [String: Any], browseId: String) {
-        guard let data = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted]),
-              let string = String(data: data, encoding: .utf8) else { return }
-        let safe = browseId.replacingOccurrences(of: "/", with: "_")
-        let url = URL(fileURLWithPath: "/tmp/ytm_\(safe).json")
-        try? string.write(to: url, atomically: true, encoding: .utf8)
-        print("[YTMClient] dumped \(browseId) response to \(url.path)")
+        do {
+            let data = try JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted])
+            guard let string = String(data: data, encoding: .utf8) else { return }
+            let safe = browseId.replacingOccurrences(of: "/", with: "_")
+            let url = URL(fileURLWithPath: "/tmp/ytm_\(safe).json")
+            try string.write(to: url, atomically: true, encoding: .utf8)
+            Log.web.debug("Dumped \(browseId) response to \(url.path)")
+        } catch {
+            Log.web.debug("Failed to dump debug page for \(browseId): \(error.localizedDescription)")
+        }
     }
 
     /// DFS that collects every dictionary in a JSON tree.
@@ -630,6 +704,137 @@ public final class YTMClient {
                     return token
                 }
             }
+        }
+        return nil
+    }
+
+    /// Parses the top matching song or video from an InnerTube search response.
+    public static func parseTopTrack(from page: [String: Any]) -> Track? {
+        guard let contents = page["contents"] as? [String: Any],
+              let tabbed = contents["tabbedSearchResultsRenderer"] as? [String: Any],
+              let tabs = tabbed["tabs"] as? [[String: Any]],
+              let firstTab = tabs.first,
+              let tabRenderer = firstTab["tabRenderer"] as? [String: Any],
+              let tabContent = tabRenderer["content"] as? [String: Any],
+              let sectionList = tabContent["sectionListRenderer"] as? [String: Any],
+              let sections = sectionList["contents"] as? [[String: Any]] else {
+            return nil
+        }
+
+        // 1. Check Top Card shelf (musicCardShelfRenderer)
+        for s in sections {
+            if let card = s["musicCardShelfRenderer"] as? [String: Any] {
+                let title = textFrom(card["title"])
+                let subtitle = textFrom(card["subtitle"])
+                let isPodcast = subtitle.contains("Episode") || subtitle.contains("Podcast")
+
+                if !isPodcast {
+                    // Check direct onTap watchEndpoint
+                    if let onTap = card["onTap"] as? [String: Any],
+                       let watch = onTap["watchEndpoint"] as? [String: Any],
+                       let vid = watch["videoId"] as? String, !vid.isEmpty {
+                        return Track(videoId: vid, title: title, artist: subtitle, album: "", artworkUrl: "https://i.ytimg.com/vi/\(vid)/hqdefault.jpg", duration: "")
+                    }
+
+                    // Check card buttons for direct videoId (excluding radio/mix playlist)
+                    if let buttons = card["buttons"] as? [[String: Any]] {
+                        for b in buttons {
+                            if let rend = b["buttonRenderer"] as? [String: Any] {
+                                let nav = (rend["navigationEndpoint"] as? [String: Any]) ?? (rend["command"] as? [String: Any])
+                                if let watch = nav?["watchEndpoint"] as? [String: Any],
+                                   let vid = watch["videoId"] as? String, !vid.isEmpty {
+                                    let plist = watch["playlistId"] as? String ?? ""
+                                    if !plist.hasPrefix("RD") {
+                                        return Track(videoId: vid, title: title, artist: subtitle, album: "", artworkUrl: "https://i.ytimg.com/vi/\(vid)/hqdefault.jpg", duration: "")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Check card contents (e.g. top songs list inside artist card)
+                if let cardContents = card["contents"] as? [[String: Any]] {
+                    for item in cardContents {
+                        if let r = item["musicResponsiveListItemRenderer"] as? [String: Any],
+                           let vid = extractVideoId(from: r) {
+                            let itemTitle = listItemTitle(r)
+                            return Track(videoId: vid, title: itemTitle.isEmpty ? title : itemTitle, artist: subtitle, album: "", artworkUrl: "https://i.ytimg.com/vi/\(vid)/hqdefault.jpg", duration: "")
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Check general shelves (musicShelfRenderer or itemSectionRenderer)
+        for s in sections {
+            var candidateRenderers: [[String: Any]] = []
+            if let shelf = s["musicShelfRenderer"] as? [String: Any] {
+                if let items = shelf["contents"] as? [[String: Any]] {
+                    for item in items {
+                        if let r = item["musicResponsiveListItemRenderer"] as? [String: Any] {
+                            candidateRenderers.append(r)
+                        }
+                    }
+                }
+            } else if let isr = s["itemSectionRenderer"] as? [String: Any] {
+                if let items = isr["contents"] as? [[String: Any]] {
+                    for item in items {
+                        if let r = item["musicResponsiveListItemRenderer"] as? [String: Any] {
+                            candidateRenderers.append(r)
+                        } else if let subShelf = item["musicShelfRenderer"] as? [String: Any],
+                                  let subItems = subShelf["contents"] as? [[String: Any]] {
+                            for subItem in subItems {
+                                if let r = subItem["musicResponsiveListItemRenderer"] as? [String: Any] {
+                                    candidateRenderers.append(r)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            for r in candidateRenderers {
+                if let vid = extractVideoId(from: r) {
+                    let title = listItemTitle(r)
+                    var artist = ""
+                    if let flexColumns = r["flexColumns"] as? [[String: Any]], flexColumns.count >= 2,
+                       let col = flexColumns[1]["musicResponsiveListItemFlexColumnRenderer"] as? [String: Any] {
+                        let t = textFrom(col["text"])
+                        if !t.isEmpty {
+                            artist = t.components(separatedBy: " • ").first ?? ""
+                        }
+                    }
+                    guard !title.isEmpty else { continue }
+                    return Track(videoId: vid, title: title, artist: artist, album: "", artworkUrl: "https://i.ytimg.com/vi/\(vid)/hqdefault.jpg", duration: "")
+                }
+            }
+        }
+
+        return nil
+    }
+
+    private static func extractVideoId(from dict: [String: Any]) -> String? {
+        if let data = dict["playlistItemData"] as? [String: Any],
+           let vid = data["videoId"] as? String, !vid.isEmpty {
+            return vid
+        }
+        if let overlay = dict["overlay"] as? [String: Any],
+           let thumbOverlay = overlay["musicItemThumbnailOverlayRenderer"] as? [String: Any],
+           let content = thumbOverlay["content"] as? [String: Any],
+           let playBtn = content["musicPlayButtonRenderer"] as? [String: Any],
+           let nav = playBtn["playNavigationEndpoint"] as? [String: Any],
+           let watch = nav["watchEndpoint"] as? [String: Any],
+           let vid = watch["videoId"] as? String, !vid.isEmpty {
+            return vid
+        }
+        if let nav = dict["navigationEndpoint"] as? [String: Any],
+           let watch = nav["watchEndpoint"] as? [String: Any],
+           let vid = watch["videoId"] as? String, !vid.isEmpty {
+            return vid
+        }
+        if let vid = dict["videoId"] as? String, vid.count == 11 {
+            return vid
         }
         return nil
     }

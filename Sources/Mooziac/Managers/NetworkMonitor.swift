@@ -62,7 +62,7 @@ public final class NetworkMonitor {
             self.connectionType = status ? type : .none
             self.isReachable = status
             
-            print("[NetworkMonitor] Status changed: \(status ? "ONLINE (\(type.rawValue))" : "OFFLINE")")
+            Log.general.debug("Network status changed: \(status ? "ONLINE" : "OFFLINE") (\(type.rawValue))")
         }
         
         monitor.start(queue: queue)

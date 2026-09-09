@@ -25,7 +25,7 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
     }
 
     public var currentVersion: String {
-        return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1.4"
+        return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1.5"
     }
 
     private var releasesAPIURL: URL? {
@@ -73,8 +73,27 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
                 return
             }
 
-            guard let data = data,
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            guard let data = data else {
+                if userInitiated {
+                    DispatchQueue.main.async {
+                        self.showAlert(
+                            title: "Update Check Failed",
+                            message: "No response data received from GitHub.",
+                            style: .warning
+                        )
+                    }
+                }
+                return
+            }
+
+            let json: [String: Any]
+            do {
+                guard let parsed = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    throw NSError(domain: "UpdateError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Malformed response payload"])
+                }
+                json = parsed
+            } catch {
+                Log.general.error("Failed to parse GitHub update release payload: \(error.localizedDescription)")
                 if userInitiated {
                     DispatchQueue.main.async {
                         self.showAlert(
@@ -346,8 +365,12 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
         let extractDir = URL(fileURLWithPath: "/tmp/mooziac_extract_\(UUID().uuidString)")
 
         do {
-            try? FileManager.default.removeItem(at: tempZipURL)
-            try? FileManager.default.removeItem(at: extractDir)
+            if FileManager.default.fileExists(atPath: tempZipURL.path) {
+                try FileManager.default.removeItem(at: tempZipURL)
+            }
+            if FileManager.default.fileExists(atPath: extractDir.path) {
+                try FileManager.default.removeItem(at: extractDir)
+            }
             try FileManager.default.copyItem(at: location, to: tempZipURL)
             try FileManager.default.createDirectory(at: extractDir, withIntermediateDirectories: true)
 
@@ -401,9 +424,14 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
                 let relaunchProcess = Process()
                 relaunchProcess.executableURL = URL(fileURLWithPath: "/bin/bash")
                 relaunchProcess.arguments = [scriptPath]
-                try? relaunchProcess.run()
 
-                NSApp.terminate(nil)
+                do {
+                    try relaunchProcess.run()
+                    NSApp.terminate(nil)
+                } catch {
+                    Log.general.error("Failed to execute update relaunch script: \(error.localizedDescription)")
+                    self?.handleUpdateFailure(error: error)
+                }
             }
         } catch {
             DispatchQueue.main.async { [weak self] in

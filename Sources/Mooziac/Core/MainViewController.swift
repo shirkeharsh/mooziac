@@ -214,6 +214,9 @@ class MainViewController: NSViewController, DynamicIslandPlayerViewDelegate, Hea
         let cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanQuery.isEmpty else { return }
 
+        // Mood change / search: explicitly release any active playlist context
+        PlaylistManager.shared.clearActiveContext()
+
         // 1. Offline Mode Search & Local Fallback
         if NowPlayingManager.shared.engineMode == .offline || !NetworkMonitor.shared.isReachable {
             if let result = findBestLocalTrack(for: cleanQuery) {
@@ -233,126 +236,167 @@ class MainViewController: NSViewController, DynamicIslandPlayerViewDelegate, Hea
         setBrowserVisible(false)
         setOfflineLibraryVisible(false)
 
-        guard let encoded = cleanQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "https://music.youtube.com/search?q=\(encoded)") else { return }
+        Log.playback.debug("Searching and auto-playing '\(cleanQuery)'")
+        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "🔍 Searching: \"\(cleanQuery)\"")
 
-        print("[MainViewController] Searching and auto-playing '\(cleanQuery)'...")
-        webViewContainer.webView.load(URLRequest(url: url))
-        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "🔍 Playing: \"\(cleanQuery)\"")
-
-        // Enhanced Auto-play JavaScript that handles all modern YouTube Music result layouts and enforces active playback
-        let autoPlayJS = """
-        (function() {
-            function triggerClick(element) {
-                if (!element) return false;
-                try {
-                    element.scrollIntoView({ behavior: 'instant', block: 'center' });
-                    var opts = { bubbles: true, cancelable: true, view: window };
-                    element.dispatchEvent(new MouseEvent('mousedown', opts));
-                    element.dispatchEvent(new MouseEvent('mouseup', opts));
-                    element.dispatchEvent(new MouseEvent('click', opts));
-                    if (typeof element.click === 'function') { element.click(); }
-                    return true;
-                } catch(e) {
-                    try { element.click(); return true; } catch(err) { return false; }
+        // Fast Path: Resolve exact top matching song via InnerTube API without webView reload
+        YTMClient.shared.searchTopTrack(query: cleanQuery) { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                switch result {
+                case .success(let track):
+                    Log.playback.info("Direct search resolved track '\(track.title)' by '\(track.artist)' (videoId: \(track.videoId))")
+                    let displayTitle = track.artist.isEmpty ? track.title : "\(track.title) - \(track.artist)"
+                    CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "▶ Playing: \"\(displayTitle)\"")
+                    self.webViewContainer.navigateToVideo(videoId: track.videoId)
+                case .failure(let error):
+                    Log.playback.warning("InnerTube search fallback to webView search page: \(error.localizedDescription)")
+                    self.performWebViewSearchFallback(query: cleanQuery)
                 }
-            }
-
-            function ensurePlaying() {
-                try {
-                    var player = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
-                    if (player && typeof player.playVideo === 'function') {
-                        var state = typeof player.getPlayerState === 'function' ? player.getPlayerState() : -1;
-                        if (state !== 1 && state !== 3) {
-                            player.playVideo();
-                        }
-                    }
-                } catch(e) {}
-
-                try {
-                    var video = document.querySelector('video');
-                    if (video && video.paused && !video.ended && video.readyState >= 1) {
-                        video.play().catch(function(){});
-                    }
-                } catch(e) {}
-
-                try {
-                    var playBtn = document.querySelector('ytmusic-player-bar #play-pause-button[aria-label="Play"]') ||
-                                  document.querySelector('#play-pause-button[title="Play"]');
-                    if (playBtn) {
-                        triggerClick(playBtn);
-                    }
-                } catch(e) {}
-            }
-
-            var clickedTrack = false;
-
-            function findAndPlayTopTrack() {
-                if (!clickedTrack) {
-                    // Priority 1: Top Result card play button
-                    var topCardBtn = document.querySelector('ytmusic-card-shelf-renderer ytmusic-play-button-renderer #button') ||
-                                     document.querySelector('ytmusic-card-shelf-renderer ytmusic-play-button-renderer') ||
-                                     document.querySelector('ytmusic-card-shelf-renderer #play-button');
-                    if (topCardBtn && triggerClick(topCardBtn)) {
-                        clickedTrack = true;
-                        ensurePlaying();
-                        return true;
-                    }
-
-                    // Priority 2: First Song in Songs list
-                    var songRows = document.querySelectorAll('ytmusic-responsive-list-item-renderer');
-                    for (var i = 0; i < songRows.length; i++) {
-                        var row = songRows[i];
-                        var btn = row.querySelector('ytmusic-play-button-renderer #button') ||
-                                  row.querySelector('ytmusic-play-button-renderer') ||
-                                  row.querySelector('.play-button') ||
-                                  row.querySelector('#play-button');
-                        if (btn && triggerClick(btn)) {
-                            clickedTrack = true;
-                            ensurePlaying();
-                            return true;
-                        }
-                        var link = row.querySelector('a.yt-simple-endpoint') || row.querySelector('.title a');
-                        if (link && triggerClick(link)) {
-                            clickedTrack = true;
-                            ensurePlaying();
-                            return true;
-                        }
-                    }
-
-                    // Priority 3: Any play button on search results
-                    var anyPlayBtn = document.querySelector('ytmusic-play-button-renderer #button') ||
-                                     document.querySelector('ytmusic-play-button-renderer');
-                    if (anyPlayBtn && triggerClick(anyPlayBtn)) {
-                        clickedTrack = true;
-                        ensurePlaying();
-                        return true;
-                    }
-                } else {
-                    ensurePlaying();
-                }
-
-                return false;
-            }
-
-            var attempts = 0;
-            var timer = setInterval(function() {
-                attempts++;
-                findAndPlayTopTrack();
-                ensurePlaying();
-                if (attempts > 30) {
-                    clearInterval(timer);
-                }
-            }, 250);
-        })();
-        """
-
-        for delay in [0.4, 0.8, 1.3, 1.8, 2.5] {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                self?.webViewContainer.webView.evaluateJavaScript(autoPlayJS, completionHandler: nil)
             }
         }
     }
+
+    private func performWebViewSearchFallback(query: String) {
+        guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://music.youtube.com/search?q=\(encoded)") else { return }
+
+        webViewContainer.webView.load(URLRequest(url: url))
+        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "🔍 Playing: \"\(query)\"")
+
+        // Evaluate safe autoplay script after page has had time to load
+        for delay in [1.2, 2.0, 3.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                self?.webViewContainer.webView.evaluateJavaScript(Self.safeSearchAutoPlayJS, completionHandler: nil)
+            }
+        }
+    }
+
+    public static let safeSearchAutoPlayJS = """
+    (function() {
+        var href = window.location.href;
+        if (href.indexOf('music.youtube.com') === -1 || href.indexOf('search?q=') === -1) {
+            return;
+        }
+
+        function triggerClick(element) {
+            if (!element) return false;
+            try {
+                element.scrollIntoView({ behavior: 'instant', block: 'center' });
+                var opts = { bubbles: true, cancelable: true, view: window };
+                element.dispatchEvent(new MouseEvent('mousedown', opts));
+                element.dispatchEvent(new MouseEvent('mouseup', opts));
+                element.dispatchEvent(new MouseEvent('click', opts));
+                if (typeof element.click === 'function') { element.click(); }
+                return true;
+            } catch(e) {
+                try { element.click(); return true; } catch(err) { return false; }
+            }
+        }
+
+        function ensurePlaying() {
+            try {
+                var player = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
+                if (player && typeof player.playVideo === 'function') {
+                    var state = typeof player.getPlayerState === 'function' ? player.getPlayerState() : -1;
+                    if (state !== 1 && state !== 3) {
+                        player.playVideo();
+                    }
+                }
+            } catch(e) {}
+
+            try {
+                var video = document.querySelector('video');
+                if (video && video.paused && !video.ended && video.readyState >= 1) {
+                    video.play().catch(function(){});
+                }
+            } catch(e) {}
+
+            try {
+                var playBtn = document.querySelector('ytmusic-player-bar #play-pause-button[aria-label="Play"]') ||
+                              document.querySelector('#play-pause-button[title="Play"]');
+                if (playBtn) {
+                    triggerClick(playBtn);
+                }
+            } catch(e) {}
+        }
+
+        var clickedTrack = false;
+
+        function findAndPlayTopTrack() {
+            if (window.location.href.indexOf('search?q=') === -1) return false;
+
+            var searchContainer = document.querySelector('ytmusic-tab-renderer[page-type="MUSIC_PAGE_TYPE_SEARCH"]') ||
+                                  document.querySelector('ytmusic-section-list-renderer') ||
+                                  document.querySelector('ytmusic-search-page');
+            if (!searchContainer) return false;
+
+            if (!clickedTrack) {
+                // Priority 1: Top Result Card ONLY if it is a Song or Video (not artist radio/shuffle)
+                var topCard = searchContainer.querySelector('ytmusic-card-shelf-renderer');
+                if (topCard) {
+                    var subEl = topCard.querySelector('.subtitle') || topCard.querySelector('#subtitle');
+                    var subText = subEl ? (subEl.textContent || '') : '';
+                    var isArtist = subText.toLowerCase().indexOf('artist') !== -1;
+                    var isPodcast = subText.toLowerCase().indexOf('episode') !== -1 || subText.toLowerCase().indexOf('podcast') !== -1;
+
+                    if (!isArtist && !isPodcast) {
+                        var topCardBtn = topCard.querySelector('ytmusic-play-button-renderer #button') ||
+                                         topCard.querySelector('ytmusic-play-button-renderer') ||
+                                         topCard.querySelector('#play-button');
+                        if (topCardBtn && triggerClick(topCardBtn)) {
+                            clickedTrack = true;
+                            setTimeout(ensurePlaying, 350);
+                            return true;
+                        }
+                    }
+
+                    // For artist cards, check if the card contains individual top songs
+                    var cardSong = topCard.querySelector('ytmusic-responsive-list-item-renderer ytmusic-play-button-renderer #button') ||
+                                   topCard.querySelector('ytmusic-responsive-list-item-renderer a.yt-simple-endpoint');
+                    if (cardSong && triggerClick(cardSong)) {
+                        clickedTrack = true;
+                        setTimeout(ensurePlaying, 350);
+                        return true;
+                    }
+                }
+
+                // Priority 2: First Song in Songs shelf
+                var songRows = searchContainer.querySelectorAll('ytmusic-responsive-list-item-renderer');
+                for (var i = 0; i < songRows.length; i++) {
+                    var row = songRows[i];
+                    var btn = row.querySelector('ytmusic-play-button-renderer #button') ||
+                              row.querySelector('ytmusic-play-button-renderer') ||
+                              row.querySelector('.play-button') ||
+                              row.querySelector('#play-button');
+                    if (btn && triggerClick(btn)) {
+                        clickedTrack = true;
+                        setTimeout(ensurePlaying, 350);
+                        return true;
+                    }
+                    var link = row.querySelector('a.yt-simple-endpoint') || row.querySelector('.title a');
+                    if (link && triggerClick(link)) {
+                        clickedTrack = true;
+                        setTimeout(ensurePlaying, 350);
+                        return true;
+                    }
+                }
+            } else {
+                ensurePlaying();
+            }
+
+            return false;
+        }
+
+        var attempts = 0;
+        var timer = setInterval(function() {
+            attempts++;
+            if (findAndPlayTopTrack() || attempts > 25) {
+                clearInterval(timer);
+            }
+        }, 250);
+    })();
+    """
 
     private func findBestLocalTrack(for query: String) -> (best: LocalTrack, matches: [LocalTrack])? {
         let cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()

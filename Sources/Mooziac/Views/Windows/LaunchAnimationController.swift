@@ -3,8 +3,6 @@ import SwiftUI
 
 @MainActor
 final class LaunchAnimationController {
-    public static let shared = LaunchAnimationController()
-
     private let timeline = LaunchAnimationTimeline()
     private let sound = ClickSound()
 

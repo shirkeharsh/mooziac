@@ -5,12 +5,18 @@ import Foundation
 
 public final class VisualMatrixVideoGenerator {
     public static func run(completion: @escaping (URL?) -> Void) {
-        print("\n🎬 [Mooziac Video Studio] Starting automated 60 FPS MP4 video render...")
+        Log.general.info("Starting automated 60 FPS MP4 video render")
         
         let outputURL = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Desktop/Mooziac_Showcase_Demo.mp4")
         
-        try? FileManager.default.removeItem(at: outputURL)
+        if FileManager.default.fileExists(atPath: outputURL.path) {
+            do {
+                try FileManager.default.removeItem(at: outputURL)
+            } catch {
+                Log.general.warning("Failed to remove existing output file: \(error.localizedDescription)")
+            }
+        }
         
         let width = 1280
         let height = 720
@@ -18,8 +24,11 @@ public final class VisualMatrixVideoGenerator {
         let durationSeconds: Double = 16.0
         let totalFrames = Int(durationSeconds * Double(fps))
         
-        guard let writer = try? AVAssetWriter(outputURL: outputURL, fileType: .mp4) else {
-            print("❌ Failed to create AVAssetWriter")
+        let writer: AVAssetWriter
+        do {
+            writer = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
+        } catch {
+            Log.general.error("Failed to create AVAssetWriter: \(error.localizedDescription)")
             completion(nil)
             return
         }
@@ -51,7 +60,7 @@ public final class VisualMatrixVideoGenerator {
         )
         
         guard writer.canAdd(writerInput) else {
-            print("❌ Cannot add writer input")
+            Log.general.error("Cannot add writer input")
             completion(nil)
             return
         }
@@ -182,7 +191,7 @@ public final class VisualMatrixVideoGenerator {
             
             if frameIndex % 120 == 0 {
                 let pct = Int((Double(frameIndex) / Double(totalFrames)) * 100)
-                print("🎥 Rendering frames: \(pct)% (\(frameIndex)/\(totalFrames))")
+                Log.general.debug("Rendering frames: \(pct)% (\(frameIndex)/\(totalFrames))")
             }
         }
         
@@ -193,8 +202,7 @@ public final class VisualMatrixVideoGenerator {
         }
         sema.wait()
         
-        print("\n🎉 [Mooziac Video Studio] Render Complete!")
-        print("📹 Saved MP4 Video to: \(outputURL.path)\n")
+        Log.general.info("Render complete. Saved MP4 video to: \(outputURL.path)")
         completion(outputURL)
     }
     

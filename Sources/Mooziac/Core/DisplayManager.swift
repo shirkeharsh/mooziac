@@ -2,11 +2,9 @@ import AppKit
 
 /// Centralized display detection, frame persistence, and safe-area boundary manager for Mooziac.
 public final class DisplayManager: NSObject {
-    public static let shared = DisplayManager()
-
     public var onDisplayConfigurationChanged: (() -> Void)?
 
-    private override init() {
+    public override init() {
         super.init()
         setupObservers()
     }

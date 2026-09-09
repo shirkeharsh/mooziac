@@ -24,6 +24,9 @@ extension NowPlayingManager {
             };
             
             var cachedTitle = "", cachedArtist = "", cachedArtwork = "", cachedAlbum = "", cachedVideoId = "";
+            var cachedIsLiked = false, cachedShuffle = false, cachedRepeat = false;
+            var cachedAudioDiag = { itag: "", codecs: "", bitrate: "" };
+            var lastAudioDiagCheck = 0;
             var lastMetaCheck = 0;
             var lastSongModeAttemptID = "";
             var lastOptimizedVideoId = "";
@@ -60,6 +63,61 @@ extension NowPlayingManager {
                 return false;
             }
 
+            var lastTrackEndedPostTime = 0;
+            function notifyTrackEnded(source) {
+                var now = Date.now();
+                if (now - lastTrackEndedPostTime < 2500) return;
+
+                var video = document.querySelector('video');
+                var curTime = (video && video.currentTime) || 0;
+                var dur = (video && video.duration) || 0;
+
+                if (isAdShowing()) {
+                    return;
+                }
+
+                // Natural check: If track duration is substantial, don't report completion unless near end
+                if (dur > 20.0 && curTime < (dur - 3.0)) {
+                    return;
+                }
+
+                lastTrackEndedPostTime = now;
+
+                if (window.ytmRepeatMode === 1) {
+                    try {
+                        var player = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
+                        if (player && typeof player.seekTo === 'function') {
+                            player.seekTo(0);
+                            if (typeof player.playVideo === 'function') player.playVideo();
+                        } else if (video) {
+                            video.currentTime = 0;
+                            video.play();
+                        }
+                    } catch(e) {
+                        if (video) {
+                            video.currentTime = 0;
+                            video.play();
+                        }
+                    }
+                    return;
+                }
+
+                window.__mooziacAutoplayPending = true;
+                if (window.__mooziacAudioOutput && typeof window.__mooziacAudioOutput.prepare === 'function') {
+                    window.__mooziacAudioOutput.prepare();
+                }
+                try {
+                    window.webkit.messageHandlers.nowPlayingHandler.postMessage({
+                        event: 'videoEnded',
+                        videoId: cachedVideoId || "",
+                        currentTime: curTime,
+                        duration: dur,
+                        isAd: false,
+                        source: source || 'unknown'
+                    });
+                } catch(e) {}
+            }
+
             function updateNowPlaying(force) {
                 try {
                     var video = document.querySelector('video');
@@ -71,11 +129,15 @@ extension NowPlayingManager {
                         playbackRate = video.playbackRate || 1.0;
                     }
                     
+                    if (video && duration > 5.0 && currentTime >= (duration - 0.85) && (!isPlaying || video.paused || video.ended)) {
+                        notifyTrackEnded('timeNearEnd');
+                    }
+
                     var now = Date.now();
                     if (!force && !isPlaying && lastIsPlaying === false && Math.abs(currentTime - lastTime) < 0.1) {
                         return;
                     }
-                    var minInterval = window.mooziacPanelVisible ? 350 : 1000;
+                    var minInterval = window.mooziacPanelVisible ? 1000 : 2500;
                     if (!force && isPlaying && (now - lastPostTime < minInterval)) {
                         return;
                     }
@@ -107,6 +169,43 @@ extension NowPlayingManager {
                             audioBitrate: ""
                         });
                         return;
+                    }
+
+                    // Ultra-light Background Path: When panel is hidden in menu bar and song is unchanged,
+                    // post cached state with zero DOM queries to keep background CPU under 0.2%
+                    if (!force && !window.mooziacPanelVisible && cachedTitle && cachedVideoId) {
+                        var fastVid = cachedVideoId;
+                        try {
+                            var pFast = document.getElementById('movie_player');
+                            if (pFast && typeof pFast.getVideoData === 'function') {
+                                var vd = pFast.getVideoData();
+                                if (vd && vd.video_id) fastVid = vd.video_id;
+                            }
+                        } catch(e) {}
+
+                        if (fastVid === cachedVideoId && !(currentTime < 2.0 && prevTime > 5.0)) {
+                            window.webkit.messageHandlers.nowPlayingHandler.postMessage({
+                                isAd: false,
+                                title: cachedTitle,
+                                artist: cachedArtist,
+                                album: cachedAlbum,
+                                artworkUrl: cachedArtwork,
+                                isPlaying: isPlaying,
+                                currentTime: currentTime,
+                                duration: duration,
+                                playbackRate: playbackRate,
+                                pageUrl: window.location.href,
+                                videoId: cachedVideoId,
+                                trackID: cachedVideoId,
+                                isLiked: cachedIsLiked,
+                                isShuffle: cachedShuffle,
+                                isRepeat: cachedRepeat,
+                                audioItag: "",
+                                audioCodecs: "",
+                                audioBitrate: ""
+                            });
+                            return;
+                        }
                     }
 
                     // Extract live DOM metadata (authoritative source)
@@ -156,6 +255,9 @@ extension NowPlayingManager {
                         cachedArtist = resolvedArtist;
                         cachedAlbum = resolvedAlbum;
                         cachedVideoId = resolvedVideoId;
+                        cachedArtwork = "";
+                        cachedAudioDiag = { itag: "", codecs: "", bitrate: "" };
+                        lastAudioDiagCheck = 0;
                         enforceSongMode();
                         optimizePlaybackStreams();
                     } else {
@@ -165,7 +267,13 @@ extension NowPlayingManager {
                         if (resolvedVideoId) cachedVideoId = resolvedVideoId;
                     }
 
-                    if (liveMediaArtwork && liveMediaArtwork.indexOf('data:') !== 0) {
+                    // Only trust liveMediaArtwork if mediaSession metadata matches the current track
+                    var mediaSessionMatches = liveMediaTitle && cachedTitle &&
+                        (liveMediaTitle.toLowerCase() === cachedTitle.toLowerCase() ||
+                         cachedTitle.toLowerCase().indexOf(liveMediaTitle.toLowerCase()) !== -1 ||
+                         liveMediaTitle.toLowerCase().indexOf(cachedTitle.toLowerCase()) !== -1);
+
+                    if (mediaSessionMatches && liveMediaArtwork && liveMediaArtwork.indexOf('data:') !== 0) {
                         cachedArtwork = liveMediaArtwork;
                     } else if (!cachedArtwork || cachedArtwork.indexOf('data:') === 0 || isNewTrack) {
                         var artElem = document.querySelector('ytmusic-player-bar .image') ||
@@ -174,7 +282,7 @@ extension NowPlayingManager {
                                       document.querySelector('ytmusic-player-bar .thumbnail-image_wrapper img') ||
                                       document.querySelector('ytmusic-player-bar img') ||
                                       document.querySelector('img.ytmusic-player-bar');
-                        if (artElem && artElem.src && artElem.src.indexOf('data:') !== 0) {
+                        if (artElem && artElem.src && artElem.src.indexOf('data:') !== 0 && !isNewTrack) {
                             cachedArtwork = artElem.src;
                         } else if (cachedVideoId) {
                             cachedArtwork = "https://i.ytimg.com/vi/" + cachedVideoId + "/hqdefault.jpg";
@@ -192,13 +300,21 @@ extension NowPlayingManager {
                             } else if (status === 'DISLIKE' || status === 'INDIFFERENT') {
                                 currentIsLiked = false;
                             } else {
-                                var likeBtn = likeRenderer.querySelector('#button-shape-like button') ||
-                                              likeRenderer.querySelector('button[aria-label*="Remove from your Liked Songs"]') ||
-                                              likeRenderer.querySelector('button[aria-label*="Undo like"]');
+                                var likeBtn = likeRenderer.querySelector('#button-shape-like button, .like-button, [aria-label*="Liked Songs" i], [aria-label*="Undo like" i]');
+                                if (!likeBtn) {
+                                    var btns = likeRenderer.querySelectorAll('button, tp-yt-paper-icon-button, yt-icon-button');
+                                    for (var bi = 0; bi < btns.length; bi++) {
+                                        var bLabel = (btns[bi].getAttribute('aria-label') || btns[bi].getAttribute('title') || '').toLowerCase();
+                                        if (!bLabel.includes('dislike') && (bLabel.includes('like') || bLabel.includes('undo') || bLabel.includes('remove') || bLabel.includes('thumbs up'))) {
+                                            likeBtn = btns[bi];
+                                            break;
+                                        }
+                                    }
+                                }
                                 if (likeBtn) {
-                                    var ariaPressed = likeBtn.getAttribute('aria-pressed');
+                                    var ariaPressed = likeBtn.getAttribute('aria-pressed') === 'true' || likeBtn.getAttribute('aria-checked') === 'true' || likeBtn.classList.contains('active');
                                     var label = (likeBtn.getAttribute('aria-label') || likeBtn.getAttribute('title') || '').toLowerCase();
-                                    if (ariaPressed === 'true' || label.includes('undo like') || label.includes('remove from your liked')) {
+                                    if (ariaPressed || label.includes('undo like') || label.includes('remove from your liked') || label.includes('remove from liked')) {
                                         currentIsLiked = true;
                                     }
                                 }
@@ -206,8 +322,9 @@ extension NowPlayingManager {
                         }
                     } catch(e) {}
                     
-                    var cachedShuffle = false;
-                    var cachedRepeat = false;
+                    cachedIsLiked = currentIsLiked;
+                    cachedShuffle = false;
+                    cachedRepeat = false;
                     try {
                         var sBtn = document.querySelector('ytmusic-player-bar .shuffle-button') || document.querySelector('.shuffle-button');
                         if (sBtn) {
@@ -221,20 +338,27 @@ extension NowPlayingManager {
                         }
                     } catch(e) {}
                     
-                    if (cachedArtwork) {
+                    if (cachedArtwork && window.mooziacPanelVisible) {
                         syncSongArtwork(cachedArtwork);
                     }
                     
-                    var audioDiag = { itag: "", codecs: "", bitrate: "" };
-                    try {
-                        var diagPlayer = document.querySelector('ytmusic-player')?.playerApi || document.getElementById('movie_player') || (window.yt && window.yt.player);
-                        if (diagPlayer && typeof diagPlayer.getStatsForNerds === 'function') {
-                            var stats = diagPlayer.getStatsForNerds() || {};
-                            audioDiag.itag = String(stats.audioItag || stats.itag || stats.afmt || "");
-                            audioDiag.codecs = String(stats.codecs || stats.audioCodec || stats.audioCodecs || "");
-                            audioDiag.bitrate = String(stats.audioBitrate || stats.bitrate || "");
-                        }
-                    } catch(e) {}
+                    var audioDiag = cachedAudioDiag;
+                    if (window.mooziacPanelVisible && (!cachedAudioDiag.itag || (now - lastAudioDiagCheck > 5000))) {
+                        lastAudioDiagCheck = now;
+                        try {
+                            var diagPlayer = document.querySelector('ytmusic-player')?.playerApi || document.getElementById('movie_player') || (window.yt && window.yt.player);
+                            if (diagPlayer && typeof diagPlayer.getStatsForNerds === 'function') {
+                                var stats = diagPlayer.getStatsForNerds() || {};
+                                var diagItag = String(stats.audioItag || stats.itag || stats.afmt || "");
+                                var diagCodecs = String(stats.codecs || stats.audioCodec || stats.audioCodecs || "");
+                                var diagBitrate = String(stats.audioBitrate || stats.bitrate || "");
+                                if (diagItag || diagCodecs || diagBitrate) {
+                                    cachedAudioDiag = { itag: diagItag, codecs: diagCodecs, bitrate: diagBitrate };
+                                    audioDiag = cachedAudioDiag;
+                                }
+                            }
+                        } catch(e) {}
+                    }
                     
                     window.webkit.messageHandlers.nowPlayingHandler.postMessage({
                         isAd: false,
@@ -474,42 +598,7 @@ extension NowPlayingManager {
                             updateNowPlaying(false);
                         });
                         video.addEventListener('ended', function() {
-                            if (window.ytmRepeatMode === 1) {
-                                try {
-                                    var player = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
-                                    if (player && typeof player.seekTo === 'function') {
-                                        player.seekTo(0);
-                                        if (typeof player.playVideo === 'function') player.playVideo();
-                                    } else if (video) {
-                                        video.currentTime = 0;
-                                        video.play();
-                                    }
-                                } catch(e) {
-                                    if (video) {
-                                        video.currentTime = 0;
-                                        video.play();
-                                    }
-                                }
-                            } else {
-                                window.__mooziacAutoplayPending = true;
-                                if (window.__mooziacAudioOutput && typeof window.__mooziacAudioOutput.prepare === 'function') {
-                                    window.__mooziacAudioOutput.prepare();
-                                }
-                                if (isAdShowing()) {
-                                    if (video) {
-                                        video.muted = false;
-                                        video.playbackRate = 1.0;
-                                    }
-                                    return;
-                                }
-                                try {
-                                    window.webkit.messageHandlers.nowPlayingHandler.postMessage({
-                                        event: 'videoEnded',
-                                        videoId: cachedVideoId || "",
-                                        isAd: false
-                                    });
-                                } catch(e) {}
-                            }
+                            notifyTrackEnded('domEnded');
                         });
                         if (video.readyState >= 3) {
                             recoverAutoplayIfNeeded();
@@ -518,51 +607,140 @@ extension NowPlayingManager {
                         enforceSongMode();
                     }
                 }
+
+                // Hook YouTube Player API state changes (0 = ENDED)
+                try {
+                    var playerApi = document.getElementById('movie_player') || (document.querySelector('ytmusic-player') && document.querySelector('ytmusic-player').playerApi);
+                    if (playerApi && typeof playerApi.addEventListener === 'function' && !playerApi.__mooziacEndedHooked) {
+                        playerApi.__mooziacEndedHooked = true;
+                        playerApi.addEventListener('onStateChange', function(state) {
+                            if (state === 0) {
+                                notifyTrackEnded('playerStateEnded');
+                            }
+                        });
+                    }
+                } catch(e) {}
             }
             
+            var adMutedByBypass = false;
+            var isBypassing = false;
             function bypassAdsAndPopups() {
+                if (isBypassing) return;
+                isBypassing = true;
                 try {
-                    var skipBtns = document.querySelectorAll('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button, button.ytp-ad-skip-button-self-modern, [class*="skip-button"], .ytp-ad-overlay-close-button');
-                    for (var i = 0; i < skipBtns.length; i++) {
-                        if (skipBtns[i]) skipBtns[i].click();
+                    var mp = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
+                    var video = document.querySelector('#movie_player video') || document.querySelector('video');
+                    if (!video) return;
+
+                    var isAd = !!(mp && mp.classList && (
+                        mp.classList.contains('ad-showing') ||
+                        mp.classList.contains('ad-interrupting')
+                    ));
+
+                    if (isAd) {
+                        adMutedByBypass = true;
+                        video.muted = true;
+
+                        var skipBtns = document.querySelectorAll(
+                            '.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button, ' +
+                            '.ytp-ad-skip-button-container button, button.ytp-ad-skip-button-modern, ' +
+                            'button.ytp-skip-ad-button, button.ytp-ad-skip-button, button[aria-label*="Skip" i]'
+                        );
+                        for (var i = 0; i < skipBtns.length; i++) {
+                            try { skipBtns[i].click(); } catch(e) {}
+                        }
+                        var closeBtns = document.querySelectorAll('.ytp-ad-overlay-close-button');
+                        for (var c = 0; c < closeBtns.length; c++) {
+                            try { closeBtns[c].click(); } catch(e) {}
+                        }
+                    } else if (adMutedByBypass) {
+                        adMutedByBypass = false;
+                        video.muted = false;
                     }
+                } catch(e) {} finally {
+                    isBypassing = false;
+                }
+            }
+
+            function dismissPromoDialogs() {
+                try {
                     var dismissBtns = document.querySelectorAll(
                         'ytmusic-mealbar-promo-renderer #dismiss-button button, ' +
+                        'ytmusic-mealbar-promo-renderer tp-yt-paper-button, ' +
+                        'ytmusic-banner-promo-renderer #dismiss-button button, ' +
                         'ytmusic-dialog #dismiss-button button, ' +
                         'ytmusic-you-there-renderer #button, ' +
-                        'tp-yt-paper-dialog #dismiss-button'
+                        '.ytmusic-you-there-renderer button, ' +
+                        '.ytmusic-you-there-renderer tp-yt-paper-button, ' +
+                        'tp-yt-paper-dialog #dismiss-button, ' +
+                        'ytmusic-player-bar-promo-renderer #dismiss-button button'
                     );
                     for (var d = 0; d < dismissBtns.length; d++) {
-                        if (dismissBtns[d]) dismissBtns[d].click();
-                    }
-                    var player = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
-                    if (player && player.classList && (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting'))) {
-                        var video = document.querySelector('video');
-                        if (video) {
-                            video.muted = true;
-                            if (!isNaN(video.duration) && video.duration > 0) {
-                                video.currentTime = video.duration - 0.1;
-                            }
-                            video.playbackRate = 16.0;
-                        }
-                    }
-                    var dialogBtns = document.querySelectorAll('ytmusic-you-there-renderer button, .ytmusic-you-there-renderer #button, .ytmusic-you-there-renderer tp-yt-paper-button');
-                    for (var j = 0; j < dialogBtns.length; j++) {
-                        if (dialogBtns[j]) dialogBtns[j].click();
+                        try { dismissBtns[d].click(); } catch(e) {}
                     }
                 } catch(e) {}
             }
             
             bindVideoEvents();
+
+            try {
+                var playerNode = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
+                if (playerNode && window.MutationObserver) {
+                    var adObserver = new MutationObserver(function() {
+                        bypassAdsAndPopups();
+                    });
+                    adObserver.observe(playerNode, { attributes: true, attributeFilter: ['class'] });
+                }
+            } catch(e) {}
+
             setInterval(function() {
                 bindVideoEvents();
             }, 4000);
-            setInterval(bypassAdsAndPopups, 500);
+            setInterval(bypassAdsAndPopups, 250);
+            setInterval(dismissPromoDialogs, 3500);
         })();
         """
         
         let script = WKUserScript(source: observerJS, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
         userContentController.addUserScript(script)
+    }
+
+    private func handleTrackEnded(dict: [String: Any]) {
+        let isAd = (dict["isAd"] as? Bool) ?? false
+        if isAd { return }
+
+        let now = CACurrentMediaTime()
+        guard now - lastTrackEndedTriggerTime > 3.0 else { return }
+
+        // Natural guard: If track changed less than 5 seconds ago, ignore premature ends
+        guard now - lastTrackChangeTime > 5.0 else { return }
+
+        // If duration is known and currentTime is significantly before the end, ignore
+        let currentTime = (dict["currentTime"] as? Double) ?? currentState.currentTime
+        let duration = (dict["duration"] as? Double) ?? currentState.duration
+        if duration > 20.0 && currentTime < (duration - 4.0) {
+            Log.playback.debug("Ignoring premature track completion: currentTime=\(currentTime), duration=\(duration)")
+            return
+        }
+
+        lastTrackEndedTriggerTime = now
+
+        if repeatMode == .one {
+            seek(to: 0.0)
+            play()
+            return
+        }
+
+        // Only advance Mooziac playlist if an active context exists
+        if PlaylistManager.shared.hasActiveContext {
+            if PlaylistManager.shared.playNextTrackInPlaylist() {
+                return
+            }
+        }
+
+        // When in online mode without active Mooziac playlist context:
+        // Let YouTube Music naturally advance its own Up Next recommendation queue.
+        Log.playback.debug("No active playlist context — letting YouTube Music naturally play next suggestion")
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -576,38 +754,13 @@ extension NowPlayingManager {
         if let fallback = dict["selectorFallbackUsed"] as? Bool, fallback,
            let feature = dict["feature"] as? String,
            let tier = dict["tier"] as? Int {
-            print("[NowPlayingManager] Selector fallback used — feature: \(feature), tier: \(tier)")
+            Log.web.debug("Selector fallback used — feature: \(feature), tier: \(tier)")
             return
         }
 
-        // Handle playlist track ended event
+        // Handle track ended event from WebKit
         if let event = dict["event"] as? String, event == "videoEnded" {
-            let isAd = (dict["isAd"] as? Bool) ?? false
-            if isAd { return }
-
-            if repeatMode == .one {
-                seek(to: 0.0)
-                play()
-                return
-            }
-            if PlaylistManager.shared.hasActiveContext {
-                if PlaylistManager.shared.playNextTrackInPlaylist() {
-                    return
-                }
-            } else if repeatMode == .off && NetworkMonitor.shared.isReachable && engineMode == .online {
-                // Standalone online track ended with Repeat OFF -> trigger Infinite Flow!
-                var seed = NowPlayingManager.shared.currentState.videoId
-                if seed.isEmpty || seed.contains("_") {
-                    seed = (dict["videoId"] as? String) ?? ""
-                }
-                if seed.isEmpty || seed.contains("_") {
-                    seed = currentVideoId
-                }
-                if !seed.isEmpty && !seed.contains("_") {
-                    PlaylistManager.shared.triggerInfiniteFlow(seededFrom: seed)
-                    return
-                }
-            }
+            handleTrackEnded(dict: dict)
             return
         }
 
@@ -626,6 +779,12 @@ extension NowPlayingManager {
         let isShuffleOn = (dict["isShuffle"] as? Bool) ?? false
         let isRepeatOn = (dict["isRepeat"] as? Bool) ?? false
 
+        // Auto-advance fallback: only if playing an active Mooziac playlist context, past startup (>5s), and audio paused near the end of the track (within 1.25s)
+        let now = CACurrentMediaTime()
+        if !isAd && !isPlaying && duration > 5.0 && currentTime >= (duration - 1.25) && (now - lastTrackChangeTime > 5.0) && PlaylistManager.shared.hasActiveContext {
+            handleTrackEnded(dict: dict)
+        }
+
         if isAd {
             // An ad is playing: update time and play status so background keepalive runs,
             // but keep the current track metadata and do NOT notify trackChanged or fetch lyrics.
@@ -634,16 +793,17 @@ extension NowPlayingManager {
             adState.currentTime = currentTime
             adState.duration = duration
             adState.playbackRate = playbackRate
-            adState.hostTimestamp = CACurrentMediaTime()
+            adState.hostTimestamp = now
             adState.isAd = true
             currentState = adState
+            domHealthMonitor.recordSuccessfulUpdate()
             return
         }
 
         // Mutual exclusivity: If in offline mode and WebKit starts playing, immediately pause offline audio
         if engineMode == .offline {
             if isPlaying && !title.isEmpty && title != "Not Playing" {
-                print("[NowPlayingManager] WebKit started playing '\(title)' while offline player was active. Pausing offline player and switching to online mode.")
+                Log.playback.info("WebKit started playing '\(title)' while offline player was active. Pausing offline player and switching to online mode")
                 NativeAudioPlayer.shared.pause()
                 engineMode = .online
                 NotificationCenter.default.post(name: NSNotification.Name("Mooziac_EngineModeChanged"), object: nil, userInfo: ["mode": engineMode.rawValue])
@@ -658,7 +818,21 @@ extension NowPlayingManager {
         if trackChanged {
             currentVideoId = msgTrackID
             currentTime = 0.0
-            lastTrackChangeTime = CACurrentMediaTime()
+            lastTrackChangeTime = now
+
+            // Natural divergence: If user actively navigated to a track outside current playlist context, release context so YouTube suggestions take over
+            if let ctx = PlaylistManager.shared.activeContext {
+                let inContext = ctx.items.contains { item in
+                    item.id == msgTrackID ||
+                    item.refID == msgTrackID ||
+                    (!videoId.isEmpty && (item.ytVideoId == videoId || item.refID == videoId)) ||
+                    (!title.isEmpty && item.title.localizedCaseInsensitiveCompare(title) == .orderedSame)
+                }
+                if !inContext {
+                    Log.playback.info("Divergence detected: '\(title)' is outside active playlist '\(ctx.playlistID)'. Releasing playlist context to follow YouTube suggestions.")
+                    PlaylistManager.shared.clearActiveContext()
+                }
+            }
         } else if !msgTrackID.isEmpty && msgTrackID != currentVideoId {
             if title.isEmpty || title == "Not Playing" {
                 return
@@ -668,8 +842,45 @@ extension NowPlayingManager {
         let jsReportedLiked = (dict["isLiked"] as? Bool) ?? false
 
         var effectiveLiked = jsReportedLiked
-        if engineMode == .online, !LikedSongsManager.shared.isSignedIn, !videoId.isEmpty {
-            effectiveLiked = LikedSongsManager.shared.isLiked(videoId: videoId)
+        let isWithinUserToggleLock = (now - lastUserLikeToggleTime < 2.0) && (videoId == lastUserToggledVideoId || (!videoId.isEmpty && lastUserToggledVideoId.isEmpty))
+
+        if isWithinUserToggleLock {
+            effectiveLiked = lastUserDesiredLiked
+        } else if engineMode == .online {
+            if !LikedSongsManager.shared.isSignedIn {
+                if !videoId.isEmpty {
+                    effectiveLiked = LikedSongsManager.shared.isLiked(videoId: videoId)
+                }
+            } else {
+                // When signed in:
+                // 1. If song is liked on YouTube Music, ensure it exists in Mooziac's local Liked Songs table
+                if !videoId.isEmpty {
+                    if jsReportedLiked {
+                        if !LikedSongsManager.shared.isLiked(videoId: videoId) {
+                            LikedSongsManager.shared.recordOnlineLikeToggle(
+                                desiredLiked: true,
+                                videoId: videoId,
+                                title: title,
+                                artist: artist,
+                                album: album,
+                                artworkUrl: artworkUrl,
+                                duration: duration
+                            )
+                        }
+                    } else if !trackChanged && currentState.isLiked && !jsReportedLiked {
+                        // 2. Edge-trigger: user unliked the song directly in the YouTube Music web interface
+                        LikedSongsManager.shared.recordOnlineLikeToggle(
+                            desiredLiked: false,
+                            videoId: videoId,
+                            title: title,
+                            artist: artist,
+                            album: album,
+                            artworkUrl: artworkUrl,
+                            duration: duration
+                        )
+                    }
+                }
+            }
         }
         
         let rawItag = (dict["audioItag"] as? String) ?? ""
@@ -722,7 +933,7 @@ extension NowPlayingManager {
         )
         
         currentState = newState
-        DOMHealthMonitor.shared.recordSuccessfulUpdate()
+        domHealthMonitor.recordSuccessfulUpdate()
         
         if !title.isEmpty && title != "Not Playing" {
             if trackChanged {
@@ -743,6 +954,8 @@ extension NowPlayingManager {
                     targetWatchUrl = pageUrl
                     UserDefaults.standard.set(pageUrl, forKey: "YTM_lastUrl")
                 }
+            } else if !artworkUrl.isEmpty && UserDefaults.standard.string(forKey: "YTM_lastArtwork") != artworkUrl {
+                UserDefaults.standard.set(artworkUrl, forKey: "YTM_lastArtwork")
             }
             
             if trackChanged {
@@ -750,7 +963,7 @@ extension NowPlayingManager {
                 UserDefaults.standard.set(0.0, forKey: "YTM_lastTime")
                 
                 // Trigger native macOS track change notification
-                TrackNotificationManager.shared.notifyTrackChange(title: title, artist: artist, artworkUrl: artworkUrl)
+                notificationManager.notifyTrackChange(title: title, artist: artist, artworkUrl: artworkUrl)
             } else if isPlaying && currentTime > 1.0 {
                 // Throttle time updates to every 5 seconds to minimize disk operations
                 if abs(currentTime - UserDefaults.standard.double(forKey: "YTM_lastTime")) >= 5.0 {

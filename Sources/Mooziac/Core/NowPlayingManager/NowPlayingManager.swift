@@ -15,8 +15,15 @@ class NowPlayingManager: NSObject, WKScriptMessageHandler {
     var lastSavedArtist = ""
     var lastIsPlayingState = false
     var lastNowPlayingTrackKey = ""
+    var lastTrackEndedTriggerTime: TimeInterval = 0
     
     var isSystemSleeping = false
+    let domHealthMonitor = DOMHealthMonitor()
+    let notificationManager = TrackNotificationManager()
+
+    var lastUserLikeToggleTime: TimeInterval = 0
+    var lastUserToggledVideoId: String = ""
+    var lastUserDesiredLiked: Bool = false
 
     public func playOfflineTrack(_ track: LocalTrack, in queue: [LocalTrack] = []) {
         engineMode = .offline
@@ -50,7 +57,7 @@ class NowPlayingManager: NSObject, WKScriptMessageHandler {
         setupSleepObservers()
         setupNetworkObserver()
         setupRemoteCommands()
-        DOMHealthMonitor.shared.startMonitoring()
+        domHealthMonitor.startMonitoring()
     }
 
     func setupNetworkObserver() {
@@ -60,10 +67,10 @@ class NowPlayingManager: NSObject, WKScriptMessageHandler {
                 // If WebKit is actively playing an online song, do not interrupt it or overwrite metadata.
                 // WebKit buffers audio ahead and will continue smoothly through brief connection glitches.
                 if self.engineMode == .online && self.currentState.isPlaying {
-                    print("[NowPlayingManager] Network hiccup detected while online track is playing. Preserving playback.")
+                    Log.playback.debug("Network hiccup detected while online track is playing. Preserving playback")
                     return
                 }
-                print("[NowPlayingManager] Network went OFFLINE: switching to offline engine mode")
+                Log.playback.info("Network went OFFLINE: switching to offline engine mode")
                 self.engineMode = .offline
                 if NativeAudioPlayer.shared.currentTrack == nil && !LocalLibraryManager.shared.allTracks.isEmpty {
                     NativeAudioPlayer.shared.primeLastOrFirstTrack()
@@ -71,7 +78,7 @@ class NowPlayingManager: NSObject, WKScriptMessageHandler {
             } else {
                 // Network restored: if no offline audio is actively playing, restore online engine mode
                 if self.engineMode == .offline && !NativeAudioPlayer.shared.isPlaying {
-                    print("[NowPlayingManager] Network restored and offline audio idle. Restoring online engine mode.")
+                    Log.playback.info("Network restored and offline audio idle. Restoring online engine mode")
                     self.engineMode = .online
                     NotificationCenter.default.post(name: NSNotification.Name("Mooziac_EngineModeChanged"), object: nil, userInfo: ["mode": self.engineMode.rawValue])
                 }
@@ -106,7 +113,7 @@ class NowPlayingManager: NSObject, WKScriptMessageHandler {
     // Suppresses messages from the dying WebContent process and re-registers the
     // message bridge so the freshly restored WebContent instance drives state.
     func handleWebContentTermination() {
-        print("[NowPlayingManager] WebContent terminated - suppressing stale callbacks and re-wiring bridge")
+        Log.web.error("WebContent terminated - suppressing stale callbacks and re-wiring bridge")
         isRestoringAfterTermination = true
         DispatchQueue.main.async {
             guard let mainVC = StatusItemManager.shared?.mainViewController else { return }
@@ -116,7 +123,7 @@ class NowPlayingManager: NSObject, WKScriptMessageHandler {
     
     // Re-enables state updates once the restored page has finished loading.
     func markTerminationRecoveryComplete() {
-        print("[NowPlayingManager] Recovery complete - re-enabling player state updates")
+        Log.web.info("Recovery complete - re-enabling player state updates")
         isRestoringAfterTermination = false
     }
     
@@ -199,7 +206,7 @@ class NowPlayingManager: NSObject, WKScriptMessageHandler {
             UserDefaults.standard.removeObject(forKey: "YTM_lastArtist")
             UserDefaults.standard.removeObject(forKey: "YTM_lastArtwork")
         }
-        print("[NowPlayingManager] Session state and client-side caches flushed cleanly.")
+        Log.playback.debug("Session state and client-side caches flushed cleanly")
     }
     
     public struct QueueItemInfo {
@@ -257,7 +264,7 @@ class NowPlayingManager: NSObject, WKScriptMessageHandler {
         }
     }
     public func setPanelVisibility(_ visible: Bool) {
-        evaluateJS("window.mooziacPanelVisible = \(visible ? "true" : "false");")
+        evaluateJS("window.mooziacPanelVisible = \(visible ? "true" : "false"); if (window.mooziacPanelVisible && typeof updateNowPlaying === 'function') { updateNowPlaying(true); }")
     }
 
     func evaluateJS(_ code: String) {
@@ -266,7 +273,7 @@ class NowPlayingManager: NSObject, WKScriptMessageHandler {
             guard let mainVC = StatusItemManager.shared?.mainViewController else { return }
             mainVC.webViewContainer.webView.evaluateJavaScript(code) { _, error in
                 if let error = error {
-                    print("[NowPlayingManager] evaluateJS notice: \(error.localizedDescription)")
+                    Log.web.debug("evaluateJS notice: \(error.localizedDescription)")
                 }
             }
         }
@@ -284,7 +291,7 @@ class NowPlayingManager: NSObject, WKScriptMessageHandler {
             }
             mainVC.webViewContainer.webView.evaluateJavaScript(code) { result, error in
                 if let error = error {
-                    print("[NowPlayingManager] evaluateJSWithResult notice: \(error.localizedDescription)")
+                    Log.web.debug("evaluateJSWithResult notice: \(error.localizedDescription)")
                 }
                 completion?(result)
             }
