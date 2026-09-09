@@ -856,33 +856,17 @@ extension NowPlayingManager {
                 effectiveLiked = isLocallyLiked
             } else {
                 // When signed in:
-                // 1. If song is liked on YouTube Music, ensure it exists in Mooziac's local Liked Songs table
-                if !resolvedVid.isEmpty {
-                    if jsReportedLiked {
-                        if !isLocallyLiked {
-                            LikedSongsManager.shared.recordOnlineLikeToggle(
-                                desiredLiked: true,
-                                videoId: resolvedVid,
-                                title: title,
-                                artist: artist,
-                                album: album,
-                                artworkUrl: artworkUrl,
-                                duration: duration
-                            )
-                        }
-                    } else if !trackChanged && currentState.isLiked && !jsReportedLiked && (now - lastUserLikeToggleTime > 5.0) {
-                        // 2. Edge-trigger: user unliked the song directly in the YouTube Music web interface
-                        LikedSongsManager.shared.recordOnlineLikeToggle(
-                            desiredLiked: false,
-                            videoId: resolvedVid,
-                            title: title,
-                            artist: artist,
-                            album: album,
-                            artworkUrl: artworkUrl,
-                            duration: duration
-                        )
-                        effectiveLiked = false
-                    }
+                // If song is liked on YouTube Music, ensure it exists in Mooziac's local Liked Songs table
+                if !resolvedVid.isEmpty && jsReportedLiked && !isLocallyLiked {
+                    LikedSongsManager.shared.recordOnlineLikeToggle(
+                        desiredLiked: true,
+                        videoId: resolvedVid,
+                        title: title,
+                        artist: artist,
+                        album: album,
+                        artworkUrl: artworkUrl,
+                        duration: duration
+                    )
                 }
             }
         }
