@@ -70,9 +70,9 @@ public final class YTMClient {
     /// the `Authorization` header value and `Cookie` string for InnerTube requests.
     private func authCredentials(completion: @escaping (Result<AuthCredentials, Error>) -> Void) {
         WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
-            let sapisid = cookies.first(where: { $0.name == "SAPISID" })?.value
+            let sapisid = cookies.first(where: { $0.name == "SAPISID" && $0.domain.contains("youtube.com") && !$0.value.isEmpty })?.value
             let apiSID = cookies.first(where: {
-                $0.name == "__Secure-1PAPISID" || $0.name == "__Secure-3PAPISID"
+                $0.name == "__Secure-1PAPISID" && $0.domain.contains("youtube.com") && !$0.value.isEmpty
             })?.value
 
             let authValue = sapisid ?? apiSID

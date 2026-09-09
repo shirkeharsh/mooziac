@@ -840,26 +840,29 @@ extension NowPlayingManager {
         }
         
         let jsReportedLiked = (dict["isLiked"] as? Bool) ?? false
+        var resolvedVid = videoId
+        if resolvedVid.isEmpty {
+            resolvedVid = DownloadManager.extractVideoID(from: pageUrl) ?? DownloadManager.extractVideoID(from: msgTrackID) ?? ""
+        }
+        let isLocallyLiked = !resolvedVid.isEmpty && LikedSongsManager.shared.isLiked(videoId: resolvedVid)
 
-        var effectiveLiked = jsReportedLiked
-        let isWithinUserToggleLock = (now - lastUserLikeToggleTime < 2.0) && (videoId == lastUserToggledVideoId || (!videoId.isEmpty && lastUserToggledVideoId.isEmpty))
+        var effectiveLiked = jsReportedLiked || isLocallyLiked
+        let isWithinUserToggleLock = (now - lastUserLikeToggleTime < 2.0) && (resolvedVid == lastUserToggledVideoId || (!resolvedVid.isEmpty && lastUserToggledVideoId.isEmpty))
 
         if isWithinUserToggleLock {
             effectiveLiked = lastUserDesiredLiked
         } else if engineMode == .online {
             if !LikedSongsManager.shared.isSignedIn {
-                if !videoId.isEmpty {
-                    effectiveLiked = LikedSongsManager.shared.isLiked(videoId: videoId)
-                }
+                effectiveLiked = isLocallyLiked
             } else {
                 // When signed in:
                 // 1. If song is liked on YouTube Music, ensure it exists in Mooziac's local Liked Songs table
-                if !videoId.isEmpty {
+                if !resolvedVid.isEmpty {
                     if jsReportedLiked {
-                        if !LikedSongsManager.shared.isLiked(videoId: videoId) {
+                        if !isLocallyLiked {
                             LikedSongsManager.shared.recordOnlineLikeToggle(
                                 desiredLiked: true,
-                                videoId: videoId,
+                                videoId: resolvedVid,
                                 title: title,
                                 artist: artist,
                                 album: album,
@@ -871,13 +874,14 @@ extension NowPlayingManager {
                         // 2. Edge-trigger: user unliked the song directly in the YouTube Music web interface
                         LikedSongsManager.shared.recordOnlineLikeToggle(
                             desiredLiked: false,
-                            videoId: videoId,
+                            videoId: resolvedVid,
                             title: title,
                             artist: artist,
                             album: album,
                             artworkUrl: artworkUrl,
                             duration: duration
                         )
+                        effectiveLiked = false
                     }
                 }
             }
