@@ -50,8 +50,7 @@ public final class AppArtworkHelper {
                 "MOOZIAC.png",
                 "Resources/MOOZIAC.png",
                 "Resources/MOOZIAC_transparent.png",
-                "/Users/harshshirke/local/projects/mp3kal/MOOZIAC.png",
-                "/Users/harshshirke/local/projects/mp3kal/Resources/MOOZIAC.png"
+                "src/Resources/MOOZIAC.png"
             ]
             for path in possiblePaths {
                 if FileManager.default.fileExists(atPath: path) {

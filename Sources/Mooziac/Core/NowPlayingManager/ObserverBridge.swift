@@ -867,7 +867,7 @@ extension NowPlayingManager {
                                 duration: duration
                             )
                         }
-                    } else if !trackChanged && currentState.isLiked && !jsReportedLiked {
+                    } else if !trackChanged && currentState.isLiked && !jsReportedLiked && (now - lastUserLikeToggleTime > 5.0) {
                         // 2. Edge-trigger: user unliked the song directly in the YouTube Music web interface
                         LikedSongsManager.shared.recordOnlineLikeToggle(
                             desiredLiked: false,
