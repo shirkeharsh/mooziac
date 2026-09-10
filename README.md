@@ -32,7 +32,7 @@
 
 ## Overview
 
-Mooziac is a native macOS music player written in Swift and AppKit. It lives in the macOS menu bar, providing instant playback controls, YouTube Music integration, offline audio playback, real-time synchronized lyrics, and trackpad edge volume gestures with minimal resource usage.
+Mooziac is a native macOS music player written in Swift and AppKit. It lives in the macOS menu bar, providing instant playback controls, YouTube Music integration, offline audio playback, real-time synchronized lyrics in menu bar, and trackpad edge volume gestures with minimal resource usage.
 
 ---
 
