@@ -38,7 +38,7 @@ Mooziac is a native macOS music player written in Swift and AppKit. It lives in 
 ---
 
 <p align="center">
-  <img src="Resources/Animals.png" alt="Mooziac macOS Menu Bar Interface" width="700">
+  <img src="Resources/Animals2.png" alt="Mooziac macOS Menu Bar Interface" width="700">
 </p>
 
 ## Core Features
