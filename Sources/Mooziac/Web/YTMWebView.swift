@@ -937,8 +937,7 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         let routerJS = """
         (function() {
             var videoId = '\(escapedVideoId)';
-            var gen = \(currentGeneration);
-            window.__mooziacNavigationGeneration = gen;
+            window.__mooziacNavigationGeneration = \(currentGeneration);
             window.__mooziacAutoplayPending = true;
             window.__mooziacPlaybackSuppressed = false;
             window.__mooziacBlockAutoplay = false;
@@ -947,34 +946,33 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
                 window.__mooziacAudioOutput.prepare();
             }
 
-            // Priority 1: YouTube Music native Polymer router (Instant 0ms track switch, zero page reload)
+            // 1. Check if already on this exact video
             try {
-                var app = document.querySelector('ytmusic-app');
-                if (app && typeof app.resolveCommand === 'function') {
-                    app.resolveCommand({ watchEndpoint: { videoId: videoId } });
-                    setTimeout(function() {
-                        try {
-                            var p = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
-                            if (p && typeof p.playVideo === 'function') p.playVideo();
-                            var v = document.querySelector('video');
-                            if (v && v.paused) v.play().catch(function(){});
-                        } catch(e) {}
-                    }, 100);
-                    return { success: true, method: 'resolveCommand' };
+                var m = window.location.href.match(/[?&]v=([^&]+)/);
+                if (m && m[1] === videoId) {
+                    var v = document.querySelector('video');
+                    if (v && v.paused) v.play().catch(function(){});
+                    return { success: true, method: 'alreadyPlaying' };
                 }
             } catch(e) {}
 
-            // Priority 2: HTML5 Player API loadVideoById
+            // 2. Check if track is present in active Up Next queue and click it (instant 0ms transition)
             try {
-                var p = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
-                if (p && typeof p.loadVideoById === 'function') {
-                    p.loadVideoById(videoId);
-                    if (typeof p.playVideo === 'function') p.playVideo();
-                    return { success: true, method: 'loadVideoById' };
+                var queueItems = document.querySelectorAll('ytmusic-player-queue-item');
+                for (var i = 0; i < queueItems.length; i++) {
+                    var item = queueItems[i];
+                    if (item.data && (item.data.videoId === videoId || (item.data.navigationEndpoint && item.data.navigationEndpoint.watchEndpoint && item.data.navigationEndpoint.watchEndpoint.videoId === videoId))) {
+                        item.click();
+                        return { success: true, method: 'queueClick' };
+                    }
                 }
             } catch(e) {}
 
-            return { success: false, method: 'none' };
+            // 3. Navigate page directly via window.location.replace
+            // Reinitializes the queue specifically for this video with zero queue conflict or song hopping
+            var targetUrl = 'https://music.youtube.com/watch?v=' + videoId;
+            window.location.replace(targetUrl);
+            return { success: true, method: 'locationReplace' };
         })();
         """
 
@@ -982,90 +980,11 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
             guard let self = self else { return }
             guard self.navigationGeneration == currentGeneration else { return }
 
-            let dict = result as? [String: Any]
-            let success = (dict?["success"] as? Bool) == true
-
-            if !success {
-                // If in-page routing was not available, immediately fall back
-                self.fallbackLoadVideo(videoId: videoId, generation: currentGeneration)
-                return
-            }
-
-            // In-page routing was dispatched. Arm 1800ms watchdog to verify that the track actually loaded:
-            let watchdog = DispatchWorkItem { [weak self] in
-                guard let self = self else { return }
-                guard self.navigationGeneration == currentGeneration else { return }
-                self.verifyVideoSwitch(videoId: videoId, generation: currentGeneration)
-            }
-            self.routerWatchdogItem = watchdog
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.8, execute: watchdog)
-        }
-    }
-
-    private func verifyVideoSwitch(videoId: String, generation: UInt64) {
-        guard navigationGeneration == generation else { return }
-        let checkJS = """
-        (function() {
-            try {
-                var p = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
-                if (p && typeof p.getVideoData === 'function') {
-                    var data = p.getVideoData();
-                    if (data && (data.video_id === '\(videoId)' || data.videoId === '\(videoId)')) {
-                        return true;
-                    }
-                }
-                var m = window.location.href.match(/[?&]v=([^&]+)/);
-                if (m && m[1] === '\(videoId)') {
-                    return true;
-                }
-            } catch(e) {}
-            return false;
-        })();
-        """
-        webView.evaluateJavaScript(checkJS) { [weak self] result, _ in
-            guard let self = self else { return }
-            guard self.navigationGeneration == generation else { return }
-            if (result as? Bool) != true {
-                Log.web.error("Router navigation watchdog expired for \(videoId). Executing safe URL fallback")
-                self.fallbackLoadVideo(videoId: videoId, generation: generation)
-            } else {
-                let playJS = """
-                (function() {
-                    try {
-                        var p = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
-                        if (p && typeof p.getPlayerState === 'function') {
-                            var st = p.getPlayerState();
-                            if (st === 2 || st === 5 || st === -1) {
-                                if (typeof p.playVideo === 'function') p.playVideo();
-                            }
-                        }
-                        var v = document.querySelector('video');
-                        if (v && v.paused) v.play().catch(function(){});
-                    } catch(e) {}
-                })();
-                """
-                self.webView.evaluateJavaScript(playJS, completionHandler: nil)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
-                    self?.selectSongTab()
-                }
-            }
-        }
-    }
-
-    private func fallbackLoadVideo(videoId: String, generation: UInt64) {
-        guard navigationGeneration == generation else { return }
-        let targetUrlStr = "https://music.youtube.com/watch?v=\(videoId)&list=RDAMVM\(videoId)"
-        guard let url = URL(string: targetUrlStr) else { return }
-        
-        let replaceJS = "window.location.replace('\(targetUrlStr)');"
-        webView.evaluateJavaScript(replaceJS) { [weak self] _, error in
-            guard let self = self else { return }
-            guard self.navigationGeneration == generation else { return }
             if error != nil {
-                self.webView.load(URLRequest(url: url))
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
-                self?.selectSongTab()
+                let targetUrlStr = "https://music.youtube.com/watch?v=\(escapedVideoId)"
+                if let url = URL(string: targetUrlStr) {
+                    self.webView.load(URLRequest(url: url))
+                }
             }
         }
     }

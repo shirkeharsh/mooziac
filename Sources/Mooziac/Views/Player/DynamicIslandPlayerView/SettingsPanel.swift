@@ -38,13 +38,13 @@ extension DynamicIslandPlayerView {
         let themeRow = makeThemeFeatureRow()
         let progressRow = makeProgressStyleFeatureRow()
 
-        let volumeRow = makeFeatureRow(
+        let loudnessRow = makeFeatureRow(
             icon: "speaker.wave.2.fill",
-            title: "Focused Audio",
-            description: "Independent app media volume",
-            isOn: AppVolumeManager.shared.isAppVolumeOnly,
-            toggle: appVolumeToggle,
-            onToggle: { AppVolumeManager.shared.isAppVolumeOnly = $0 }
+            title: "Loudness Leveling",
+            description: "Consistent volume across tracks",
+            isOn: AppVolumeManager.shared.isLoudnessNormalizationEnabled,
+            toggle: loudnessToggle,
+            onToggle: { AppVolumeManager.shared.isLoudnessNormalizationEnabled = $0 }
         )
         let gesturesRow = makeFeatureRow(
             icon: "hand.tap",
@@ -71,7 +71,7 @@ extension DynamicIslandPlayerView {
             onToggle: { DiscordRPCManager.shared.isEnabled = $0 }
         )
 
-        let featuresStack = NSStackView(views: [themeRow, progressRow, volumeRow, gesturesRow, lyricsRow, discordRow])
+        let featuresStack = NSStackView(views: [themeRow, progressRow, loudnessRow, gesturesRow, lyricsRow, discordRow])
         featuresStack.orientation = .vertical
         featuresStack.alignment = .leading
         featuresStack.spacing = 3
@@ -637,7 +637,7 @@ extension DynamicIslandPlayerView {
 
             themeRow.widthAnchor.constraint(equalTo: featuresStack.widthAnchor),
             progressRow.widthAnchor.constraint(equalTo: featuresStack.widthAnchor),
-            volumeRow.widthAnchor.constraint(equalTo: featuresStack.widthAnchor),
+            loudnessRow.widthAnchor.constraint(equalTo: featuresStack.widthAnchor),
             gesturesRow.widthAnchor.constraint(equalTo: featuresStack.widthAnchor),
             lyricsRow.widthAnchor.constraint(equalTo: featuresStack.widthAnchor),
             discordRow.widthAnchor.constraint(equalTo: featuresStack.widthAnchor)

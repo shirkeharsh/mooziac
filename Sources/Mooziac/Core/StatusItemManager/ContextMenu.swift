@@ -79,6 +79,15 @@ extension StatusItemManager {
             }
         )
         gestureMenu.addItem(masterGestureRes.menuItem)
+
+        let focusAudioRes = makeCapsuleToggleMenuItem(
+            title: "Focus Audio",
+            isOn: AppVolumeManager.shared.isAppVolumeOnly,
+            onToggle: { enabled in
+                AppVolumeManager.shared.isAppVolumeOnly = enabled
+            }
+        )
+        gestureMenu.addItem(focusAudioRes.menuItem)
         
         gestureMenu.addItem(NSMenuItem.separator())
         
@@ -173,6 +182,7 @@ extension StatusItemManager {
         menu.addItem(syncItem)
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdatesFromMenu), keyEquivalent: "u"))
+
         menu.addItem(NSMenuItem(title: "Quit Mooziac", action: #selector(quitFromMenu), keyEquivalent: "q"))
         
         for item in menu.items {

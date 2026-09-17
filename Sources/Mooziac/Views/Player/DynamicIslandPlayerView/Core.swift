@@ -152,7 +152,8 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     var featureRowContainers: [NSView] = []
 
     var masterGesturesToggle = NativeCapsuleToggleView()
-    var appVolumeToggle = NativeCapsuleToggleView()
+    var loudnessToggle = NativeCapsuleToggleView()
+    var appVolumeToggle: NativeCapsuleToggleView { loudnessToggle }
     var lyricsToggle = NativeCapsuleToggleView()
     var discordToggle = NativeCapsuleToggleView()
     var settingsVersionLabel: NSTextField?
@@ -1299,6 +1300,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         }
 
         if KeyboardCommandHandler.handle(keyCode: event.keyCode,
+                                         modifierFlags: event.modifierFlags,
                                          isRepeat: event.isARepeat,
                                          showOverlay: { text in
             CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: text)

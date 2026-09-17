@@ -9,8 +9,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-APP_VERSION="1.1.5"
-APP_BUILD="15"
+APP_VERSION="1.1.6"
+APP_BUILD="16"
 APP_NAME="Mooziac.app"
 APP_BUNDLE_ID="app.mooziac.mac"
 APP_COPYRIGHT="Copyright © 2026 ThreeTen. All rights reserved."
@@ -39,7 +39,11 @@ DIST_DIR="$SCRIPT_DIR/dist"
 STAGING_DIR="$DIST_DIR/staging"
 TEMP_DMG="$DIST_DIR/temp.dmg"
 FINAL_DMG="$DIST_DIR/Mooziac.dmg"
-LOCAL_APP_DEST="$HOME/Applications/$APP_NAME"
+if [ -w "/Applications" ]; then
+    LOCAL_APP_DEST="/Applications/$APP_NAME"
+else
+    LOCAL_APP_DEST="$HOME/Applications/$APP_NAME"
+fi
 TARGET_APP="$STAGING_DIR/$APP_NAME"
 
 DMG_COMMENT="Mooziac — macOS Music Player Installer
@@ -286,9 +290,8 @@ if [ -f "Resources/AppIcon.icns" ]; then
 fi
 
 if [ "$INSTALL_LOCALLY" = true ]; then
-    echo "[7/7] Installing to ~/Applications & Launching..."
-    mkdir -p "$HOME/Applications"
-    rm -rf "$LOCAL_APP_DEST"
+    echo "[7/7] Installing to $LOCAL_APP_DEST & Launching..."
+    rm -rf "$HOME/Applications/$APP_NAME" "/Applications/$APP_NAME" 2>/dev/null || true
     cp -R "$TARGET_APP" "$LOCAL_APP_DEST"
 
     if [ "$LAUNCH_AFTER_BUILD" = true ]; then

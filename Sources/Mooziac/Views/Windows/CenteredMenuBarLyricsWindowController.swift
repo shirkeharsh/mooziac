@@ -19,14 +19,14 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
         get { UserDefaults.standard.object(forKey: "YTM_v3_isCenteredLyricsEnabled") as? Bool ?? false }
         set {
             UserDefaults.standard.set(newValue, forKey: "YTM_v3_isCenteredLyricsEnabled")
+            NowPlayingManager.shared.setLyricsActive(newValue)
             if newValue {
                 if lastState.isPlaying && !lastState.title.isEmpty && lastState.title != "Not Playing" {
                     startLoop()
                     showOverlay()
                 }
             } else {
-                displayTimer?.invalidate()
-                displayTimer = nil
+                stopLoop()
                 lyricsLabel.stringValue = ""
                 if !isShowingVolumeOverlay {
                     window?.orderOut(nil)
@@ -54,7 +54,9 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
         setupUI()
         setupObservers()
         repositionInCenter(contentWidth: 280)
-        if !isEnabled {
+        if isEnabled {
+            NowPlayingManager.shared.setLyricsActive(true)
+        } else {
             window.orderOut(nil)
         }
     }
@@ -135,14 +137,13 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
             currentLRCLines = []
             LyricsManager.shared.clearSession()
             if !lastState.isPlaying {
-                displayTimer?.invalidate()
-                displayTimer = nil
+                stopLoop()
                 if !isShowingVolumeOverlay {
                     lyricsLabel.stringValue = ""
                     window?.orderOut(nil)
                 }
             } else {
-                updateLyricsFrame()
+                startLoop()
             }
         }
     }
@@ -154,10 +155,9 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
         self.lastState = state
 
         if isEnabled && state.isPlaying && !state.title.isEmpty && state.title != "Not Playing" {
-            updateLyricsFrame()
+            startLoop()
         } else {
-            displayTimer?.invalidate()
-            displayTimer = nil
+            stopLoop()
             if window?.isVisible == true && !isShowingVolumeOverlay {
                 lyricsLabel.stringValue = ""
                 window?.orderOut(nil)
@@ -172,40 +172,109 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
 
         if trackKey != currentTrackKey && !state.title.isEmpty && state.title != "Not Playing" {
             currentTrackKey = trackKey
-            currentLRCLines = []
             let requestKey = trackKey
 
-            // Immediately clear stale lyrics from previous song and show new track info
-            lyricsLabel.stringValue = ""
+            // Zero-latency instant cache check for songs with immediate lyrics at 0:00:
+            if let instant = LyricsManager.shared.getCachedLRCLines(trackID: state.trackID, title: state.title, artist: state.artist, duration: state.duration), !instant.isEmpty {
+                currentLRCLines = instant
+            } else {
+                currentLRCLines = []
+                lyricsLabel.stringValue = ""
+            }
             updateLyricsFrame()
 
-            LyricsManager.shared.fetchLyrics(artist: state.artist, title: state.title, duration: state.duration, trackID: state.trackID) { [weak self] _, lrcLines in
+            LyricsManager.shared.fetchLyrics(
+                artist: state.artist,
+                title: state.title,
+                duration: state.duration,
+                trackID: state.trackID,
+                videoId: state.videoId.isEmpty ? nil : state.videoId
+            ) { [weak self] _, lrcLines in
                 // Silently discard completions that no longer belong to the displayed track
                 guard let self = self, requestKey == self.currentTrackKey else { return }
                 self.currentLRCLines = lrcLines
                 self.updateLyricsFrame()
+                NowPlayingManager.shared.prefetchNextQueueLyrics()
             }
         }
     }
 
     private func startLoop() {
-        displayTimer?.invalidate()
-        displayTimer = nil
+        guard isEnabled, lastState.isPlaying else {
+            stopLoop()
+            return
+        }
         updateLyricsFrame()
     }
 
-    private func scheduleNextTick(after delay: TimeInterval) {
+    private func stopLoop() {
         displayTimer?.invalidate()
-        guard isEnabled, lastState.isPlaying else {
-            displayTimer = nil
-            return
-        }
-        let clampedDelay = max(0.1, min(4.0, delay))
-        let timer = Timer(timeInterval: clampedDelay, repeats: false) { [weak self] _ in
+        displayTimer = nil
+    }
+
+    private func scheduleNextLyricsFrame() {
+        displayTimer?.invalidate()
+        displayTimer = nil
+
+        guard isEnabled, lastState.isPlaying else { return }
+
+        let accurateTime = lastState.getAccurateTime()
+        let delay: TimeInterval = {
+            guard !currentLRCLines.isEmpty else { return 1.0 }
+
+            let lead = 0.15
+            let effectiveTime = accurateTime + lead
+
+            // If before first line:
+            if effectiveTime < currentLRCLines[0].timestamp {
+                let diff = currentLRCLines[0].timestamp - effectiveTime
+                return max(0.04, min(diff, 1.0))
+            }
+
+            var foundIndex = -1
+            for (i, line) in currentLRCLines.enumerated() {
+                if effectiveTime >= line.timestamp {
+                    foundIndex = i
+                } else {
+                    break
+                }
+            }
+
+            guard foundIndex >= 0 && foundIndex < currentLRCLines.count else { return 1.0 }
+            let line = currentLRCLines[foundIndex]
+
+            // If there is a next line:
+            if foundIndex + 1 < currentLRCLines.count {
+                let nextTs = currentLRCLines[foundIndex + 1].timestamp
+                let lineDuration: Double = {
+                    if let lastWord = line.words.last {
+                        return max(2.0, lastWord.endTime - line.timestamp)
+                    }
+                    return min(6.0, max(2.0, (nextTs - line.timestamp) * 0.75))
+                }()
+                let lineEndTime = line.timestamp + lineDuration
+                let interludeTime = lineEndTime + 1.2
+
+                // If instrumental gap is upcoming:
+                if (nextTs - lineEndTime) > 3.0 && effectiveTime < interludeTime {
+                    let diffToInterlude = interludeTime - effectiveTime
+                    return max(0.04, min(diffToInterlude, 1.0))
+                }
+
+                // Diff to next line:
+                let diffToNext = nextTs - effectiveTime
+                return max(0.04, min(diffToNext, 1.0))
+            }
+
+            return 1.5
+        }()
+
+        displayTimer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
             self?.updateLyricsFrame()
         }
-        RunLoop.main.add(timer, forMode: .common)
-        displayTimer = timer
+        if let timer = displayTimer {
+            RunLoop.main.add(timer, forMode: .common)
+        }
     }
 
     private func updateLyricsFrame() {
@@ -214,8 +283,7 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
                 lyricsLabel.stringValue = ""
                 window?.orderOut(nil)
             }
-            displayTimer?.invalidate()
-            displayTimer = nil
+            stopLoop()
             return
         }
         let state = lastState
@@ -225,8 +293,7 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
                 lyricsLabel.stringValue = ""
                 window?.orderOut(nil)
             }
-            displayTimer?.invalidate()
-            displayTimer = nil
+            stopLoop()
             return
         }
 
@@ -234,23 +301,19 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
 
         let accurateTime = state.getAccurateTime()
         var textToDisplay = ""
-        var nextEventDelay: TimeInterval = 2.5
 
         if !currentLRCLines.isEmpty {
-            if let activeInfo = SyncedLyricsParser.activeLineAndWord(at: accurateTime, in: currentLRCLines, leadOffset: 0.35) {
-                textToDisplay = activeInfo.line.text
-                let nextIdx = activeInfo.lineIndex + 1
-                if nextIdx < currentLRCLines.count {
-                    let nextLineTime = currentLRCLines[nextIdx].timestamp - 0.35
-                    nextEventDelay = max(0.1, nextLineTime - accurateTime)
-                } else if state.duration > accurateTime {
-                    nextEventDelay = max(0.1, state.duration - accurateTime)
+            if let activeInfo = SyncedLyricsParser.activeLineAndWord(at: accurateTime, in: currentLRCLines, leadOffset: 0.15) {
+                let trimmed = activeInfo.line.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed == "♪" || trimmed == "♪♪" || trimmed == "(Instrumental)" || trimmed == "[Instrumental]" {
+                    let shortTitle = state.title.count > 30 ? String(state.title.prefix(30)) + "…" : state.title
+                    let shortArtist = state.artist.count > 30 ? String(state.artist.prefix(30)) + "…" : state.artist
+                    textToDisplay = "♪ \(shortTitle) • \(shortArtist)"
+                } else {
+                    textToDisplay = activeInfo.line.text
                 }
             } else {
-                if let firstLine = currentLRCLines.first {
-                    let firstTime = firstLine.timestamp - 0.35
-                    nextEventDelay = max(0.1, firstTime - accurateTime)
-                }
+                // If playback is before the first line timestamp (initial intro) or in an instrumental break
                 let shortTitle = state.title.count > 30 ? String(state.title.prefix(30)) + "…" : state.title
                 let shortArtist = state.artist.count > 30 ? String(state.artist.prefix(30)) + "…" : state.artist
                 textToDisplay = "\(shortTitle) • \(shortArtist)"
@@ -259,16 +322,9 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
             let shortTitle = state.title.count > 30 ? String(state.title.prefix(30)) + "…" : state.title
             let shortArtist = state.artist.count > 30 ? String(state.artist.prefix(30)) + "…" : state.artist
             textToDisplay = "\(shortTitle) • \(shortArtist)"
-            nextEventDelay = 3.0
         }
 
         if lyricsLabel.stringValue != textToDisplay {
-            let transition = CATransition()
-            transition.duration = 0.06
-            transition.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            transition.type = .fade
-            lyricsLabel.layer?.add(transition, forKey: "subtleFadeLyrics")
-
             lyricsLabel.stringValue = textToDisplay
 
             let fontAttributes = [NSAttributedString.Key.font: lyricsLabel.font!]
@@ -278,7 +334,7 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
             repositionInCenter(contentWidth: targetWidth)
         }
 
-        scheduleNextTick(after: nextEventDelay)
+        scheduleNextLyricsFrame()
     }
 
     public func showVolumeOverlay(volumePercent: Int, isAppOnly: Bool = false) {
@@ -361,11 +417,7 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
         let targetFrame = NSRect(x: x, y: y, width: textContainerWidth, height: textContainerHeight)
 
         if window?.frame != targetFrame {
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.25
-                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-                window?.animator().setFrame(targetFrame, display: true)
-            }
+            window?.setFrame(targetFrame, display: true)
         }
     }
 

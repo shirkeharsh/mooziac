@@ -1,15 +1,31 @@
 import Foundation
+import AppKit
 
 // MARK: - Shared Keyboard Command Handling
 // Single source of truth for the arrow/space media commands (key codes 123/124/126/125/49).
 // Used both by StatusItemManager's live key event monitor and DynamicIslandPlayerView.keyDown.
 enum KeyboardCommandHandler {
     static func handle(keyCode: UInt16,
+                       modifierFlags: NSEvent.ModifierFlags = [],
                        isRepeat: Bool,
                        showOverlay: (String) -> Void) -> Bool {
+        let cleanFlags = modifierFlags.intersection(.deviceIndependentFlagsMask)
+
+        // Do not intercept if Command is held (allow system / app Command shortcuts like Cmd+Arrow)
+        if cleanFlags.contains(.command) {
+            return false
+        }
+
         switch keyCode {
         case 123: // Left Arrow ←
-            let step: Double = isRepeat ? 8.0 : 4.0
+            let step: Double
+            if cleanFlags.contains(.shift) {
+                step = 30.0
+            } else if cleanFlags.contains(.option) {
+                step = 15.0
+            } else {
+                step = isRepeat ? 8.0 : 4.0
+            }
             NowPlayingManager.shared.rewind(seconds: step)
             let curr = NowPlayingManager.shared.currentState.getAccurateTime()
             let newTime = max(0, curr - step)
@@ -17,11 +33,24 @@ enum KeyboardCommandHandler {
             return true
 
         case 124: // Right Arrow →
-            let step: Double = isRepeat ? 8.0 : 4.0
+            let step: Double
+            if cleanFlags.contains(.shift) {
+                step = 30.0
+            } else if cleanFlags.contains(.option) {
+                step = 15.0
+            } else {
+                step = isRepeat ? 8.0 : 4.0
+            }
             NowPlayingManager.shared.fastForward(seconds: step)
             let curr = NowPlayingManager.shared.currentState.getAccurateTime()
-            let newTime = min(NowPlayingManager.shared.currentState.duration, curr + step)
-            showOverlay("Forward \(Int(step))s: \(formatTime(newTime))")
+            let dur = NowPlayingManager.shared.currentState.duration
+            if dur > 5.0 && (curr + step) >= (dur - 1.5) {
+                let msg = PlaylistManager.shared.hasActiveContext ? "Next Track in Playlist" : "Forward \(Int(step))s: \(formatTime(dur))"
+                showOverlay(msg)
+            } else {
+                let newTime = min(dur, curr + step)
+                showOverlay("Forward \(Int(step))s: \(formatTime(newTime))")
+            }
             return true
 
         case 126: // Up Arrow ↑

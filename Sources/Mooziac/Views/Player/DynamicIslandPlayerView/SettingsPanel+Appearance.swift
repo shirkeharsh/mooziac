@@ -377,9 +377,13 @@ extension DynamicIslandPlayerView {
 
         themeToggle.updateVisuals()
         progressToggle.updateVisuals()
+        masterGesturesToggle.isOn = EdgeVolumeEngine.shared.isEnabled
         masterGesturesToggle.updateVisuals()
-        appVolumeToggle.updateVisuals()
+        loudnessToggle.isOn = AppVolumeManager.shared.isLoudnessNormalizationEnabled
+        loudnessToggle.updateVisuals()
+        lyricsToggle.isOn = CenteredMenuBarLyricsWindowController.shared.isEnabled
         lyricsToggle.updateVisuals()
+        discordToggle.isOn = DiscordRPCManager.shared.isEnabled
         discordToggle.updateVisuals()
 
         let currentThemeStep: Int

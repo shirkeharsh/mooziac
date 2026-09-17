@@ -339,6 +339,16 @@ public final class NativeAudioPlayer: NSObject {
     public func fastForward(seconds: Double = 10.0) {
         let curr = getCurrentTime()
         let dur = currentTrack?.duration ?? 0.0
+        if dur > 5.0 && curr + seconds >= dur - 1.0 {
+            if repeatMode == .one {
+                seek(to: 0)
+            } else if PlaylistManager.shared.hasActiveContext {
+                _ = PlaylistManager.shared.playNextTrackInPlaylist()
+            } else {
+                nextTrack()
+            }
+            return
+        }
         seek(to: min(dur, curr + seconds))
     }
 

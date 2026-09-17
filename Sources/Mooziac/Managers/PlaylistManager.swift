@@ -256,6 +256,9 @@ public final class PlaylistManager: NSObject {
             }) {
                 ctx.currentIndex = newIdx
                 currentAnchorTrackID = ctx.items[newIdx].id
+            } else if !ctx.items.isEmpty {
+                ctx.currentIndex = max(0, min(ctx.currentIndex, ctx.items.count - 1))
+                currentAnchorTrackID = ctx.items[ctx.currentIndex].id
             }
 
             rebuildLocalQueue(for: &ctx)
@@ -846,6 +849,20 @@ public final class PlaylistManager: NSObject {
 
     public private(set) var activeContext: ActivePlaylistPlaybackContext?
     public private(set) var currentAnchorTrackID: String?
+    public private(set) var isAdvancingTrack: Bool = false
+    private var advanceStartTime: TimeInterval = 0
+
+    public var isAdvancing: Bool {
+        if isAdvancingTrack && (CACurrentMediaTime() - advanceStartTime < 6.0) {
+            return true
+        }
+        return false
+    }
+
+    public func completeAdvancing() {
+        isAdvancingTrack = false
+        advanceStartTime = 0
+    }
 
     public var hasActiveContext: Bool {
         return activeContext != nil
@@ -854,6 +871,15 @@ public final class PlaylistManager: NSObject {
     public func clearActiveContext() {
         activeContext = nil
         currentAnchorTrackID = nil
+        isAdvancingTrack = false
+        advanceStartTime = 0
+    }
+
+    public func updateActiveContextIndex(_ index: Int) {
+        guard var ctx = activeContext, index >= 0, index < ctx.items.count else { return }
+        ctx.currentIndex = index
+        activeContext = ctx
+        currentAnchorTrackID = ctx.items[index].id
     }
 
     #if DEBUG
@@ -1026,8 +1052,13 @@ public final class PlaylistManager: NSObject {
         guard let ctx = activeContext, ctx.currentIndex >= 0, ctx.currentIndex < ctx.items.count else {
             activeContext = nil
             currentAnchorTrackID = nil
+            isAdvancingTrack = false
+            advanceStartTime = 0
             return
         }
+
+        isAdvancingTrack = true
+        advanceStartTime = CACurrentMediaTime()
 
         let item = ctx.items[ctx.currentIndex]
         currentAnchorTrackID = item.id

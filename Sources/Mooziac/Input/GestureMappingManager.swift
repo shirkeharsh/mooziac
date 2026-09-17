@@ -86,6 +86,18 @@ public final class GestureMappingManager {
         case .seekBackward:
             NowPlayingManager.shared.rewind(seconds: 10)
             CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Seek -10s")
+        case .seekForward15:
+            NowPlayingManager.shared.fastForward(seconds: 15)
+            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Seek +15s")
+        case .seekBackward15:
+            NowPlayingManager.shared.rewind(seconds: 15)
+            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Seek -15s")
+        case .seekForward30:
+            NowPlayingManager.shared.fastForward(seconds: 30)
+            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Seek +30s")
+        case .seekBackward30:
+            NowPlayingManager.shared.rewind(seconds: 30)
+            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Seek -30s")
         case .toggleShuffle:
             NowPlayingManager.shared.toggleShuffle()
             let enabled = NowPlayingManager.shared.isShuffleActive

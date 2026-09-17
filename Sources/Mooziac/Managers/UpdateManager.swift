@@ -25,7 +25,7 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
     }
 
     public var currentVersion: String {
-        return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1.5"
+        return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1.6"
     }
 
     private var releasesAPIURL: URL? {
@@ -204,7 +204,8 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
                 !line.starts(with: "###") &&
                 !line.starts(with: "---") &&
                 !line.starts(with: "|") &&
-                !line.contains("Minimum System Requirements")
+                !line.contains("Minimum System Requirements") &&
+                !line.lowercased().contains("buymeacoffee.com")
             }
         let bulletLines = lines.prefix(5).map { line -> String in
             var l = line
@@ -231,14 +232,97 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
         let formattedNotes = formatCompactReleaseNotes(releaseNotes)
         alert.informativeText = "You are currently running Mooziac \(currentVersion).\n\nHighlights:\n\(formattedNotes)"
         alert.alertStyle = .informational
+        alert.icon = NSImage(size: NSSize(width: 0.1, height: 0.1))
 
-        alert.addButton(withTitle: "Update Now (In-App)")
+        _ = alert.addButton(withTitle: "Update Now (In-App)")
+        let coffeeButton = alert.addButton(withTitle: "Buy Me a Coffee ☕️")
         let starButton = alert.addButton(withTitle: "Star on GitHub ⭐")
+        _ = alert.addButton(withTitle: "Later")
         self.pendingWebURL = webURL
+
+        coffeeButton.target = self
+        coffeeButton.action = #selector(coffeeButtonClicked(_:))
+
         starButton.target = self
         starButton.action = #selector(starOnGitHubClicked(_:))
-        alert.addButton(withTitle: "Later")
 
+        alert.layout()
+
+        let win = alert.window
+        if let cv = win.contentView {
+            var iconView: NSView?
+            var titleField: NSTextField?
+            var infoField: NSTextField?
+
+            func findViews(_ v: NSView) {
+                for sub in v.subviews {
+                    if sub is NSImageView {
+                        iconView = sub
+                    } else if let tf = sub as? NSTextField {
+                        if tf.stringValue.contains("New Update Available") {
+                            titleField = tf
+                        } else if tf.stringValue.contains("Highlights") || tf.stringValue.contains("currently running") {
+                            infoField = tf
+                        }
+                    }
+                    findViews(sub)
+                }
+            }
+            findViews(cv)
+
+            iconView?.isHidden = true
+            iconView?.frame = .zero
+
+            let margin: CGFloat = 28.0
+            let targetWidth = cv.bounds.width - (margin * 2)
+
+            let pStyle = NSMutableParagraphStyle()
+            pStyle.lineSpacing = 5.0
+            let attrStr = NSMutableAttributedString(
+                string: infoField?.stringValue ?? alert.informativeText,
+                attributes: [
+                    .font: NSFont.systemFont(ofSize: 15.0, weight: .regular),
+                    .foregroundColor: NSColor.labelColor,
+                    .paragraphStyle: pStyle
+                ]
+            )
+            infoField?.attributedStringValue = attrStr
+
+            let neededTextSize = attrStr.boundingRect(
+                with: NSSize(width: targetWidth, height: 2000),
+                options: [.usesLineFragmentOrigin, .usesFontLeading]
+            ).size
+            let neededInfoHeight = ceil(neededTextSize.height) + 8
+            let titleHeight: CGFloat = 26.0
+
+            let neededTotalHeight: CGFloat = 28 + titleHeight + 14 + neededInfoHeight + 24 + 28 + 16
+
+            var winFrame = win.frame
+            let heightDelta = neededTotalHeight - winFrame.size.height
+            winFrame.size.height = neededTotalHeight
+            winFrame.origin.y -= heightDelta
+            win.setFrame(winFrame, display: true)
+
+            for button in alert.buttons {
+                var f = button.frame
+                f.origin.y = 16.0
+                button.frame = f
+            }
+
+            let totalH = cv.bounds.height
+            if let title = titleField {
+                title.font = NSFont.systemFont(ofSize: 18, weight: .bold)
+                title.textColor = .labelColor
+                title.frame = NSRect(x: margin, y: totalH - 28 - titleHeight, width: targetWidth, height: titleHeight)
+            }
+
+            if let info = infoField {
+                let titleMinY = titleField?.frame.minY ?? (totalH - 28 - titleHeight)
+                info.frame = NSRect(x: margin, y: titleMinY - 14 - neededInfoHeight, width: targetWidth, height: neededInfoHeight)
+            }
+        }
+
+        win.center()
         let response = alert.runModal()
         if response == .alertFirstButtonReturn {
             if let zipURL = zipURL {
@@ -249,8 +333,14 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
         }
     }
 
-    @objc private func starOnGitHubClicked(_ sender: NSButton) {
-        if let githubURL = URL(string: "https://github.com/shirkeharsh/mooziac") {
+    @objc private func coffeeButtonClicked(_ sender: Any) {
+        if let coffeeURL = URL(string: "https://buymeacoffee.com/shirkeharsh") {
+            NSWorkspace.shared.open(coffeeURL)
+        }
+    }
+
+    @objc private func starOnGitHubClicked(_ sender: Any) {
+        if let githubURL = self.pendingWebURL ?? URL(string: "https://github.com/\(repositoryOwner)/\(repositoryName)") {
             NSWorkspace.shared.open(githubURL)
         }
     }

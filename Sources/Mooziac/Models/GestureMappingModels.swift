@@ -47,6 +47,10 @@ public enum GestureAction: String, CaseIterable, Codable {
     case togglePlayer    = "togglePlayer"
     case seekForward     = "seekForward"
     case seekBackward    = "seekBackward"
+    case seekForward15   = "seekForward15"
+    case seekBackward15  = "seekBackward15"
+    case seekForward30   = "seekForward30"
+    case seekBackward30  = "seekBackward30"
     case toggleShuffle   = "toggleShuffle"
     case toggleRepeat    = "toggleRepeat"
 
@@ -62,6 +66,10 @@ public enum GestureAction: String, CaseIterable, Codable {
         case .togglePlayer:     return "Toggle Player Panel"
         case .seekForward:      return "Seek Forward 10s"
         case .seekBackward:     return "Seek Backward 10s"
+        case .seekForward15:    return "Seek Forward 15s"
+        case .seekBackward15:   return "Seek Backward 15s"
+        case .seekForward30:    return "Seek Forward 30s"
+        case .seekBackward30:   return "Seek Backward 30s"
         case .toggleShuffle:    return "Toggle Shuffle"
         case .toggleRepeat:     return "Toggle Repeat"
         }
@@ -79,6 +87,10 @@ public enum GestureAction: String, CaseIterable, Codable {
         case .togglePlayer:     return "sidebar.left"
         case .seekForward:      return "goforward.10"
         case .seekBackward:     return "gobackward.10"
+        case .seekForward15:    return "goforward.15"
+        case .seekBackward15:   return "gobackward.15"
+        case .seekForward30:    return "goforward.30"
+        case .seekBackward30:   return "gobackward.30"
         case .toggleShuffle:    return "shuffle"
         case .toggleRepeat:     return "repeat"
         }

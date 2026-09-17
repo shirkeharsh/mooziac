@@ -129,7 +129,7 @@ extension NowPlayingManager {
                         playbackRate = video.playbackRate || 1.0;
                     }
                     
-                    if (video && duration > 5.0 && currentTime >= (duration - 0.85) && (!isPlaying || video.paused || video.ended)) {
+                    if (video && duration > 5.0 && currentTime >= (duration - 0.65)) {
                         notifyTrackEnded('timeNearEnd');
                     }
 
@@ -503,54 +503,47 @@ extension NowPlayingManager {
                 } catch(e) {}
             }
 
-            function __mooziacAttemptAutoplayRecovery(video, playBtn) {
+            function __mooziacAttemptAutoplayRecovery(video) {
                 if (!window.__mooziacAutoplayPending) return 'noop';
                 if (window.__mooziacPlaybackSuppressed || window.__mooziacBlockAutoplay) return 'suppressed';
-                if (!video.paused) {
+                if (!video || !video.paused) {
                     window.__mooziacAutoplayPending = false;
                     window.__mooziacAutoplayAttempts = 0;
                     return 'noop';
                 }
 
                 var attempts = window.__mooziacAutoplayAttempts || 0;
-                if (attempts >= 6) {
+                if (attempts >= 4) {
                     return 'exhausted';
                 }
                 window.__mooziacAutoplayAttempts = attempts + 1;
 
-                function scheduleRetry() {
-                    if (typeof setTimeout !== 'function' || window.__mooziacAutoplayRetryScheduled) return;
-                    window.__mooziacAutoplayRetryScheduled = true;
-                    setTimeout(function() {
-                        window.__mooziacAutoplayRetryScheduled = false;
-                        var currentVideo = document.querySelector('video');
-                        if (!window.__mooziacAutoplayPending || !currentVideo || !currentVideo.paused) return;
-                        __mooziacAttemptAutoplayRecovery(currentVideo, null);
-                    }, 250);
-                }
+                // Priority 1: Direct idempotent player API (cannot toggle or pause)
+                try {
+                    var player = document.getElementById('movie_player') || (document.querySelector('ytmusic-player') && document.querySelector('ytmusic-player').playerApi);
+                    if (player && typeof player.playVideo === 'function') {
+                        player.playVideo();
+                        return 'playerPlay';
+                    }
+                } catch(e) {}
 
-                if (playBtn) {
-                    try {
-                        if (typeof playBtn.click === 'function') { playBtn.click(); }
-                        else {
-                            var opts = { bubbles: true, cancelable: true, view: window };
-                            playBtn.dispatchEvent(new MouseEvent('mousedown', opts));
-                            playBtn.dispatchEvent(new MouseEvent('mouseup', opts));
-                            playBtn.dispatchEvent(new MouseEvent('click', opts));
-                        }
-                    } catch(e) {}
-                    scheduleRetry();
-                    return 'clicked';
-                }
+                // Priority 2: Direct video element play()
                 try {
                     var playResult = video.play();
                     if (playResult && typeof playResult.catch === 'function') {
-                        playResult.catch(function() { scheduleRetry(); });
+                        playResult.catch(function() {
+                            // Autoplay restricted by browser: only click Play button if it explicitly shows Play (NOT Pause)
+                            try {
+                                var playBtn = document.querySelector('ytmusic-player-bar #play-pause-button[aria-label="Play"]') ||
+                                              document.querySelector('ytmusic-player-bar #play-pause-button[title="Play"]') ||
+                                              document.querySelector('#play-pause-button[aria-label="Play"]') ||
+                                              document.querySelector('#play-pause-button[title="Play"]');
+                                if (playBtn) playBtn.click();
+                            } catch(err) {}
+                        });
                     }
-                    scheduleRetry();
                     return 'played';
                 } catch (e) {
-                    scheduleRetry();
                     return 'error';
                 }
             }
@@ -558,15 +551,12 @@ extension NowPlayingManager {
 
             function recoverAutoplayIfNeeded() {
                 var video = document.querySelector('video');
-                if (!video) return;
+                if (!video || !video.paused) return;
                 if (window.__mooziacPlaybackSuppressed || window.__mooziacBlockAutoplay) {
                     try { video.pause(); } catch (_) {}
                     return;
                 }
-                var btn = document.querySelector('.play-pause-button.ytmusic-player-bar') ||
-                          document.querySelector('ytmusic-player-bar #play-pause-button') ||
-                          document.querySelector('#play-pause-button');
-                __mooziacAttemptAutoplayRecovery(video, btn);
+                __mooziacAttemptAutoplayRecovery(video);
             }
             window.__mooziacRecoverAutoplayIfNeeded = recoverAutoplayIfNeeded;
 
@@ -587,7 +577,12 @@ extension NowPlayingManager {
                             window.__mooziacAutoplayAttempts = 0;
                         });
                         video.addEventListener('canplay', function() {
-                            recoverAutoplayIfNeeded();
+                            // Give natural browser autoplay 800ms to begin smoothly before checking if a recovery nudge is needed
+                            setTimeout(function() {
+                                if (window.__mooziacAutoplayPending) {
+                                    recoverAutoplayIfNeeded();
+                                }
+                            }, 800);
                         });
                         ['pause', 'ratechange', 'seeked'].forEach(function(evt) {
                             video.addEventListener(evt, function() {
@@ -600,9 +595,6 @@ extension NowPlayingManager {
                         video.addEventListener('ended', function() {
                             notifyTrackEnded('domEnded');
                         });
-                        if (video.readyState >= 3) {
-                            recoverAutoplayIfNeeded();
-                        }
                         optimizePlaybackStreams();
                         enforceSongMode();
                     }
@@ -709,18 +701,29 @@ extension NowPlayingManager {
         let isAd = (dict["isAd"] as? Bool) ?? false
         if isAd { return }
 
-        let now = CACurrentMediaTime()
-        guard now - lastTrackEndedTriggerTime > 3.0 else { return }
-
-        // Natural guard: If track changed less than 5 seconds ago, ignore premature ends
-        guard now - lastTrackChangeTime > 5.0 else { return }
-
-        // If duration is known and currentTime is significantly before the end, ignore
-        let currentTime = (dict["currentTime"] as? Double) ?? currentState.currentTime
-        let duration = (dict["duration"] as? Double) ?? currentState.duration
-        if duration > 20.0 && currentTime < (duration - 4.0) {
-            Log.playback.debug("Ignoring premature track completion: currentTime=\(currentTime), duration=\(duration)")
+        // If an advance to the next track is already in progress, drop trailing end events from the previous track
+        if PlaylistManager.shared.isAdvancing {
+            Log.playback.debug("Ignoring track ended event: advance already in progress")
             return
+        }
+
+        let now = CACurrentMediaTime()
+        let source = (dict["source"] as? String) ?? ""
+        let isForcedEnd = (source == "seekPastEnd")
+
+        guard isForcedEnd || (now - lastTrackEndedTriggerTime > 1.5) else { return }
+
+        // Natural guard: If track changed less than 5 seconds ago, ignore premature ends (unless forced by seek)
+        if !isForcedEnd {
+            guard now - lastTrackChangeTime > 5.0 else { return }
+
+            // If duration is known and currentTime is significantly before the end, ignore
+            let currentTime = (dict["currentTime"] as? Double) ?? currentState.currentTime
+            let duration = (dict["duration"] as? Double) ?? currentState.duration
+            if duration > 20.0 && currentTime < (duration - 4.0) {
+                Log.playback.debug("Ignoring premature track completion: currentTime=\(currentTime), duration=\(duration)")
+                return
+            }
         }
 
         lastTrackEndedTriggerTime = now
@@ -820,17 +823,50 @@ extension NowPlayingManager {
             currentTime = 0.0
             lastTrackChangeTime = now
 
-            // Natural divergence: If user actively navigated to a track outside current playlist context, release context so YouTube suggestions take over
+            // Manage active playlist context:
             if let ctx = PlaylistManager.shared.activeContext {
-                let inContext = ctx.items.contains { item in
-                    item.id == msgTrackID ||
-                    item.refID == msgTrackID ||
-                    (!videoId.isEmpty && (item.ytVideoId == videoId || item.refID == videoId)) ||
-                    (!title.isEmpty && item.title.localizedCaseInsensitiveCompare(title) == .orderedSame)
-                }
-                if !inContext {
-                    Log.playback.info("Divergence detected: '\(title)' is outside active playlist '\(ctx.playlistID)'. Releasing playlist context to follow YouTube suggestions.")
-                    PlaylistManager.shared.clearActiveContext()
+                if PlaylistManager.shared.isAdvancing {
+                    // Automated playlist advance completed with the newly loaded track
+                    PlaylistManager.shared.completeAdvancing()
+                    // If the newly loaded track matches a specific item index, sync to it
+                    if let foundIdx = ctx.items.firstIndex(where: {
+                        $0.id == msgTrackID ||
+                        $0.refID == msgTrackID ||
+                        (!videoId.isEmpty && ($0.ytVideoId == videoId || $0.refID == videoId || $0.refID.contains(videoId))) ||
+                        (!title.isEmpty && $0.title.localizedCaseInsensitiveCompare(title) == .orderedSame) ||
+                        (!title.isEmpty && (title.localizedCaseInsensitiveContains($0.title) || $0.title.localizedCaseInsensitiveContains(title)))
+                    }) {
+                        if ctx.currentIndex != foundIdx {
+                            PlaylistManager.shared.updateActiveContextIndex(foundIdx)
+                        }
+                    }
+                } else {
+                    let inContext = ctx.items.contains { item in
+                        item.id == msgTrackID ||
+                        item.refID == msgTrackID ||
+                        (!videoId.isEmpty && (item.ytVideoId == videoId || item.refID == videoId || item.refID.contains(videoId))) ||
+                        (!title.isEmpty && item.title.localizedCaseInsensitiveCompare(title) == .orderedSame) ||
+                        (!title.isEmpty && (title.localizedCaseInsensitiveContains(item.title) || item.title.localizedCaseInsensitiveContains(title)))
+                    }
+                    if !inContext {
+                        // Track changed to something outside the playlist (e.g. user clicked a recommended song or searched).
+                        // Release playlist context so normal online playback / autoplay can proceed smoothly.
+                        Log.playback.info("Track outside active playlist '\(ctx.playlistID, privacy: .public)' detected ('\(title, privacy: .public)'). Releasing playlist context.")
+                        PlaylistManager.shared.clearActiveContext()
+                    } else {
+                        // Current track is in playlist -> keep index and anchor in sync
+                        if let foundIdx = ctx.items.firstIndex(where: {
+                            $0.id == msgTrackID ||
+                            $0.refID == msgTrackID ||
+                            (!videoId.isEmpty && ($0.ytVideoId == videoId || $0.refID == videoId || $0.refID.contains(videoId))) ||
+                            (!title.isEmpty && $0.title.localizedCaseInsensitiveCompare(title) == .orderedSame) ||
+                            (!title.isEmpty && (title.localizedCaseInsensitiveContains($0.title) || $0.title.localizedCaseInsensitiveContains(title)))
+                        }) {
+                            if ctx.currentIndex != foundIdx {
+                                PlaylistManager.shared.updateActiveContextIndex(foundIdx)
+                            }
+                        }
+                    }
                 }
             }
         } else if !msgTrackID.isEmpty && msgTrackID != currentVideoId {

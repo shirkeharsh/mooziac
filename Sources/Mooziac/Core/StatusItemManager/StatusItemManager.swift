@@ -464,14 +464,10 @@ class StatusItemManager: NSObject {
                 if responder is NSText || responder is NSTextView || responder is NSTextField || responder is NSSearchField {
                     return event
                 }
-                // 2. If focus is inside WKWebView / WebKit content (such as YouTube Music search bar), let WebKit handle it natively
-                let responderClass = String(describing: type(of: responder))
-                if responderClass.contains("WK") || responderClass.contains("Web") || (responder as? NSView)?.isDescendant(of: self.mainViewController.webViewContainer.webView) == true {
-                    return event
-                }
             }
 
             if KeyboardCommandHandler.handle(keyCode: event.keyCode,
+                                             modifierFlags: event.modifierFlags,
                                              isRepeat: event.isARepeat,
                                              showOverlay: { text in
                 CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: text)

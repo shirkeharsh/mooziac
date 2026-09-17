@@ -388,17 +388,23 @@ extension NowPlayingManager {
             }
 
             function ensurePlayingSoon() {
-                [250, 600, 1200].forEach(function(delay) {
+                [800, 1600].forEach(function(delay) {
                     setTimeout(function() {
                         try {
+                            if (window.__mooziacPlaybackSuppressed || window.__mooziacBlockAutoplay) return;
+                            var v = document.querySelector('video');
+                            if (v && !v.paused) return;
                             var p = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
                             if (p && typeof p.getPlayerState === 'function') {
                                 var state = p.getPlayerState();
-                                if (state === 2 || state === 5 || state === -1) {
-                                    if (typeof p.playVideo === 'function') p.playVideo();
+                                if (state === 1 || state === 3) return;
+                                if (state === 2) {
+                                    if (typeof p.playVideo === 'function') {
+                                        p.playVideo();
+                                        return;
+                                    }
                                 }
                             }
-                            var v = document.querySelector('video');
                             if (v && v.paused) {
                                 v.play().catch(function(){});
                             }
@@ -525,17 +531,23 @@ extension NowPlayingManager {
             }
 
             function ensurePlayingSoon() {
-                [250, 600, 1200].forEach(function(delay) {
+                [800, 1600].forEach(function(delay) {
                     setTimeout(function() {
                         try {
+                            if (window.__mooziacPlaybackSuppressed || window.__mooziacBlockAutoplay) return;
+                            var v = document.querySelector('video');
+                            if (v && !v.paused) return;
                             var p = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
                             if (p && typeof p.getPlayerState === 'function') {
                                 var state = p.getPlayerState();
-                                if (state === 2 || state === 5 || state === -1) {
-                                    if (typeof p.playVideo === 'function') p.playVideo();
+                                if (state === 1 || state === 3) return;
+                                if (state === 2) {
+                                    if (typeof p.playVideo === 'function') {
+                                        p.playVideo();
+                                        return;
+                                    }
                                 }
                             }
-                            var v = document.querySelector('video');
                             if (v && v.paused) {
                                 v.play().catch(function(){});
                             }
@@ -715,12 +727,38 @@ extension NowPlayingManager {
                 if (player && typeof player.seekTo === 'function' && typeof player.getCurrentTime === 'function') {
                     var curr = player.getCurrentTime();
                     var dur = player.getDuration() || 0;
+                    if (dur > 5.0 && (curr + \(seconds)) >= (dur - 1.5)) {
+                        window.webkit.messageHandlers.nowPlayingHandler.postMessage({
+                            event: 'videoEnded',
+                            videoId: (typeof player.getVideoData === 'function' && player.getVideoData() ? player.getVideoData().video_id : '') || '',
+                            currentTime: dur,
+                            duration: dur,
+                            isAd: false,
+                            source: 'seekPastEnd'
+                        });
+                        return;
+                    }
                     player.seekTo(Math.min(dur, curr + \(seconds)), true);
                     return;
                 }
             } catch(e) {}
             var v = document.querySelector('video');
-            if (v) v.currentTime = Math.min(v.duration || 0, v.currentTime + \(seconds));
+            if (v) {
+                var c = v.currentTime || 0;
+                var d = v.duration || 0;
+                if (d > 5.0 && (c + \(seconds)) >= (d - 1.5)) {
+                    window.webkit.messageHandlers.nowPlayingHandler.postMessage({
+                        event: 'videoEnded',
+                        videoId: '',
+                        currentTime: d,
+                        duration: d,
+                        isAd: false,
+                        source: 'seekPastEnd'
+                    });
+                    return;
+                }
+                v.currentTime = Math.min(d, c + \(seconds));
+            }
         })();
         """
         evaluateJS(js)
@@ -758,12 +796,38 @@ extension NowPlayingManager {
             try {
                 var player = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
                 if (player && typeof player.seekTo === 'function') {
+                    var dur = player.getDuration() || 0;
+                    if (dur > 5.0 && \(seconds) >= (dur - 1.5)) {
+                        window.webkit.messageHandlers.nowPlayingHandler.postMessage({
+                            event: 'videoEnded',
+                            videoId: (typeof player.getVideoData === 'function' && player.getVideoData() ? player.getVideoData().video_id : '') || '',
+                            currentTime: dur,
+                            duration: dur,
+                            isAd: false,
+                            source: 'seekPastEnd'
+                        });
+                        return;
+                    }
                     player.seekTo(\(seconds), true);
                     return;
                 }
             } catch(e) {}
             var v = document.querySelector('video');
-            if (v) v.currentTime = \(seconds);
+            if (v) {
+                var d = v.duration || 0;
+                if (d > 5.0 && \(seconds) >= (d - 1.5)) {
+                    window.webkit.messageHandlers.nowPlayingHandler.postMessage({
+                        event: 'videoEnded',
+                        videoId: '',
+                        currentTime: d,
+                        duration: d,
+                        isAd: false,
+                        source: 'seekPastEnd'
+                    });
+                    return;
+                }
+                v.currentTime = \(seconds);
+            }
         })();
         """
         evaluateJS(js)

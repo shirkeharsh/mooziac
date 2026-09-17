@@ -4,6 +4,26 @@ All notable changes to Mooziac are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.1.6] - 2026-09-17
+
+### Added
+- Multi-tier hotkey seeking: hold Option for 15-second jumps or Shift for 30-second jumps using Left/Right arrow keys.
+- Trackpad gesture mapping options for 15-second and 30-second forward and backward seeking.
+- Smart track advancement when seeking within 1.5 seconds of a track's end.
+- Loudness Leveling toggle integrated directly into Player Preferences.
+- Focus Audio toggle integrated into Trackpad Gesture Settings under the Trackpad Master toggle.
+- Buy Me a Coffee support action in the update manager dialog.
+- Unit test suite coverage for gesture actions, variable seek durations, and queue transitions.
+
+### Changed
+- Relocated Focus Audio toggle from Player Preferences to Trackpad Gesture Settings.
+- Centered Menu Bar Lyrics now update instantly with zero flying or sliding animations.
+- Redesigned in-app software update dialog with improved typography, layout alignment, and persistent support actions.
+
+### Fixed
+- Preserved playlist queue context and active anchor track when advancing between songs.
+- Prevented unlinked state shifts during rapid track transitions.
+
 ## [1.1.5] - 2026-09-08
 
 ### Added
