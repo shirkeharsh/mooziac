@@ -202,6 +202,7 @@ extension NowPlayingManager {
         (function() {
             window.__mooziacAutoplayPending = false;
             window.__mooziacPlaybackSuppressed = true;
+            window.__mooziacBlockAutoplay = true;
             if (window.__mooziacAudioOutput && typeof window.__mooziacAudioOutput.stop === 'function') {
                 window.__mooziacAudioOutput.stop();
             }
@@ -216,6 +217,77 @@ extension NowPlayingManager {
             if (video && !video.paused) {
                 video.pause();
             }
+        })();
+        """
+        evaluateJS(js)
+    }
+
+    /// Explicitly pauses playback and updates state prior to system sleep (lid closed / sleep command).
+    func pauseForSleep() {
+        if currentState.currentTime > 0 {
+            UserDefaults.standard.set(currentState.currentTime, forKey: "YTM_lastTime")
+        }
+        if engineMode == .offline {
+            NativeAudioPlayer.shared.pause()
+        } else {
+            let js = """
+            (function() {
+                window.__mooziacAutoplayPending = false;
+                window.__mooziacPlaybackSuppressed = true;
+                window.__mooziacBlockAutoplay = true;
+                if (window.__mooziacAudioOutput && typeof window.__mooziacAudioOutput.stop === 'function') {
+                    window.__mooziacAudioOutput.stop();
+                }
+                try {
+                    var player = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
+                    if (player && typeof player.pauseVideo === 'function') {
+                        player.pauseVideo();
+                    }
+                } catch(e) {}
+                try {
+                    var video = document.querySelector('video');
+                    if (video && !video.paused) {
+                        video.pause();
+                    }
+                } catch(e) {}
+            })();
+            """
+            // Direct evaluation on main thread to guarantee prompt delivery before sleep suspension
+            if let mainVC = StatusItemManager.shared?.mainViewController {
+                mainVC.webViewContainer.webView.evaluateJavaScript(js, completionHandler: nil)
+            }
+        }
+
+        if currentState.isPlaying {
+            currentState.isPlaying = false
+            notifyObservers(currentState)
+            updateSystemNowPlayingInfo(currentState)
+        }
+    }
+
+    /// Enforces paused state when system wakes up (lid opened / sleep ended) so playback stays paused like Spotify/Apple Music.
+    func enforcePausedStateOnWake() {
+        if engineMode == .offline {
+            NativeAudioPlayer.shared.pause()
+            return
+        }
+        let js = """
+        (function() {
+            window.__mooziacAutoplayPending = false;
+            window.__mooziacPlaybackSuppressed = true;
+            window.__mooziacBlockAutoplay = true;
+            try {
+                var player = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
+                if (player && typeof player.pauseVideo === 'function') {
+                    player.pauseVideo();
+                }
+            } catch(e) {}
+            try {
+                var video = document.querySelector('video');
+                if (video && !video.paused) {
+                    video.pause();
+                }
+            } catch(e) {}
         })();
         """
         evaluateJS(js)

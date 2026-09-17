@@ -89,18 +89,16 @@ class NowPlayingManager: NSObject, WKScriptMessageHandler {
     func setupSleepObservers() {
         let wnc = NSWorkspace.shared.notificationCenter
         wnc.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
-            self?.isSystemSleeping = true
+            guard let self = self else { return }
+            Log.playback.info("System will sleep (lid closed / sleep) - pausing playback")
+            self.pauseForSleep()
+            self.isSystemSleeping = true
         }
         wnc.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
-            self?.isSystemSleeping = false
-        }
-        
-        let dnc = DistributedNotificationCenter.default()
-        dnc.addObserver(forName: NSNotification.Name("com.apple.screenIsLocked"), object: nil, queue: .main) { [weak self] _ in
-            self?.isSystemSleeping = true
-        }
-        dnc.addObserver(forName: NSNotification.Name("com.apple.screenIsUnlocked"), object: nil, queue: .main) { [weak self] _ in
-            self?.isSystemSleeping = false
+            guard let self = self else { return }
+            Log.playback.info("System did wake (lid opened / wake) - maintaining paused state")
+            self.isSystemSleeping = false
+            self.enforcePausedStateOnWake()
         }
     }
     
@@ -267,15 +265,50 @@ class NowPlayingManager: NSObject, WKScriptMessageHandler {
         evaluateJS("window.mooziacPanelVisible = \(visible ? "true" : "false"); if (window.mooziacPanelVisible && typeof updateNowPlaying === 'function') { updateNowPlaying(true); }")
     }
 
+    public func setLyricsActive(_ active: Bool) {
+        evaluateJS("window.mooziacLyricsActive = \(active ? "true" : "false");")
+    }
+
+    public func prefetchNextQueueLyrics() {
+        guard CenteredMenuBarLyricsWindowController.shared.isEnabled else { return }
+        fetchQueue { items in
+            guard let currentIdx = items.firstIndex(where: { $0.isSelected }),
+                  currentIdx + 1 < items.count else { return }
+            let nextItem = items[currentIdx + 1]
+            guard !nextItem.title.isEmpty && !nextItem.title.hasPrefix("Track ") else { return }
+            let parsedDuration: Double = {
+                let parts = nextItem.duration.split(separator: ":").compactMap { Double($0) }
+                if parts.count == 2 {
+                    return (parts[0] * 60.0) + parts[1]
+                } else if parts.count == 3 {
+                    return (parts[0] * 3600.0) + (parts[1] * 60.0) + parts[2]
+                }
+                return Double(nextItem.duration) ?? 0.0
+            }()
+            LyricsManager.shared.prefetchLyrics(
+                artist: nextItem.artist,
+                title: nextItem.title,
+                duration: parsedDuration,
+                trackID: nextItem.videoId,
+                videoId: nextItem.videoId.isEmpty ? nil : nextItem.videoId
+            )
+        }
+    }
+
     func evaluateJS(_ code: String) {
         guard !isSystemSleeping else { return }
-        DispatchQueue.main.async {
+        let run = {
             guard let mainVC = StatusItemManager.shared?.mainViewController else { return }
             mainVC.webViewContainer.webView.evaluateJavaScript(code) { _, error in
                 if let error = error {
                     Log.web.debug("evaluateJS notice: \(error.localizedDescription)")
                 }
             }
+        }
+        if Thread.isMainThread {
+            run()
+        } else {
+            DispatchQueue.main.async(execute: run)
         }
     }
 
@@ -284,7 +317,7 @@ class NowPlayingManager: NSObject, WKScriptMessageHandler {
             completion?(nil)
             return
         }
-        DispatchQueue.main.async {
+        let run = {
             guard let mainVC = StatusItemManager.shared?.mainViewController else {
                 completion?(nil)
                 return
@@ -295,6 +328,11 @@ class NowPlayingManager: NSObject, WKScriptMessageHandler {
                 }
                 completion?(result)
             }
+        }
+        if Thread.isMainThread {
+            run()
+        } else {
+            DispatchQueue.main.async(execute: run)
         }
     }
 }

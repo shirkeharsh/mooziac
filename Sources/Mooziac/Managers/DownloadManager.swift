@@ -71,6 +71,25 @@ public final class DownloadManager: NSObject {
     private var ytDlpPath: String?
     private var cancelledTaskIDs = Set<String>()
 
+    private struct ActiveNativeDownload {
+        let task: QueueTask
+        let jobDir: URL
+        let safeFilename: String
+        let cleanA: String
+        let cleanT: String
+        let videoId: String?
+        let startTime: TimeInterval
+        var didSucceed: Bool = false
+    }
+    private var currentNativeDownload: ActiveNativeDownload?
+    private var activeNativeDownloadTask: URLSessionDownloadTask?
+    private lazy var nativeDownloadSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 60.0
+        config.timeoutIntervalForResource = 600.0
+        return URLSession(configuration: config, delegate: self, delegateQueue: nil)
+    }()
+
     public var downloadingBaseURL: URL {
         let musicDir = LocalLibraryManager.shared.musicFolderURL
         let folder = musicDir.appendingPathComponent(".downloading", isDirectory: true)
@@ -407,7 +426,11 @@ public final class DownloadManager: NSObject {
         queueLock.lock()
         let isActive = activeTask?.id == taskID
         let process = activeProcess
+        let nativeTask = activeNativeDownloadTask
+        activeNativeDownloadTask = nil
         queueLock.unlock()
+
+        nativeTask?.cancel()
         guard isActive, let process = process else { return }
 
         Log.download.error("Download timed out after \(Int(DownloadManager.downloadTimeout))s, terminating yt-dlp")
@@ -426,24 +449,6 @@ public final class DownloadManager: NSObject {
         let cleanA = task.artist
         let videoId = DownloadManager.extractVideoID(from: task.urlOrVideoId)
 
-        let targetQuery: String
-        if task.urlOrVideoId.hasPrefix("http://") || task.urlOrVideoId.hasPrefix("https://") {
-            if task.urlOrVideoId.contains("watch?v=") || task.urlOrVideoId.contains("youtu.be/") {
-                targetQuery = task.urlOrVideoId
-            } else if !cleanT.isEmpty {
-                targetQuery = "ytsearch1:\(cleanA) - \(cleanT)"
-            } else {
-                targetQuery = task.urlOrVideoId
-            }
-        } else if !task.urlOrVideoId.isEmpty && !task.urlOrVideoId.contains(" ") && task.urlOrVideoId.count == 11 {
-            targetQuery = "https://music.youtube.com/watch?v=\(task.urlOrVideoId)"
-        } else if !cleanT.isEmpty {
-            targetQuery = "ytsearch1:\(cleanA) - \(cleanT)"
-        } else {
-            finishTask(task: task, success: false, message: "Invalid track query")
-            return
-        }
-
         DispatchQueue.main.async {
             self.isDownloading = true
             self.currentDownloadTitle = cleanT
@@ -456,7 +461,6 @@ public final class DownloadManager: NSObject {
             self.broadcastQueueStatus()
         }
 
-        let musicDir = LocalLibraryManager.shared.musicFolderURL
         let safeFilename = "\(cleanA.isEmpty ? "Unknown" : cleanA) - \(cleanT.isEmpty ? "Track" : cleanT)"
             .replacingOccurrences(of: "/", with: "-")
             .replacingOccurrences(of: ":", with: "-")
@@ -472,6 +476,112 @@ public final class DownloadManager: NSObject {
         }
 
         self.currentActiveJobDirURL = jobDir
+
+        // Attempt Tier 1: Fast Native Stream Extraction (VISIONOS client)
+        if let vid = videoId, vid.count == 11 {
+            self.performNativeDownload(task: task, jobDir: jobDir, safeFilename: safeFilename, cleanA: cleanA, cleanT: cleanT, videoId: vid)
+        } else if !cleanT.isEmpty {
+            let query = cleanA.isEmpty ? cleanT : "\(cleanA) \(cleanT)"
+            YTMClient.shared.searchTopTrack(query: query) { [weak self] result in
+                guard let self = self else { return }
+                self.queueLock.lock()
+                let isCancelled = self.cancelledTaskIDs.contains(task.id) || (self.activeTask?.id != task.id)
+                self.queueLock.unlock()
+
+                if isCancelled {
+                    self.cleanupJobDir(jobDir)
+                    self.finishTask(task: task, success: false, message: "Download cancelled")
+                    return
+                }
+
+                if case .success(let track) = result, !track.videoId.isEmpty {
+                    self.performNativeDownload(task: task, jobDir: jobDir, safeFilename: safeFilename, cleanA: cleanA, cleanT: cleanT, videoId: track.videoId)
+                } else {
+                    self.executeYtDlpDownloadTask(task: task, jobDir: jobDir, safeFilename: safeFilename, videoId: nil)
+                }
+            }
+        } else {
+            self.executeYtDlpDownloadTask(task: task, jobDir: jobDir, safeFilename: safeFilename, videoId: videoId)
+        }
+    }
+
+    private func performNativeDownload(task: QueueTask, jobDir: URL, safeFilename: String, cleanA: String, cleanT: String, videoId: String) {
+        YTMClient.shared.fetchDirectStreamURL(videoId: videoId) { [weak self] result in
+            guard let self = self else { return }
+            self.queueLock.lock()
+            let isCancelled = self.cancelledTaskIDs.contains(task.id) || (self.activeTask?.id != task.id)
+            self.queueLock.unlock()
+
+            if isCancelled {
+                self.cleanupJobDir(jobDir)
+                self.finishTask(task: task, success: false, message: "Download cancelled")
+                return
+            }
+
+            switch result {
+            case .success(let streamRes):
+                Log.download.info("Direct audio stream resolved for '\(cleanT)' (itag \(streamRes.itag)), starting native download...")
+                self.startNativeStreamDownload(
+                    streamURL: streamRes.streamURL,
+                    task: task,
+                    jobDir: jobDir,
+                    safeFilename: safeFilename,
+                    cleanA: cleanA,
+                    cleanT: cleanT,
+                    videoId: videoId
+                )
+            case .failure(let error):
+                Log.download.info("Direct stream extraction unavailable (\(error.localizedDescription)), falling back to yt-dlp...")
+                self.executeYtDlpDownloadTask(task: task, jobDir: jobDir, safeFilename: safeFilename, videoId: videoId)
+            }
+        }
+    }
+
+    private func startNativeStreamDownload(streamURL: URL, task: QueueTask, jobDir: URL, safeFilename: String, cleanA: String, cleanT: String, videoId: String) {
+        var request = URLRequest(url: streamURL)
+        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
+
+        queueLock.lock()
+        let active = ActiveNativeDownload(
+            task: task,
+            jobDir: jobDir,
+            safeFilename: safeFilename,
+            cleanA: cleanA,
+            cleanT: cleanT,
+            videoId: videoId,
+            startTime: Date().timeIntervalSince1970
+        )
+        self.currentNativeDownload = active
+        let downloadTask = nativeDownloadSession.downloadTask(with: request)
+        self.activeNativeDownloadTask = downloadTask
+        queueLock.unlock()
+
+        downloadTask.resume()
+    }
+
+    private func executeYtDlpDownloadTask(task: QueueTask, jobDir: URL, safeFilename: String, videoId: String?) {
+        let cleanT = task.title
+        let cleanA = task.artist
+
+        let targetQuery: String
+        if task.urlOrVideoId.hasPrefix("http://") || task.urlOrVideoId.hasPrefix("https://") {
+            if task.urlOrVideoId.contains("watch?v=") || task.urlOrVideoId.contains("youtu.be/") {
+                targetQuery = task.urlOrVideoId
+            } else if !cleanT.isEmpty {
+                targetQuery = "ytsearch1:\(cleanA) - \(cleanT)"
+            } else {
+                targetQuery = task.urlOrVideoId
+            }
+        } else if !task.urlOrVideoId.isEmpty && !task.urlOrVideoId.contains(" ") && task.urlOrVideoId.count == 11 {
+            targetQuery = "https://music.youtube.com/watch?v=\(task.urlOrVideoId)"
+        } else if !cleanT.isEmpty {
+            targetQuery = "ytsearch1:\(cleanA) - \(cleanT)"
+        } else {
+            cleanupJobDir(jobDir)
+            finishTask(task: task, success: false, message: "Invalid track query")
+            return
+        }
+
         let outputTemplate = jobDir.appendingPathComponent("\(safeFilename).%(ext)s").path
 
         let process = Process()
@@ -484,7 +594,7 @@ public final class DownloadManager: NSObject {
             }) { [weak self] success, error in
                 guard let self = self else { return }
                 if success, self.resolveYtDlpPath() != nil {
-                    self.executeDownloadTask(task: task)
+                    self.executeYtDlpDownloadTask(task: task, jobDir: jobDir, safeFilename: safeFilename, videoId: videoId)
                 } else {
                     self.cleanupJobDir(jobDir)
                     self.finishTask(task: task, success: false, message: error ?? "Helper installation failed")
@@ -581,85 +691,95 @@ public final class DownloadManager: NSObject {
                 return
             }
 
-            // 2. Validate Resulting Audio File in Job Sandbox
-            guard let validatedAudioURL = self.validateJobAudioFile(in: jobDir) else {
-                cleanupJobDir(jobDir)
-                finishTask(task: task, success: false, message: "Downloaded file corrupted or invalid")
-                return
-            }
-
-            // 3. Stage Artwork (best effort fetch)
-            let tempArtworkURL = jobDir.appendingPathComponent("\(safeFilename).jpg")
-            if !task.artworkUrl.isEmpty, let artURL = URL(string: task.artworkUrl), artURL.scheme?.hasPrefix("http") == true {
-                do {
-                    let imgData = try Data(contentsOf: artURL)
-                    if !imgData.isEmpty {
-                        try imgData.write(to: tempArtworkURL, options: .atomic)
-                    }
-                } catch {
-                    Log.download.debug("Artwork staging skipped: \(error.localizedDescription)")
-                }
-            }
-
-            // 4. Finalize to ~/Music/Mooziac/
-            let finalAudioURL = musicDir.appendingPathComponent("\(safeFilename).\(validatedAudioURL.pathExtension)")
-            let finalLrcURL = musicDir.appendingPathComponent("\(safeFilename).lrc")
-            let finalArtworkURL = musicDir.appendingPathComponent("\(safeFilename).jpg")
-
-            do {
-                if FileManager.default.fileExists(atPath: finalAudioURL.path) {
-                    try FileManager.default.removeItem(at: finalAudioURL)
-                }
-                try FileManager.default.moveItem(at: validatedAudioURL, to: finalAudioURL)
-
-                if FileManager.default.fileExists(atPath: tempArtworkURL.path) {
-                    if FileManager.default.fileExists(atPath: finalArtworkURL.path) {
-                        try FileManager.default.removeItem(at: finalArtworkURL)
-                    }
-                    do {
-                        try FileManager.default.moveItem(at: tempArtworkURL, to: finalArtworkURL)
-                    } catch {
-                        Log.download.warning("Could not persist artwork file: \(error.localizedDescription)")
-                    }
-                }
-            } catch {
-                cleanupJobDir(jobDir)
-                finishTask(task: task, success: false, message: "Failed to save audio file")
-                return
-            }
-
-            cleanupJobDir(jobDir)
-
-            // 5. Fetch synced lyrics in the background (non-blocking) directly to the final path
-            if !cleanT.isEmpty {
-                LyricsManager.shared.fetchRawSyncedLRC(artist: cleanA, title: cleanT) { lrc in
-                    guard let lrc = lrc, !lrc.isEmpty else { return }
-                    DispatchQueue.global(qos: .utility).async {
-                        do {
-                            if FileManager.default.fileExists(atPath: finalLrcURL.path) {
-                                try FileManager.default.removeItem(at: finalLrcURL)
-                            }
-                            try lrc.write(to: finalLrcURL, atomically: true, encoding: .utf8)
-                        } catch {
-                            Log.download.warning("Could not persist synced lyrics: \(error.localizedDescription)")
-                        }
-                    }
-                }
-            }
-
-            // 6. Rescan the library and assign yt_video_id immediately so playlist views and local library resolve the track as downloaded
-            LocalLibraryManager.shared.scanLibrary { _ in
-                if let vid = videoId {
-                    LocalLibraryManager.shared.assignYTVideoID(vid, toFileAt: finalAudioURL.path)
-                }
-                self.finishTask(task: task, success: true, message: "✓ Downloaded \(cleanT)", resultDetail: "Saved to ~/Music/Mooziac")
-            }
+            self.finalizeSuccessfulJob(task: task, jobDir: jobDir, cleanA: cleanA, cleanT: cleanT, videoId: videoId, safeFilename: safeFilename)
         } catch {
             cleanupJobDir(jobDir)
             queueLock.lock()
             self.activeProcess = nil
             queueLock.unlock()
             finishTask(task: task, success: false, message: "Error: \(error.localizedDescription)")
+        }
+    }
+
+    private func finalizeSuccessfulJob(task: QueueTask, jobDir: URL, cleanA: String, cleanT: String, videoId: String?, safeFilename: String) {
+        let musicDir = LocalLibraryManager.shared.musicFolderURL
+
+        // 2. Validate Resulting Audio File in Job Sandbox
+        guard let validatedAudioURL = self.validateJobAudioFile(in: jobDir) else {
+            cleanupJobDir(jobDir)
+            finishTask(task: task, success: false, message: "Downloaded file corrupted or invalid")
+            return
+        }
+
+        // 3. Stage Artwork (best effort fetch)
+        let tempArtworkURL = jobDir.appendingPathComponent("\(safeFilename).jpg")
+        var artURLStr = task.artworkUrl
+        if artURLStr.isEmpty, let vid = videoId {
+            artURLStr = "https://i.ytimg.com/vi/\(vid)/hqdefault.jpg"
+        }
+        if !artURLStr.isEmpty, let artURL = URL(string: artURLStr), artURL.scheme?.hasPrefix("http") == true {
+            do {
+                let imgData = try Data(contentsOf: artURL)
+                if !imgData.isEmpty {
+                    try imgData.write(to: tempArtworkURL, options: .atomic)
+                }
+            } catch {
+                Log.download.debug("Artwork staging skipped: \(error.localizedDescription)")
+            }
+        }
+
+        // 4. Finalize to ~/Music/Mooziac/
+        let finalAudioURL = musicDir.appendingPathComponent("\(safeFilename).\(validatedAudioURL.pathExtension)")
+        let finalLrcURL = musicDir.appendingPathComponent("\(safeFilename).lrc")
+        let finalArtworkURL = musicDir.appendingPathComponent("\(safeFilename).jpg")
+
+        do {
+            if FileManager.default.fileExists(atPath: finalAudioURL.path) {
+                try FileManager.default.removeItem(at: finalAudioURL)
+            }
+            try FileManager.default.moveItem(at: validatedAudioURL, to: finalAudioURL)
+
+            if FileManager.default.fileExists(atPath: tempArtworkURL.path) {
+                if FileManager.default.fileExists(atPath: finalArtworkURL.path) {
+                    try FileManager.default.removeItem(at: finalArtworkURL)
+                }
+                do {
+                    try FileManager.default.moveItem(at: tempArtworkURL, to: finalArtworkURL)
+                } catch {
+                    Log.download.warning("Could not persist artwork file: \(error.localizedDescription)")
+                }
+            }
+        } catch {
+            cleanupJobDir(jobDir)
+            finishTask(task: task, success: false, message: "Failed to save audio file")
+            return
+        }
+
+        cleanupJobDir(jobDir)
+
+        // 5. Fetch synced lyrics in the background (non-blocking) directly to the final path (official YTM lyrics first!)
+        if !cleanT.isEmpty {
+            LyricsManager.shared.fetchRawSyncedLRC(artist: cleanA, title: cleanT, videoId: videoId) { lrc in
+                guard let lrc = lrc, !lrc.isEmpty else { return }
+                DispatchQueue.global(qos: .utility).async {
+                    do {
+                        if FileManager.default.fileExists(atPath: finalLrcURL.path) {
+                            try FileManager.default.removeItem(at: finalLrcURL)
+                        }
+                        try lrc.write(to: finalLrcURL, atomically: true, encoding: .utf8)
+                    } catch {
+                        Log.download.warning("Could not persist synced lyrics: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+
+        // 6. Rescan the library and assign yt_video_id immediately so playlist views and local library resolve the track as downloaded
+        LocalLibraryManager.shared.scanLibrary { _ in
+            if let vid = videoId {
+                LocalLibraryManager.shared.assignYTVideoID(vid, toFileAt: finalAudioURL.path)
+            }
+            self.finishTask(task: task, success: true, message: "✓ Downloaded \(cleanT)", resultDetail: "Saved to ~/Music/Mooziac")
         }
     }
 
@@ -971,8 +1091,12 @@ public final class DownloadManager: NSObject {
         let removedCount = tasksQueue.count - before
         let isActive = activeTask?.id == id
         let process = activeProcess
+        let nativeTask = activeNativeDownloadTask
+        activeNativeDownloadTask = nil
         let active = isActive ? activeTask : nil
         queueLock.unlock()
+
+        nativeTask?.cancel()
 
         if removedCount > 0 {
             DispatchQueue.main.async {
@@ -981,12 +1105,13 @@ public final class DownloadManager: NSObject {
             return
         }
 
-        guard isActive, let process = process, process.isRunning else { return }
-        process.terminate()
-        let pid = process.processIdentifier
-        DispatchQueue.global().asyncAfter(deadline: .now() + 2.0) {
-            if process.isRunning {
-                kill(pid, SIGKILL)
+        if let process = process, process.isRunning {
+            process.terminate()
+            let pid = process.processIdentifier
+            DispatchQueue.global().asyncAfter(deadline: .now() + 2.0) {
+                if process.isRunning {
+                    kill(pid, SIGKILL)
+                }
             }
         }
 
@@ -1008,7 +1133,11 @@ public final class DownloadManager: NSObject {
         tasksQueue.removeAll()
         let active = activeTask
         let process = activeProcess
+        let nativeTask = activeNativeDownloadTask
+        activeNativeDownloadTask = nil
         queueLock.unlock()
+
+        nativeTask?.cancel()
 
         if let process = process, process.isRunning {
             process.terminate()
@@ -1141,5 +1270,111 @@ public final class DownloadManager: NSObject {
             }
         }
         return nil
+    }
+}
+
+// MARK: - URLSessionDownloadDelegate
+extension DownloadManager: URLSessionDownloadDelegate {
+    public func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+        queueLock.lock()
+        guard let active = self.currentNativeDownload, self.activeTask?.id == active.task.id else {
+            queueLock.unlock()
+            return
+        }
+        let taskID = active.task.id
+        let videoId = active.videoId
+        let title = active.cleanT
+        let startTime = active.startTime
+        queueLock.unlock()
+
+        let progress: Double
+        if totalBytesExpectedToWrite > 0 {
+            progress = min(max(Double(totalBytesWritten) / Double(totalBytesExpectedToWrite), 0.0), 1.0)
+        } else {
+            progress = 0.5
+        }
+
+        let elapsed = Date().timeIntervalSince1970 - startTime
+        var speedStr = ""
+        var etaStr = ""
+        if elapsed > 0.4 && totalBytesWritten > 0 {
+            let bytesPerSec = Double(totalBytesWritten) / elapsed
+            if bytesPerSec >= 1024 * 1024 {
+                speedStr = String(format: "%.1f MB/s", bytesPerSec / (1024 * 1024))
+            } else {
+                speedStr = String(format: "%.0f KB/s", bytesPerSec / 1024)
+            }
+            if totalBytesExpectedToWrite > totalBytesWritten && bytesPerSec > 0 {
+                let remainingBytes = Double(totalBytesExpectedToWrite - totalBytesWritten)
+                let remainingSec = Int(remainingBytes / bytesPerSec)
+                if remainingSec >= 60 {
+                    etaStr = "\(remainingSec / 60)m \(remainingSec % 60)s"
+                } else {
+                    etaStr = "\(remainingSec)s"
+                }
+            }
+        }
+
+        self.handleStreamingProgress(taskID: taskID, videoId: videoId, title: title, progress: progress, eta: etaStr, speed: speedStr)
+    }
+
+    public func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
+        queueLock.lock()
+        guard var active = self.currentNativeDownload, self.activeTask?.id == active.task.id else {
+            queueLock.unlock()
+            return
+        }
+        active.didSucceed = true
+        self.currentNativeDownload = active
+        self.activeNativeDownloadTask = nil
+        queueLock.unlock()
+
+        let destURL = active.jobDir.appendingPathComponent("\(active.safeFilename).m4a")
+        do {
+            if FileManager.default.fileExists(atPath: destURL.path) {
+                try FileManager.default.removeItem(at: destURL)
+            }
+            try FileManager.default.moveItem(at: location, to: destURL)
+
+            self.finalizeSuccessfulJob(
+                task: active.task,
+                jobDir: active.jobDir,
+                cleanA: active.cleanA,
+                cleanT: active.cleanT,
+                videoId: active.videoId,
+                safeFilename: active.safeFilename
+            )
+        } catch {
+            Log.download.error("Failed to move downloaded native audio stream: \(error.localizedDescription)")
+            self.cleanupJobDir(active.jobDir)
+            self.finishTask(task: active.task, success: false, message: "Failed to save audio stream")
+        }
+    }
+
+    public func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        guard let error = error else { return }
+
+        queueLock.lock()
+        let isCancelled = self.cancelledTaskIDs.contains(self.activeTask?.id ?? "")
+        let active = self.currentNativeDownload
+        let alreadySucceeded = active?.didSucceed ?? false
+        self.currentNativeDownload = nil
+        self.activeNativeDownloadTask = nil
+        queueLock.unlock()
+
+        if alreadySucceeded { return }
+
+        if isCancelled || (error as NSError).code == NSURLErrorCancelled {
+            if let active = active {
+                self.cleanupJobDir(active.jobDir)
+                self.finishTask(task: active.task, success: false, message: "Download cancelled")
+            }
+            return
+        }
+
+        if let active = active {
+            Log.download.info("Direct stream download failed (\(error.localizedDescription)), falling back to yt-dlp...")
+            self.executeYtDlpDownloadTask(task: active.task, jobDir: active.jobDir, safeFilename: active.safeFilename, videoId: active.videoId)
+        }
     }
 }

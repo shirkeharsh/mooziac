@@ -838,4 +838,337 @@ public final class YTMClient {
         }
         return nil
     }
+
+    // MARK: - Direct Stream Extraction (VISIONOS Client)
+
+    public struct DirectStreamResult {
+        public let streamURL: URL
+        public let itag: Int
+        public let mimeType: String
+        public let contentLength: Int64?
+        public let approxDurationMs: Double?
+        public let loudnessDb: Double?
+    }
+
+    public func fetchDirectStreamURL(videoId: String, completion: @escaping (Result<DirectStreamResult, Error>) -> Void) {
+        guard let url = URL(string: "\(Self.baseURL)/player?alt=json&key=\(Self.innerTubeAPIKey)&prettyPrint=false") else {
+            completion(.failure(YTMError.badResponse))
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
+        request.setValue("101", forHTTPHeaderField: "X-YouTube-Client-Name")
+        request.setValue("0.1", forHTTPHeaderField: "X-YouTube-Client-Version")
+        request.setValue("https://music.youtube.com", forHTTPHeaderField: "Origin")
+
+        let clientContext: [String: Any] = [
+            "client": [
+                "clientName": "VISIONOS",
+                "clientVersion": "0.1",
+                "deviceMake": "Apple",
+                "deviceModel": "RealityDevice14,1",
+                "osName": "visionOS",
+                "osVersion": "1.3.21O771",
+                "hl": "en",
+                "gl": "US"
+            ]
+        ]
+
+        let body: [String: Any] = [
+            "context": clientContext,
+            "videoId": videoId,
+            "contentCheckOk": true,
+            "racyCheckOk": true
+        ]
+
+        authCredentials { [weak self] authResult in
+            guard self != nil else { return }
+            if case .success(let creds) = authResult {
+                request.setValue(creds.authorization, forHTTPHeaderField: "Authorization")
+                if !creds.cookie.isEmpty {
+                    request.setValue(creds.cookie, forHTTPHeaderField: "Cookie")
+                }
+            }
+
+            do {
+                request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            } catch {
+                completion(.failure(error))
+                return
+            }
+
+            let task = URLSession.shared.dataTask(with: request) { data, _, error in
+                if let error = error {
+                    completion(.failure(error))
+                    return
+                }
+                guard let data = data,
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    completion(.failure(YTMError.badResponse))
+                    return
+                }
+
+                if let playability = json["playabilityStatus"] as? [String: Any],
+                   let status = playability["status"] as? String,
+                   status != "OK" {
+                    let reason = playability["reason"] as? String ?? status
+                    completion(.failure(YTMError.api(reason)))
+                    return
+                }
+
+                guard let streamingData = json["streamingData"] as? [String: Any],
+                      let adaptiveFormats = streamingData["adaptiveFormats"] as? [[String: Any]] else {
+                    completion(.failure(YTMError.api("No streamingData found")))
+                    return
+                }
+
+                var loudnessDb: Double? = nil
+                if let playerConfig = json["playerConfig"] as? [String: Any],
+                   let audioConfig = playerConfig["audioConfig"] as? [String: Any] {
+                    loudnessDb = audioConfig["loudnessDb"] as? Double
+                }
+
+                let audioFormats = adaptiveFormats.filter { fmt in
+                    guard let mime = fmt["mimeType"] as? String, mime.contains("audio"),
+                          let urlStr = fmt["url"] as? String, !urlStr.isEmpty else { return false }
+                    return true
+                }
+
+                let chosenFormat = audioFormats.first(where: { ($0["itag"] as? Int) == 140 }) ??
+                                   audioFormats.first(where: { ($0["itag"] as? Int) == 251 }) ??
+                                   audioFormats.first
+
+                guard let format = chosenFormat,
+                      let urlStr = format["url"] as? String,
+                      let streamURL = URL(string: urlStr) else {
+                    completion(.failure(YTMError.api("No direct stream URL available")))
+                    return
+                }
+
+                let itag = format["itag"] as? Int ?? 0
+                let mimeType = format["mimeType"] as? String ?? "audio/mp4"
+                let contentLengthStr = format["contentLength"] as? String
+                let contentLength = contentLengthStr.flatMap(Int64.init)
+                let durationStr = format["approxDurationMs"] as? String
+                let approxDurationMs = durationStr.flatMap(Double.init)
+
+                let res = DirectStreamResult(
+                    streamURL: streamURL,
+                    itag: itag,
+                    mimeType: mimeType,
+                    contentLength: contentLength,
+                    approxDurationMs: approxDurationMs,
+                    loudnessDb: loudnessDb
+                )
+                completion(.success(res))
+            }
+            task.resume()
+        }
+    }
+
+    // MARK: - Official YouTube Music Synced Lyrics (IOS_MUSIC Client)
+
+    public func fetchOfficialLyrics(videoId: String, completion: @escaping (Result<[LRCLine], Error>) -> Void) {
+        guard let nextURL = URL(string: "\(Self.baseURL)/next?alt=json&key=\(Self.innerTubeAPIKey)&prettyPrint=false") else {
+            completion(.failure(YTMError.badResponse))
+            return
+        }
+
+        var nextRequest = URLRequest(url: nextURL)
+        nextRequest.httpMethod = "POST"
+        nextRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        nextRequest.setValue("https://music.youtube.com", forHTTPHeaderField: "Origin")
+        nextRequest.setValue(YTMWebViewContainer.userAgent, forHTTPHeaderField: "User-Agent")
+
+        let nextBody: [String: Any] = [
+            "context": Self.clientContext,
+            "videoId": videoId
+        ]
+
+        authCredentials { [weak self] authResult in
+            guard let self = self else { return }
+            let creds = (try? authResult.get())
+            if let creds = creds {
+                nextRequest.setValue(creds.authorization, forHTTPHeaderField: "Authorization")
+                if !creds.cookie.isEmpty {
+                    nextRequest.setValue(creds.cookie, forHTTPHeaderField: "Cookie")
+                }
+            }
+
+            do {
+                nextRequest.httpBody = try JSONSerialization.data(withJSONObject: nextBody)
+            } catch {
+                completion(.failure(error))
+                return
+            }
+
+            let task = URLSession.shared.dataTask(with: nextRequest) { data, _, error in
+                if let error = error {
+                    completion(.failure(error))
+                    return
+                }
+                guard let data = data,
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    completion(.failure(YTMError.badResponse))
+                    return
+                }
+
+                guard let lyricsBrowseId = Self.extractLyricsBrowseId(from: json), !lyricsBrowseId.isEmpty else {
+                    completion(.failure(YTMError.api("No lyrics browseId found for this track")))
+                    return
+                }
+
+                self.fetchLyricsFromBrowse(browseId: lyricsBrowseId, auth: creds, completion: completion)
+            }
+            task.resume()
+        }
+    }
+
+    public static func extractLyricsBrowseId(from json: [String: Any]) -> String? {
+        func search(in obj: Any) -> String? {
+            if let dict = obj as? [String: Any] {
+                if let be = dict["browseEndpoint"] as? [String: Any] {
+                    if let configs = be["browseEndpointContextSupportedConfigs"] as? [String: Any],
+                       let musicConfig = configs["browseEndpointContextMusicConfig"] as? [String: Any],
+                       (musicConfig["pageType"] as? String) == "MUSIC_PAGE_TYPE_TRACK_LYRICS" {
+                        return be["browseId"] as? String
+                    }
+                }
+                for (_, v) in dict {
+                    if let found = search(in: v) { return found }
+                }
+            } else if let arr = obj as? [Any] {
+                for v in arr {
+                    if let found = search(in: v) { return found }
+                }
+            }
+            return nil
+        }
+        return search(in: json)
+    }
+
+    public static func parseTimedLyrics(from json: [String: Any]) -> [LRCLine] {
+        var timedLines: [LRCLine] = []
+        func searchTimed(_ obj: Any) {
+            if let dict = obj as? [String: Any] {
+                if let list = dict["timedLyricsData"] as? [[String: Any]] {
+                    for item in list {
+                        guard let text = item["lyricLine"] as? String, !text.isEmpty,
+                              let cue = item["cueRange"] as? [String: Any],
+                              let startStr = cue["startTimeMilliseconds"] as? String,
+                              let startMs = Double(startStr) else { continue }
+                        let endMs = (cue["endTimeMilliseconds"] as? String).flatMap(Double.init)
+                        let startSec = startMs / 1000.0
+                        let endSec = endMs.map { $0 / 1000.0 }
+                        timedLines.append(LRCLine(timestamp: startSec, text: text, nextTimestamp: endSec))
+                    }
+                    if !timedLines.isEmpty { return }
+                }
+                for (_, v) in dict {
+                    searchTimed(v)
+                    if !timedLines.isEmpty { return }
+                }
+            } else if let arr = obj as? [Any] {
+                for v in arr {
+                    searchTimed(v)
+                    if !timedLines.isEmpty { return }
+                }
+            }
+        }
+        searchTimed(json)
+        return timedLines
+    }
+
+    public static func parsePlainLyrics(from json: [String: Any]) -> String? {
+        func searchPlain(_ obj: Any) -> String? {
+            if let dict = obj as? [String: Any] {
+                if let shelf = dict["musicDescriptionShelfRenderer"] as? [String: Any],
+                   let desc = shelf["description"] as? [String: Any],
+                   let runs = desc["runs"] as? [[String: Any]] {
+                    let text = runs.compactMap { $0["text"] as? String }.joined()
+                    if !text.isEmpty { return text }
+                }
+                for (_, v) in dict {
+                    if let found = searchPlain(v) { return found }
+                }
+            } else if let arr = obj as? [Any] {
+                for v in arr {
+                    if let found = searchPlain(v) { return found }
+                }
+            }
+            return nil
+        }
+        return searchPlain(json)
+    }
+
+    private func fetchLyricsFromBrowse(browseId: String, auth: AuthCredentials? = nil, completion: @escaping (Result<[LRCLine], Error>) -> Void) {
+        guard let browseURL = URL(string: "\(Self.baseURL)/browse?alt=json&key=\(Self.innerTubeAPIKey)&prettyPrint=false") else {
+            completion(.failure(YTMError.badResponse))
+            return
+        }
+
+        var request = URLRequest(url: browseURL)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("com.google.ios.youtubemusic/7.01.05 (iPhone16,2; U; CPU iOS 18_2 like Mac OS X;)", forHTTPHeaderField: "User-Agent")
+        request.setValue("26", forHTTPHeaderField: "X-YouTube-Client-Name")
+        request.setValue("7.01.05", forHTTPHeaderField: "X-YouTube-Client-Version")
+
+        if let creds = auth {
+            request.setValue(creds.authorization, forHTTPHeaderField: "Authorization")
+            if !creds.cookie.isEmpty {
+                request.setValue(creds.cookie, forHTTPHeaderField: "Cookie")
+            }
+        }
+
+        let iosClientContext: [String: Any] = [
+            "client": [
+                "clientName": "IOS_MUSIC",
+                "clientVersion": "7.01.05",
+                "osName": "iOS",
+                "osVersion": "18.2.0.22C152",
+                "deviceMake": "Apple",
+                "deviceModel": "iPhone16,2",
+                "hl": "en",
+                "gl": "US"
+            ]
+        ]
+
+        let body: [String: Any] = [
+            "context": iosClientContext,
+            "browseId": browseId
+        ]
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        } catch {
+            completion(.failure(error))
+            return
+        }
+
+        let task = URLSession.shared.dataTask(with: request) { data, _, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+            guard let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                completion(.failure(YTMError.badResponse))
+                return
+            }
+
+            let timedLines = Self.parseTimedLyrics(from: json)
+            if !timedLines.isEmpty {
+                completion(.success(timedLines))
+                return
+            }
+
+            // If official timed lyrics are not available, fail cleanly so caller searches LRCLib for verified synced lyrics
+            completion(.failure(YTMError.api("No synced timed lyrics available on YouTube Music")))
+        }
+        task.resume()
+    }
 }

@@ -11,6 +11,9 @@ extension NowPlayingManager {
         (function() {
             if (window.ytmObserverInjected) return;
             window.ytmObserverInjected = true;
+            if (typeof window.mooziacLyricsActive === 'undefined') {
+                window.mooziacLyricsActive = true;
+            }
             
             window.mooziacQuery = function(selectorTiers, root) {
                 root = root || document;
@@ -134,10 +137,15 @@ extension NowPlayingManager {
                     }
 
                     var now = Date.now();
+                    var isSeek = Math.abs(currentTime - lastTime) > 1.2;
+                    var playStateChanged = (lastIsPlaying !== isPlaying);
+                    if (isSeek || playStateChanged) {
+                        force = true;
+                    }
                     if (!force && !isPlaying && lastIsPlaying === false && Math.abs(currentTime - lastTime) < 0.1) {
                         return;
                     }
-                    var minInterval = window.mooziacPanelVisible ? 1000 : 2500;
+                    var minInterval = window.mooziacPanelVisible ? 1000 : 2000;
                     if (!force && isPlaying && (now - lastPostTime < minInterval)) {
                         return;
                     }
@@ -360,6 +368,24 @@ extension NowPlayingManager {
                         } catch(e) {}
                     }
                     
+                    var liveLoudnessDb = null;
+                    try {
+                        var pObj = document.getElementById('movie_player') || document.querySelector('ytmusic-player')?.playerApi;
+                        if (pObj && typeof pObj.getPlayerResponse === 'function') {
+                            var pr = pObj.getPlayerResponse();
+                            if (pr && pr.playerConfig && pr.playerConfig.audioConfig && typeof pr.playerConfig.audioConfig.loudnessDb === 'number') {
+                                liveLoudnessDb = pr.playerConfig.audioConfig.loudnessDb;
+                            }
+                        }
+                        if (liveLoudnessDb === null && pObj && typeof pObj.getStatsForNerds === 'function') {
+                            var sfn = pObj.getStatsForNerds() || {};
+                            if (typeof sfn.loudness === 'string') {
+                                var parsedVal = parseFloat(sfn.loudness);
+                                if (!isNaN(parsedVal)) liveLoudnessDb = parsedVal;
+                            }
+                        }
+                    } catch(e) {}
+
                     window.webkit.messageHandlers.nowPlayingHandler.postMessage({
                         isAd: false,
                         title: cachedTitle || "",
@@ -378,7 +404,8 @@ extension NowPlayingManager {
                         isRepeat: cachedRepeat,
                         audioItag: audioDiag.itag,
                         audioCodecs: audioDiag.codecs,
-                        audioBitrate: audioDiag.bitrate
+                        audioBitrate: audioDiag.bitrate,
+                        loudnessDb: liveLoudnessDb
                     });
                 } catch(e) {}
             }
@@ -822,6 +849,22 @@ extension NowPlayingManager {
             currentVideoId = msgTrackID
             currentTime = 0.0
             lastTrackChangeTime = now
+
+            // Update Loudness Normalization
+            let loudnessDb = dict["loudnessDb"] as? Double
+            if let lDb = loudnessDb {
+                AppVolumeManager.shared.updateTrackLoudness(loudnessDb: lDb)
+            } else if !videoId.isEmpty {
+                YTMClient.shared.fetchDirectStreamURL(videoId: videoId) { result in
+                    if case .success(let stream) = result, let lDb = stream.loudnessDb {
+                        DispatchQueue.main.async {
+                            AppVolumeManager.shared.updateTrackLoudness(loudnessDb: lDb)
+                        }
+                    }
+                }
+            } else {
+                AppVolumeManager.shared.updateTrackLoudness(loudnessDb: nil)
+            }
 
             // Manage active playlist context:
             if let ctx = PlaylistManager.shared.activeContext {

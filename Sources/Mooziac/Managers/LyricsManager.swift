@@ -11,6 +11,9 @@ public final class LyricsManager {
     public private(set) var currentTrackKey: String = ""
     public private(set) var currentLRCLines: [LRCLine] = []
     
+    private var memoryCache: [String: (plainText: String?, lines: [LRCLine])] = [:]
+    private let cacheLock = NSLock()
+    
     public var onLyricsUpdated: (([LRCLine]) -> Void)?
     
     private init() {}
@@ -18,6 +21,29 @@ public final class LyricsManager {
     public func clearSession() {
         currentTrackKey = ""
         currentLRCLines = []
+    }
+
+    private func storeInMemoryCache(key: String, plainText: String?, lines: [LRCLine]) {
+        guard !lines.isEmpty else { return }
+        cacheLock.lock()
+        memoryCache[key] = (plainText, lines)
+        cacheLock.unlock()
+    }
+
+    public func prefetchLyrics(artist: String, title: String, duration: Double = 0.0, trackID: String = "", videoId: String? = nil) {
+        let cleanTitle = LyricsManager.cleanSongInfo(title)
+        let cleanArtist = LyricsManager.cleanSongInfo(artist)
+        guard !cleanTitle.isEmpty else { return }
+        let trackKey = strongTrackKey(trackID: trackID, title: cleanTitle, artist: cleanArtist, duration: duration)
+
+        cacheLock.lock()
+        let hasCache = memoryCache[trackKey] != nil
+        cacheLock.unlock()
+        if hasCache { return }
+
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            self?.fetchLyrics(artist: artist, title: title, duration: duration, trackID: trackID, videoId: videoId) { _, _ in }
+        }
     }
     
     // Clean Title/Artist while preserving Native Scripts (Devanagari, CJK, Spanish accents, etc.)
@@ -30,6 +56,22 @@ public final class LyricsManager {
         return clean.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
+    // Serialize LRCLine array back to standard LRC file content format
+    public static func serializeLinesToLRC(lines: [LRCLine], title: String = "", artist: String = "") -> String {
+        var out = ""
+        if !title.isEmpty { out += "[ti:\(title)]\n" }
+        if !artist.isEmpty { out += "[ar:\(artist)]\n" }
+        for line in lines {
+            let totalHundredths = Int(round(line.timestamp * 100))
+            let min = totalHundredths / 6000
+            let sec = (totalHundredths % 6000) / 100
+            let hund = totalHundredths % 100
+            let timeTag = String(format: "[%02d:%02d.%02d]", min, sec, hund)
+            out += "\(timeTag)\(line.text)\n"
+        }
+        return out
+    }
+
     // Convert plain text lyrics into LRC lines spaced out evenly for scrollable viewing
     public static func convertPlainToLRCLines(_ plainText: String) -> [LRCLine] {
         let rawLines = plainText.components(separatedBy: .newlines)
@@ -210,11 +252,55 @@ public final class LyricsManager {
         return true
     }
     
-    public func fetchLyrics(artist: String, title: String, duration: Double = 0.0, trackID: String = "", completion: @escaping (String?, [LRCLine]) -> Void) {
+    private func deliverLyrics(trackKey: String, plainText: String?, lines: [LRCLine], completion: @escaping (String?, [LRCLine]) -> Void) {
+        storeInMemoryCache(key: trackKey, plainText: plainText, lines: lines)
+        if Thread.isMainThread {
+            self.onLyricsUpdated?(lines)
+            completion(plainText, lines)
+        } else {
+            DispatchQueue.main.async {
+                self.onLyricsUpdated?(lines)
+                completion(plainText, lines)
+            }
+        }
+    }
+
+    public func getCachedLRCLines(trackKey: String) -> [LRCLine]? {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        return memoryCache[trackKey]?.lines
+    }
+
+    public func getCachedLRCLines(trackID: String, title: String, artist: String, duration: Double = 0.0) -> [LRCLine]? {
+        let cleanTitle = LyricsManager.cleanSongInfo(title)
+        let cleanArtist = LyricsManager.cleanSongInfo(artist)
+        let trackKey = strongTrackKey(trackID: trackID, title: cleanTitle, artist: cleanArtist, duration: duration)
+        return getCachedLRCLines(trackKey: trackKey)
+    }
+
+    public func fetchLyrics(artist: String, title: String, duration: Double = 0.0, trackID: String = "", videoId: String? = nil, completion: @escaping (String?, [LRCLine]) -> Void) {
         let cleanTitle = LyricsManager.cleanSongInfo(title)
         let cleanArtist = LyricsManager.cleanSongInfo(artist)
         let trackKey = strongTrackKey(trackID: trackID, title: cleanTitle, artist: cleanArtist, duration: duration)
         
+        cacheLock.lock()
+        if let cached = memoryCache[trackKey], !cached.lines.isEmpty {
+            cacheLock.unlock()
+            self.currentTrackKey = trackKey
+            self.currentLRCLines = cached.lines
+            if Thread.isMainThread {
+                self.onLyricsUpdated?(cached.lines)
+                completion(cached.plainText, cached.lines)
+            } else {
+                DispatchQueue.main.async {
+                    self.onLyricsUpdated?(cached.lines)
+                    completion(cached.plainText, cached.lines)
+                }
+            }
+            return
+        }
+        cacheLock.unlock()
+
         if trackKey == currentTrackKey && !currentLRCLines.isEmpty {
             completion(nil, currentLRCLines)
             return
@@ -317,11 +403,12 @@ public final class LyricsManager {
                     Log.playback.debug("Found local offline LRC file: \(candidate.lastPathComponent) with \(parsedLines.count) lines")
                     self.currentLRCLines = parsedLines
                     let cleanText = lrcContent.replacingOccurrences(of: "\\[\\d+:\\d+[\\.:]?\\d*\\]", with: "", options: .regularExpression)
-                    DispatchQueue.main.async {
-                        self.onLyricsUpdated?(parsedLines)
-                        completion(cleanText.trimmingCharacters(in: .whitespacesAndNewlines), parsedLines)
-                    }
+                    self.deliverLyrics(trackKey: trackKey, plainText: cleanText.trimmingCharacters(in: .whitespacesAndNewlines), lines: parsedLines, completion: completion)
                     return
+                } else if candidate.path.contains("Mooziac/Lyrics") {
+                    // Evict corrupted/plain-text pseudo-LRC from local cache
+                    Log.playback.debug("Evicting pseudo-LRC without timestamps from cache: \(candidate.lastPathComponent)")
+                    try? FileManager.default.removeItem(at: candidate)
                 }
             }
         }
@@ -336,7 +423,39 @@ public final class LyricsManager {
             completion(nil, [])
             return
         }
-        
+
+        // Tier 0.8: Official YouTube Music Synced Lyrics via InnerTube
+        let effectiveVideoId: String? = {
+            if let vid = videoId, vid.count == 11 { return vid }
+            if let extracted = DownloadManager.extractVideoID(from: trackID), extracted.count == 11 { return extracted }
+            return nil
+        }()
+
+        if let vid = effectiveVideoId {
+            YTMClient.shared.fetchOfficialLyrics(videoId: vid) { [weak self] result in
+                guard let self = self else { return }
+                guard requestID == self.currentRequestID else { return }
+
+                switch result {
+                case .success(let lines) where !lines.isEmpty:
+                    Log.playback.info("Retrieved \(lines.count) official synced lyrics from YouTube Music for track '\(cleanTitle)'")
+                    self.currentLRCLines = lines
+                    let serializedLRC = LyricsManager.serializeLinesToLRC(lines: lines, title: cleanTitle, artist: cleanArtist)
+                    self.saveToLocalLyricsCache(filename: cacheFilename, title: cleanTitle, artist: cleanArtist, lrcText: serializedLRC)
+                    let plainText = lines.map { $0.text }.joined(separator: "\n")
+                    self.deliverLyrics(trackKey: trackKey, plainText: plainText, lines: lines, completion: completion)
+                case .success, .failure:
+                    // Fall through to Tier 1: LRCLib
+                    self.fetchFromLRCLib(requestID: requestID, trackKey: trackKey, cleanTitle: cleanTitle, cleanArtist: cleanArtist, duration: duration, cacheFilename: cacheFilename, completion: completion)
+                }
+            }
+            return
+        }
+
+        self.fetchFromLRCLib(requestID: requestID, trackKey: trackKey, cleanTitle: cleanTitle, cleanArtist: cleanArtist, duration: duration, cacheFilename: cacheFilename, completion: completion)
+    }
+
+    private func fetchFromLRCLib(requestID: UUID, trackKey: String, cleanTitle: String, cleanArtist: String, duration: Double, cacheFilename: String, completion: @escaping (String?, [LRCLine]) -> Void) {
         // Tier 1: Direct Exact Lookup on LRCLib
         let encodedArtist = cleanArtist.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
         let encodedTitle = cleanTitle.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
@@ -345,56 +464,52 @@ public final class LyricsManager {
         if let url = URL(string: getUrlStr) {
             let task = urlSession.dataTask(with: url) { [weak self] data, _, error in
                 guard let self = self else { return }
-                // Stale/cancelled request: never apply and never start a fallback for an old track.
                 guard requestID == self.currentRequestID else { return }
+                
+                var fallbackPlain: String? = nil
                 
                 if let data = data, error == nil,
                    let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                     if self.isResultMatch(json, targetTitle: cleanTitle, targetArtist: cleanArtist, targetDuration: duration) {
                         if let syncedLyrics = json["syncedLyrics"] as? String, !syncedLyrics.isEmpty {
                             let parsedLines = SyncedLyricsParser.parse(lrcText: syncedLyrics)
-                            self.currentLRCLines = parsedLines
-                            self.saveToLocalLyricsCache(filename: cacheFilename, title: cleanTitle, artist: cleanArtist, lrcText: syncedLyrics)
-                            let cleanText = syncedLyrics.replacingOccurrences(of: "\\[\\d+:\\d+\\.\\d+\\]", with: "", options: .regularExpression)
-                            DispatchQueue.main.async {
-                                self.onLyricsUpdated?(parsedLines)
-                                completion(cleanText.trimmingCharacters(in: .whitespacesAndNewlines), parsedLines)
+                            if !parsedLines.isEmpty {
+                                self.currentLRCLines = parsedLines
+                                self.saveToLocalLyricsCache(filename: cacheFilename, title: cleanTitle, artist: cleanArtist, lrcText: syncedLyrics)
+                                let cleanText = syncedLyrics.replacingOccurrences(of: "\\[\\d+:\\d+[\\.:]?\\d*\\]", with: "", options: .regularExpression)
+                                self.deliverLyrics(trackKey: trackKey, plainText: cleanText.trimmingCharacters(in: .whitespacesAndNewlines), lines: parsedLines, completion: completion)
+                                return
                             }
-                            return
-                        } else if let plainLyrics = json["plainLyrics"] as? String, !plainLyrics.isEmpty {
-                            let parsedLines = LyricsManager.convertPlainToLRCLines(plainLyrics)
-                            self.currentLRCLines = parsedLines
-                            self.saveToLocalLyricsCache(filename: cacheFilename, title: cleanTitle, artist: cleanArtist, lrcText: plainLyrics)
-                            DispatchQueue.main.async {
-                                self.onLyricsUpdated?(parsedLines)
-                                completion(plainLyrics.trimmingCharacters(in: .whitespacesAndNewlines), parsedLines)
-                            }
-                            return
+                        }
+                        if let plainLyrics = json["plainLyrics"] as? String, !plainLyrics.isEmpty {
+                            // Hold plainLyrics as a fallback, but do NOT abort — search for true synced lyrics!
+                            fallbackPlain = plainLyrics
                         }
                     }
                 }
                 
-                // Tier 2: Search LRCLib with title + artist
-                self.searchLRCLibFallback(requestID: requestID, artist: cleanArtist, title: cleanTitle, duration: duration, completion: completion)
+                // Tier 2: Search LRCLib with title + artist (prefer synced)
+                self.searchLRCLibFallback(requestID: requestID, trackKey: trackKey, artist: cleanArtist, title: cleanTitle, duration: duration, cacheFilename: cacheFilename, fallbackPlain: fallbackPlain, completion: completion)
             }
             currentTask = task
             task.resume()
         } else {
-            searchLRCLibFallback(requestID: requestID, artist: cleanArtist, title: cleanTitle, duration: duration, completion: completion)
+            searchLRCLibFallback(requestID: requestID, trackKey: trackKey, artist: cleanArtist, title: cleanTitle, duration: duration, cacheFilename: cacheFilename, fallbackPlain: nil, completion: completion)
         }
     }
     
-    private func searchLRCLibFallback(requestID: UUID, artist: String, title: String, duration: Double, completion: @escaping (String?, [LRCLine]) -> Void) {
+    private func searchLRCLibFallback(requestID: UUID, trackKey: String, artist: String, title: String, duration: Double, cacheFilename: String, fallbackPlain: String?, completion: @escaping (String?, [LRCLine]) -> Void) {
         let query = "\(title) \(artist)"
         guard let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let url = URL(string: "https://lrclib.net/api/search?q=\(encodedQuery)") else {
-            searchLRCLibTitleOnly(requestID: requestID, title: title, artist: artist, duration: duration, completion: completion)
+            searchLRCLibTitleOnly(requestID: requestID, trackKey: trackKey, title: title, artist: artist, duration: duration, cacheFilename: cacheFilename, fallbackPlain: fallbackPlain, completion: completion)
             return
         }
         
         urlSession.dataTask(with: url) { [weak self] data, _, error in
             guard let self = self else { return }
             guard requestID == self.currentRequestID else { return }
+            var candidatePlain = fallbackPlain
             if let data = data, error == nil,
                let results = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
                 
@@ -402,74 +517,75 @@ public final class LyricsManager {
                 if let item = self.bestPassingResult(in: results, preferSynced: true, targetTitle: title, targetArtist: artist, targetDuration: duration),
                    let syncedLyrics = item["syncedLyrics"] as? String, !syncedLyrics.isEmpty {
                     let parsedLines = SyncedLyricsParser.parse(lrcText: syncedLyrics)
-                    self.currentLRCLines = parsedLines
-                    let cleanText = syncedLyrics.replacingOccurrences(of: "\\[\\d+:\\d+\\.\\d+\\]", with: "", options: .regularExpression)
-                    DispatchQueue.main.async {
-                        self.onLyricsUpdated?(parsedLines)
-                        completion(cleanText.trimmingCharacters(in: .whitespacesAndNewlines), parsedLines)
+                    if !parsedLines.isEmpty {
+                        self.currentLRCLines = parsedLines
+                        self.saveToLocalLyricsCache(filename: cacheFilename, title: title, artist: artist, lrcText: syncedLyrics)
+                        let cleanText = syncedLyrics.replacingOccurrences(of: "\\[\\d+:\\d+[\\.:]?\\d*\\]", with: "", options: .regularExpression)
+                        self.deliverLyrics(trackKey: trackKey, plainText: cleanText.trimmingCharacters(in: .whitespacesAndNewlines), lines: parsedLines, completion: completion)
+                        return
                     }
-                    return
                 }
                 
-                // Second pass: best verified plain lyrics
-                if let item = self.bestPassingResult(in: results, preferSynced: false, targetTitle: title, targetArtist: artist, targetDuration: duration),
+                // Second pass: best verified plain lyrics if no plain was held
+                if candidatePlain == nil,
+                   let item = self.bestPassingResult(in: results, preferSynced: false, targetTitle: title, targetArtist: artist, targetDuration: duration),
                    let plainLyrics = item["plainLyrics"] as? String, !plainLyrics.isEmpty {
-                    let parsedLines = LyricsManager.convertPlainToLRCLines(plainLyrics)
-                    self.currentLRCLines = parsedLines
-                    DispatchQueue.main.async {
-                        self.onLyricsUpdated?(parsedLines)
-                        completion(plainLyrics.trimmingCharacters(in: .whitespacesAndNewlines), parsedLines)
-                    }
-                    return
+                    candidatePlain = plainLyrics
                 }
             }
             
             // Tier 3: Search with title ONLY
-            self.searchLRCLibTitleOnly(requestID: requestID, title: title, artist: artist, duration: duration, completion: completion)
+            self.searchLRCLibTitleOnly(requestID: requestID, trackKey: trackKey, title: title, artist: artist, duration: duration, cacheFilename: cacheFilename, fallbackPlain: candidatePlain, completion: completion)
         }.resume()
     }
     
-    private func searchLRCLibTitleOnly(requestID: UUID, title: String, artist: String, duration: Double, completion: @escaping (String?, [LRCLine]) -> Void) {
+    private func searchLRCLibTitleOnly(requestID: UUID, trackKey: String, title: String, artist: String, duration: Double, cacheFilename: String, fallbackPlain: String?, completion: @escaping (String?, [LRCLine]) -> Void) {
         guard let encodedTitle = title.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let url = URL(string: "https://lrclib.net/api/search?q=\(encodedTitle)") else {
-            fetchLyricsOVHFallback(requestID: requestID, artist: artist, title: title, completion: completion)
+            finalizePlainOrOVHFallback(requestID: requestID, trackKey: trackKey, artist: artist, title: title, fallbackPlain: fallbackPlain, completion: completion)
             return
         }
         
         urlSession.dataTask(with: url) { [weak self] data, _, error in
             guard let self = self else { return }
             guard requestID == self.currentRequestID else { return }
+            var candidatePlain = fallbackPlain
             if let data = data, error == nil,
                let results = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
                 
                 if let item = self.bestPassingResult(in: results, preferSynced: true, targetTitle: title, targetArtist: artist, targetDuration: duration),
                    let syncedLyrics = item["syncedLyrics"] as? String, !syncedLyrics.isEmpty {
                     let parsedLines = SyncedLyricsParser.parse(lrcText: syncedLyrics)
-                    self.currentLRCLines = parsedLines
-                    let cleanText = syncedLyrics.replacingOccurrences(of: "\\[\\d+:\\d+\\.\\d+\\]", with: "", options: .regularExpression)
-                    DispatchQueue.main.async {
-                        self.onLyricsUpdated?(parsedLines)
-                        completion(cleanText.trimmingCharacters(in: .whitespacesAndNewlines), parsedLines)
+                    if !parsedLines.isEmpty {
+                        self.currentLRCLines = parsedLines
+                        self.saveToLocalLyricsCache(filename: cacheFilename, title: title, artist: artist, lrcText: syncedLyrics)
+                        let cleanText = syncedLyrics.replacingOccurrences(of: "\\[\\d+:\\d+[\\.:]?\\d*\\]", with: "", options: .regularExpression)
+                        self.deliverLyrics(trackKey: trackKey, plainText: cleanText.trimmingCharacters(in: .whitespacesAndNewlines), lines: parsedLines, completion: completion)
+                        return
                     }
-                    return
-                } else if let item = self.bestPassingResult(in: results, preferSynced: false, targetTitle: title, targetArtist: artist, targetDuration: duration),
+                } else if candidatePlain == nil,
+                          let item = self.bestPassingResult(in: results, preferSynced: false, targetTitle: title, targetArtist: artist, targetDuration: duration),
                           let plainLyrics = item["plainLyrics"] as? String, !plainLyrics.isEmpty {
-                    let parsedLines = LyricsManager.convertPlainToLRCLines(plainLyrics)
-                    self.currentLRCLines = parsedLines
-                    DispatchQueue.main.async {
-                        self.onLyricsUpdated?(parsedLines)
-                        completion(plainLyrics.trimmingCharacters(in: .whitespacesAndNewlines), parsedLines)
-                    }
-                    return
+                    candidatePlain = plainLyrics
                 }
             }
             
-            // Tier 4: Lyrics.ovh final fallback
-            self.fetchLyricsOVHFallback(requestID: requestID, artist: artist, title: title, completion: completion)
+            // Tier 4: Use candidate plain lyrics or fallback to Lyrics.ovh
+            self.finalizePlainOrOVHFallback(requestID: requestID, trackKey: trackKey, artist: artist, title: title, fallbackPlain: candidatePlain, completion: completion)
         }.resume()
     }
+
+    private func finalizePlainOrOVHFallback(requestID: UUID, trackKey: String, artist: String, title: String, fallbackPlain: String?, completion: @escaping (String?, [LRCLine]) -> Void) {
+        if let plain = fallbackPlain, !plain.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            self.currentLRCLines = []
+            // Plain lyrics are delivered for viewing in the panel, but with EMPTY synced lines so menu bar gracefully displays Title • Artist without fake jumps
+            self.deliverLyrics(trackKey: trackKey, plainText: plain.trimmingCharacters(in: .whitespacesAndNewlines), lines: [], completion: completion)
+            return
+        }
+        self.fetchLyricsOVHFallback(requestID: requestID, trackKey: trackKey, artist: artist, title: title, completion: completion)
+    }
     
-    private func fetchLyricsOVHFallback(requestID: UUID, artist: String, title: String, completion: @escaping (String?, [LRCLine]) -> Void) {
+    private func fetchLyricsOVHFallback(requestID: UUID, trackKey: String, artist: String, title: String, completion: @escaping (String?, [LRCLine]) -> Void) {
         let cleanArtist = artist.isEmpty ? "Artist" : artist
         guard let encodedArtist = cleanArtist.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
               let encodedTitle = title.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
@@ -488,18 +604,19 @@ public final class LyricsManager {
                 return
             }
             
-            let parsedLines = LyricsManager.convertPlainToLRCLines(lyrics)
-            self.currentLRCLines = parsedLines
-            
-            DispatchQueue.main.async {
-                self.onLyricsUpdated?(parsedLines)
-                completion(lyrics.trimmingCharacters(in: .whitespacesAndNewlines), parsedLines)
-            }
+            self.currentLRCLines = []
+            self.deliverLyrics(trackKey: trackKey, plainText: lyrics.trimmingCharacters(in: .whitespacesAndNewlines), lines: [], completion: completion)
         }.resume()
     }
 
     private func saveToLocalLyricsCache(filename: String, title: String, artist: String, lrcText: String) {
         guard !lrcText.isEmpty else { return }
+        // CRUCIAL: Only save to local .lrc cache if the text contains real timestamp cues!
+        let hasTimestamp = lrcText.range(of: "\\[\\d+:\\d+", options: .regularExpression) != nil
+        guard hasTimestamp else {
+            Log.playback.debug("Skipping LRC cache save: text contains no timestamps for \(title)")
+            return
+        }
         let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?.appendingPathComponent("Mooziac/Lyrics", isDirectory: true)
         if let cacheDir = cacheDir {
             do {
@@ -516,10 +633,36 @@ public final class LyricsManager {
         }
     }
 
-    public func fetchRawSyncedLRC(artist: String, title: String, duration: Double = 0.0, expectedTrackID: String = "", completion: @escaping (String?) -> Void) {
+    public func fetchRawSyncedLRC(artist: String, title: String, duration: Double = 0.0, expectedTrackID: String = "", videoId: String? = nil, completion: @escaping (String?) -> Void) {
         let cleanTitle = LyricsManager.cleanSongInfo(title)
         let cleanArtist = LyricsManager.cleanSongInfo(artist)
-        
+
+        let effectiveVideoId: String? = {
+            if let vid = videoId, vid.count == 11 { return vid }
+            if let extracted = DownloadManager.extractVideoID(from: expectedTrackID), extracted.count == 11 { return extracted }
+            return nil
+        }()
+
+        if let vid = effectiveVideoId {
+            YTMClient.shared.fetchOfficialLyrics(videoId: vid) { [weak self] result in
+                guard let self = self else { return }
+                switch result {
+                case .success(let lines) where !lines.isEmpty:
+                    let lrcText = LyricsManager.serializeLinesToLRC(lines: lines, title: cleanTitle, artist: cleanArtist)
+                    completion(lrcText)
+                    return
+                case .success, .failure:
+                    break
+                }
+                self.fetchRawSyncedLRCFromLRCLib(cleanArtist: cleanArtist, cleanTitle: cleanTitle, duration: duration, expectedTrackID: expectedTrackID, completion: completion)
+            }
+            return
+        }
+
+        fetchRawSyncedLRCFromLRCLib(cleanArtist: cleanArtist, cleanTitle: cleanTitle, duration: duration, expectedTrackID: expectedTrackID, completion: completion)
+    }
+
+    private func fetchRawSyncedLRCFromLRCLib(cleanArtist: String, cleanTitle: String, duration: Double, expectedTrackID: String, completion: @escaping (String?) -> Void) {
         let encodedArtist = cleanArtist.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
         let encodedTitle = cleanTitle.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
         

@@ -72,7 +72,11 @@ final class AudioRouteMonitor {
     }
     
     @objc private func handleScreenUnlocked() {
-        isSleeping = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self = self else { return }
+            self.lastOutputDeviceID = self.getCurrentOutputDeviceID()
+            self.isSleeping = false
+        }
     }
     
     fileprivate func handleDeviceChanged() {

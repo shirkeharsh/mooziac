@@ -109,7 +109,7 @@ public final class SyncedLyricsParser {
         return resultLines
     }
     
-    public static func activeLineAndWord(at currentTime: Double, in lines: [LRCLine], leadOffset: Double = 0.35) -> (line: LRCLine, lineIndex: Int, activeWordIndex: Int, activeWordProgress: Double)? {
+    public static func activeLineAndWord(at currentTime: Double, in lines: [LRCLine], leadOffset: Double = 0.15) -> (line: LRCLine, lineIndex: Int, activeWordIndex: Int, activeWordProgress: Double)? {
         guard !lines.isEmpty else { return nil }
         
         let effectiveTime = currentTime + leadOffset
@@ -125,6 +125,33 @@ public final class SyncedLyricsParser {
         
         guard foundIndex >= 0 && foundIndex < lines.count else { return nil }
         let line = lines[foundIndex]
+        
+        // Instrumental interlude detection:
+        // When a phrase finishes and there is an instrumental gap (> 3.0 seconds) before the next phrase starts,
+        // expire the line after a natural 1.2-second hold time so the menu bar doesn't display stale text during the instrumental.
+        if foundIndex + 1 < lines.count {
+            let nextTimestamp = lines[foundIndex + 1].timestamp
+            let lineDuration: Double = {
+                if let lastWord = line.words.last {
+                    return max(2.0, lastWord.endTime - line.timestamp)
+                }
+                return min(6.0, max(2.0, (nextTimestamp - line.timestamp) * 0.75))
+            }()
+            let lineEndTime = line.timestamp + lineDuration
+            if (nextTimestamp - lineEndTime) > 3.0 && effectiveTime > (lineEndTime + 1.2) {
+                return nil
+            }
+        } else if foundIndex == lines.count - 1 {
+            let lineDuration: Double = {
+                if let lastWord = line.words.last {
+                    return max(3.0, lastWord.endTime - line.timestamp)
+                }
+                return 5.0
+            }()
+            if effectiveTime > (line.timestamp + lineDuration + 2.0) {
+                return nil
+            }
+        }
         
         guard !line.words.isEmpty else {
             return (line, foundIndex, 0, 0.0)
