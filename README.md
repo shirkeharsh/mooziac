@@ -132,6 +132,19 @@ Mooziac is a native macOS music player written in Swift and AppKit. It lives in 
 
 ## Installation
 
+### Homebrew (Recommended)
+
+Install directly via the official tap:
+
+```bash
+brew install shirkeharsh/tap/mooziac
+```
+
+To update in the future:
+```bash
+brew upgrade --cask mooziac
+```
+
 ### Pre-built Binary
 
 1. Download [`Mooziac.dmg`](https://github.com/shirkeharsh/mooziac/releases/latest/download/Mooziac.dmg) or [`Mooziac.zip`](https://github.com/shirkeharsh/mooziac/releases/latest/download/Mooziac.zip).
