@@ -302,26 +302,24 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
         let accurateTime = state.getAccurateTime()
         var textToDisplay = ""
 
+        let shortTitle = state.title.count > 15 ? String(state.title.prefix(15)) + "..." : state.title
+        let shortArtist = state.artist.count > 15 ? String(state.artist.prefix(15)) + "..." : state.artist
+        let trackInfo = state.artist.isEmpty || state.artist == "Unknown Artist" ? shortTitle : "\(shortTitle) • \(shortArtist)"
+
         if !currentLRCLines.isEmpty {
             if let activeInfo = SyncedLyricsParser.activeLineAndWord(at: accurateTime, in: currentLRCLines, leadOffset: 0.15) {
                 let trimmed = activeInfo.line.text.trimmingCharacters(in: .whitespacesAndNewlines)
                 if trimmed == "♪" || trimmed == "♪♪" || trimmed == "(Instrumental)" || trimmed == "[Instrumental]" {
-                    let shortTitle = state.title.count > 30 ? String(state.title.prefix(30)) + "…" : state.title
-                    let shortArtist = state.artist.count > 30 ? String(state.artist.prefix(30)) + "…" : state.artist
-                    textToDisplay = "♪ \(shortTitle) • \(shortArtist)"
+                    textToDisplay = "♪ \(trackInfo)"
                 } else {
                     textToDisplay = activeInfo.line.text
                 }
             } else {
                 // If playback is before the first line timestamp (initial intro) or in an instrumental break
-                let shortTitle = state.title.count > 30 ? String(state.title.prefix(30)) + "…" : state.title
-                let shortArtist = state.artist.count > 30 ? String(state.artist.prefix(30)) + "…" : state.artist
-                textToDisplay = "\(shortTitle) • \(shortArtist)"
+                textToDisplay = trackInfo
             }
         } else {
-            let shortTitle = state.title.count > 30 ? String(state.title.prefix(30)) + "…" : state.title
-            let shortArtist = state.artist.count > 30 ? String(state.artist.prefix(30)) + "…" : state.artist
-            textToDisplay = "\(shortTitle) • \(shortArtist)"
+            textToDisplay = trackInfo
         }
 
         if lyricsLabel.stringValue != textToDisplay {

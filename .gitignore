@@ -36,6 +36,7 @@ RELEASE_*.md
 mooziac.sh
 build_brain_watcher.sh
 build_studio.sh
+build_dev.sh
 Sources/BrainWatcher/
 Sources/MooziacStudio/
 Github/

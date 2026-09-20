@@ -9,8 +9,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-APP_VERSION="1.1.6"
-APP_BUILD="16"
+APP_VERSION="1.1.7"
+APP_BUILD="17"
 APP_NAME="Mooziac.app"
 APP_BUNDLE_ID="app.mooziac.mac"
 APP_COPYRIGHT="Copyright © 2026 ThreeTen. All rights reserved."
@@ -64,8 +64,9 @@ else
     echo "[1/7] Preserving running processes..."
 fi
 
-# Clean previous build artifacts
-rm -rf "$STAGING_DIR" "$TEMP_DMG"
+# Clean previous build artifacts and old build cache
+echo "    Clearing old build artifacts and caches..."
+rm -rf "$SCRIPT_DIR/.build" "$DIST_DIR" "$LOCAL_APP_DEST"
 mkdir -p "$DIST_DIR"
 mkdir -p "$STAGING_DIR"
 
@@ -76,18 +77,44 @@ if [ -f "scripts/generate_dmg_background.swift" ]; then
 fi
 
 echo "[2/7] Compiling release binaries..."
-# Attempt Universal 2 build (arm64 + x86_64)
 UNIVERSAL_BIN="$DIST_DIR/Mooziac_universal"
-ARM_BIN=".build/arm64-apple-macosx/release/Mooziac"
-INTEL_BIN=".build/x86_64-apple-macosx/release/Mooziac"
+ARM_SCRATCH="$SCRIPT_DIR/.build/arm64"
+INTEL_SCRATCH="$SCRIPT_DIR/.build/x86_64"
 
 echo "    [1/2] Compiling Apple Silicon (arm64)..."
-if swift build --triple arm64-apple-macosx -c release --product Mooziac && \
-   echo "    [2/2] Compiling Intel (x86_64)..." && \
-   swift build --triple x86_64-apple-macosx -c release --product Mooziac; then
+ARM_BUILD_OK=false
+if swift build --triple arm64-apple-macosx -c release --product Mooziac --scratch-path "$ARM_SCRATCH"; then
+    ARM_BIN_DIR=$(swift build --triple arm64-apple-macosx -c release --product Mooziac --scratch-path "$ARM_SCRATCH" --show-bin-path)
+    ARM_BIN="$ARM_BIN_DIR/Mooziac"
+    if [ -f "$ARM_BIN" ]; then
+        ARM_BUILD_OK=true
+    fi
+fi
+
+echo "    [2/2] Compiling Intel (x86_64)..."
+INTEL_BUILD_OK=false
+if swift build --triple x86_64-apple-macosx -c release --product Mooziac --scratch-path "$INTEL_SCRATCH"; then
+    INTEL_BIN_DIR=$(swift build --triple x86_64-apple-macosx -c release --product Mooziac --scratch-path "$INTEL_SCRATCH" --show-bin-path)
+    INTEL_BIN="$INTEL_BIN_DIR/Mooziac"
+    if [ -f "$INTEL_BIN" ]; then
+        INTEL_BUILD_OK=true
+    fi
+fi
+
+if [ "$ARM_BUILD_OK" = true ] && [ "$INTEL_BUILD_OK" = true ]; then
     echo "    Merging arm64 and x86_64 into Universal 2 binary via lipo..."
-    lipo -create -output "$UNIVERSAL_BIN" "$ARM_BIN" "$INTEL_BIN"
-    BIN_PATH="$UNIVERSAL_BIN"
+    if lipo -create -output "$UNIVERSAL_BIN" "$ARM_BIN" "$INTEL_BIN"; then
+        BIN_PATH="$UNIVERSAL_BIN"
+    else
+        echo "    Lipo merge failed. Falling back to Apple Silicon binary..."
+        BIN_PATH="$ARM_BIN"
+    fi
+elif [ "$ARM_BUILD_OK" = true ]; then
+    echo "    Intel build unavailable. Using Apple Silicon (arm64) binary..."
+    BIN_PATH="$ARM_BIN"
+elif [ "$INTEL_BUILD_OK" = true ]; then
+    echo "    Apple Silicon build unavailable. Using Intel (x86_64) binary..."
+    BIN_PATH="$INTEL_BIN"
 else
     echo "    Universal build failed. Compiling for native architecture..."
     swift build -c release --product Mooziac
@@ -220,7 +247,7 @@ echo "    Creating temporary disk image..."
 hdiutil create -srcfolder "$STAGING_DIR" -volname "$VOLUME_NAME" -fs HFS+ -fsargs "-c c=64,a=16,e=16" -format UDRW -size 150m "$TEMP_DMG" > /dev/null
 
 hdiutil detach "/Volumes/$VOLUME_NAME" -force 2>/dev/null || true
-DEVICE=$(hdiutil attach -readwrite -noverify -noautoopen "$TEMP_DMG" | egrep \/Volumes\/ | awk '{print $1}')
+DEVICE=$(hdiutil attach -readwrite -noverify -noautoopen "$TEMP_DMG" | grep -E '/Volumes/' | awk '{print $1}')
 sleep 1
 
 # Apply AppleScript Finder layout & styling
@@ -278,6 +305,7 @@ sleep 2
 sync
 
 hdiutil detach "$DEVICE" -force > /dev/null 2>&1 || hdiutil detach "/Volumes/$VOLUME_NAME" -force > /dev/null 2>&1 || true
+sleep 1
 
 # Convert to final compressed read-only DMG
 echo "    Compressing final release DMG (UDZO level 9)..."

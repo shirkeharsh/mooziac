@@ -2,20 +2,6 @@ import Foundation
 import WebKit
 import AppKit
 
-// MARK: - WebFocusState
-/// Tracks whether an editable text field inside WKWebView currently has focus.
-enum WebFocusState {
-    static var isTextFieldFocused: Bool = false
-}
-
-private class FocusScriptMessageHandler: NSObject, WKScriptMessageHandler {
-    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        if let isFocused = message.body as? Bool {
-            WebFocusState.isTextFieldFocused = isFocused
-        }
-    }
-}
-
 // MARK: - WebPlaybackAudioOutput
 /// Keeps WebKit's audio output open across short music playback transitions.
 /// When macOS detects that audio playback has paused and the window is occluded/hidden,
@@ -147,10 +133,25 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
     private let progressView = NSProgressIndicator()
     private let offlineOverlay = OfflineOverlayView()
     private var hasRestoredInitialPosition = false
-    private let focusMessageHandler = FocusScriptMessageHandler()
     
     private var shouldRestoreSavedTime = false
     public var autoPlayOnHomeLoad = false
+
+    /// Whether the "stealth" compact-mode CSS (hides video/backgrounds, forces album art
+    /// full-screen) is currently applied. Defaults to true to match the mini-player's normal
+    /// appearance. MainViewController flips this via setCompactModeEnabled(_:) when the user
+    /// expands into / leaves the full browse window. Re-asserted after every navigation finish
+    /// so a full page reload (e.g. crash recovery) can't silently reset browse mode back to
+    /// stripped-down compact styling.
+    private var isCompactModeEnabled = true
+
+    public func setCompactModeEnabled(_ enabled: Bool) {
+        isCompactModeEnabled = enabled
+        webView.evaluateJavaScript(
+            "window.__mooziacSetCompactMode && window.__mooziacSetCompactMode(\(enabled));",
+            completionHandler: nil
+        )
+    }
     
     // MARK: - WebContent crash recovery state
     private var isRecoveringFromTermination = false
@@ -349,71 +350,17 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         )
         config.userContentController.addUserScript(audioOutputScript)
 
-        // Focus Bridge Script: Reports HTML input/textarea/contenteditable focus states to AppKit
-        let focusBridgeScript = WKUserScript(
-            source: """
-            (function() {
-                function isEditableElement(el) {
-                    if (!el) return false;
-                    var tag = (el.tagName || '').toUpperCase();
-                    if (tag === 'INPUT' || tag === 'TEXTAREA') return true;
-                    if (el.isContentEditable) return true;
-                    return false;
-                }
-
-                function checkTarget(e) {
-                    if (e.composedPath && e.composedPath().length > 0) {
-                        var path = e.composedPath();
-                        for (var i = 0; i < path.length; i++) {
-                            if (isEditableElement(path[i])) return true;
-                        }
-                    }
-                    return isEditableElement(e.target);
-                }
-
-                function notifyFocus(focused) {
-                    try {
-                        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.mooziacFocusBridge) {
-                            window.webkit.messageHandlers.mooziacFocusBridge.postMessage(focused);
-                        }
-                    } catch (_) {}
-                }
-
-                document.addEventListener('focusin', function(e) {
-                    if (checkTarget(e)) {
-                        notifyFocus(true);
-                    }
-                }, true);
-
-                document.addEventListener('focusout', function(e) {
-                    if (checkTarget(e)) {
-                        notifyFocus(false);
-                    }
-                }, true);
-
-                window.addEventListener('yt-navigate-start', function() {
-                    notifyFocus(false);
-                }, true);
-
-                window.addEventListener('popstate', function() {
-                    notifyFocus(false);
-                }, true);
-
-                if (document.activeElement && isEditableElement(document.activeElement)) {
-                    notifyFocus(true);
-                }
-            })();
-            """,
-            injectionTime: .atDocumentStart,
-            forMainFrameOnly: false
-        )
-        config.userContentController.addUserScript(focusBridgeScript)
-        config.userContentController.add(focusMessageHandler, name: "mooziacFocusBridge")
-
         // Stealth sizing: Positioned offscreen at -9999px with standard 640x360 dimensions so YouTube
         // never triggers adaptive bitrate emergency downgrades or buffer throttling.
+        //
+        // Scoped under `html.mooziac-compact` (toggled via window.__mooziacSetCompactMode, see
+        // below) so it only applies while Mooziac is showing its compact mini-player UI. When the
+        // user expands into the full "browse" window (MainViewController.setBrowserVisible(true)),
+        // the class is removed and YouTube Music's real page — video, backgrounds, clickable song
+        // tiles — renders normally instead of being hidden/stripped for the mini player.
         let cssString = """
-        #song-video, #player-video, .html5-video-player, video {
+        html.mooziac-compact #song-video, html.mooziac-compact #player-video,
+        html.mooziac-compact .html5-video-player, html.mooziac-compact video {
             position: fixed !important;
             left: -9999px !important;
             top: -9999px !important;
@@ -424,19 +371,23 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
             visibility: visible !important;
             z-index: -999 !important;
         }
-        #cinematics, .background-gradient, #background-gradient,
-        paper-ripple, #cinematics-container, ytm-cinematics, .ytmusic-browse-response[background-gradient],
-        .ytp-ce-element, .ytp-cards-teaser, .ytp-chrome-top, .ytp-gradient-top,
-        .ytp-gradient-bottom, .annotation, .ytp-pause-overlay,
-        ytmusic-mealbar-promo-renderer, ytmusic-player-bar-promo-renderer,
-        ytmusic-banner-promo-renderer, #player-ads {
+        html.mooziac-compact #cinematics, html.mooziac-compact .background-gradient,
+        html.mooziac-compact #background-gradient,
+        html.mooziac-compact paper-ripple, html.mooziac-compact #cinematics-container,
+        html.mooziac-compact ytm-cinematics, html.mooziac-compact .ytmusic-browse-response[background-gradient],
+        html.mooziac-compact .ytp-ce-element, html.mooziac-compact .ytp-cards-teaser,
+        html.mooziac-compact .ytp-chrome-top, html.mooziac-compact .ytp-gradient-top,
+        html.mooziac-compact .ytp-gradient-bottom, html.mooziac-compact .annotation,
+        html.mooziac-compact .ytp-pause-overlay,
+        html.mooziac-compact ytmusic-mealbar-promo-renderer, html.mooziac-compact ytmusic-player-bar-promo-renderer,
+        html.mooziac-compact ytmusic-banner-promo-renderer, html.mooziac-compact #player-ads {
             display: none !important;
             visibility: hidden !important;
         }
-        * {
+        html.mooziac-compact * {
             backdrop-filter: none !important;
         }
-        #song-image, .song-image {
+        html.mooziac-compact #song-image, html.mooziac-compact .song-image {
             display: flex !important;
             visibility: visible !important;
             opacity: 1 !important;
@@ -446,7 +397,8 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
             justify-content: center !important;
             position: relative !important;
         }
-        #song-image #img, #song-image img, .song-image img {
+        html.mooziac-compact #song-image #img, html.mooziac-compact #song-image img,
+        html.mooziac-compact .song-image img {
             display: block !important;
             visibility: visible !important;
             opacity: 1 !important;
@@ -472,6 +424,13 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
             var style = document.createElement('style');
             style.innerHTML = \(cssJSON);
             (document.head || document.documentElement).appendChild(style);
+            // Default to compact mode on every fresh document load; native code calls
+            // window.__mooziacSetCompactMode(false) right after if the browse window is
+            // already open (e.g. recovering from a WebContent crash while browsing).
+            document.documentElement.classList.add('mooziac-compact');
+            window.__mooziacSetCompactMode = function(enabled) {
+                document.documentElement.classList.toggle('mooziac-compact', !!enabled);
+            };
             """,
             injectionTime: .atDocumentEnd,
             forMainFrameOnly: true
@@ -531,7 +490,6 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
     }
     
     deinit {
-        webView.configuration.userContentController.removeScriptMessageHandler(forName: "mooziacFocusBridge")
         webView.configuration.websiteDataStore.httpCookieStore.remove(self)
     }
     
@@ -698,9 +656,12 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
     }
     
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-        WebFocusState.isTextFieldFocused = false
         progressView.isHidden = false
         progressView.doubleValue = 0.2
+        // A real (non-SPA) navigation is starting, so any previously-focused
+        // input is gone. Reset the flag so Space doesn't stay locked out of
+        // Play/Pause if a focusout was never fired for the old document.
+        NowPlayingManager.shared.isWebTextFieldFocused = false
     }
     
     public func selectSongTab() {
@@ -724,8 +685,11 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        WebFocusState.isTextFieldFocused = false
         progressView.doubleValue = 1.0
+        // Re-assert the current compact/browse mode: the injected script defaults every fresh
+        // document to compact styling, which would incorrectly re-strip the page if this
+        // navigation happened while the user already had the browse window open.
+        setCompactModeEnabled(isCompactModeEnabled)
         LikedSongsManager.shared.refreshSignInStatus()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             self?.progressView.isHidden = true
@@ -875,7 +839,6 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
     // mechanisms (WKWebsiteDataStore.default() cookies + UserDefaults) and
     // re-applies the last known track/position so playback can continue.
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        WebFocusState.isTextFieldFocused = false
         Log.web.error("WebContent process terminated - starting crash recovery")
         
         guard !isRecoveringFromTermination else {
@@ -936,13 +899,11 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
     }
     
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        WebFocusState.isTextFieldFocused = false
         progressView.isHidden = true
         handleNavigationFailure(error)
     }
     
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        WebFocusState.isTextFieldFocused = false
         progressView.isHidden = true
         handleNavigationFailure(error)
     }

@@ -1292,15 +1292,19 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     }
 
     public override func keyDown(with event: NSEvent) {
-        if WebFocusState.isTextFieldFocused {
-            super.keyDown(with: event)
-            return
-        }
         if let responder = window?.firstResponder {
             if responder is NSText || responder is NSTextView || responder is NSTextField || responder is NSSearchField {
                 super.keyDown(with: event)
                 return
             }
+        }
+
+        // Same as StatusItemManager's guard: focus on an editable element inside
+        // the embedded YouTube Music WKWebView reports firstResponder as the
+        // WKWebView itself, so check the JS-tracked flag too.
+        if NowPlayingManager.shared.isWebTextFieldFocused {
+            super.keyDown(with: event)
+            return
         }
 
         if KeyboardCommandHandler.handle(keyCode: event.keyCode,

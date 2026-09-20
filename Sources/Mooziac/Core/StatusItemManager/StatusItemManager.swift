@@ -12,6 +12,10 @@ class StatusItemManager: NSObject {
     private var globalEventMonitor: Any?
     private var localEventMonitor: Any?
     private var keyEventMonitor: Any?
+    private var scrollGlobalMonitor: Any?
+    private var scrollLocalMonitor: Any?
+    private var trackpadScrollAccumulator: CGFloat = 0.0
+    private var lastScrollTimestamp: TimeInterval = 0
     
     public var statusButtonCenterInScreen: CGPoint? {
         guard let button = statusItem?.button else { return nil }
@@ -93,6 +97,7 @@ class StatusItemManager: NSObject {
     
     deinit {
         stopEventMonitors()
+        stopScrollMonitors()
     }
     
     private func setupStatusItem() {
@@ -107,16 +112,7 @@ class StatusItemManager: NSObject {
             button.toolTip = "Mooziac Music Player (Scroll to adjust volume)"
         }
         
-        NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
-            if let button = self?.statusItem.button, event.window == button.window {
-                let delta = event.deltaY
-                if abs(delta) > 0.1 {
-                    NowPlayingManager.shared.adjustVolume(deltaPercent: delta > 0 ? 4.0 : -4.0)
-                    return nil
-                }
-            }
-            return event
-        }
+        setupScrollMonitors()
     }
     
     private func restoreDefaultIcon(_ button: NSStatusBarButton) {
@@ -415,11 +411,8 @@ class StatusItemManager: NSObject {
         }
         
         // 2. Check if inside the status bar item button or its window
-        if let button = statusItem?.button, let buttonWindow = button.window {
-            let btnScreenFrame = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
-            if btnScreenFrame.contains(mouseLoc) || buttonWindow.frame.contains(mouseLoc) {
-                return true
-            }
+        if isMouseOverStatusButton(mouseLoc: mouseLoc) {
+            return true
         }
         
         // 3. Check any child/attached windows (like NSMenu popups, alert sheets, etc.)
@@ -459,14 +452,19 @@ class StatusItemManager: NSObject {
         keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
             guard let self = self, self.panel.isVisible else { return event }
             
-            // 1. If focus is on any native text input/editor or web text field, let the event pass through untouched
-            if WebFocusState.isTextFieldFocused {
-                return event
-            }
+            // 1. If focus is on any native text input/editor, let the event pass through untouched
             if let responder = self.panel.firstResponder {
                 if responder is NSText || responder is NSTextView || responder is NSTextField || responder is NSSearchField {
                     return event
                 }
+            }
+
+            // 1b. If focus is on an editable element *inside* the embedded YouTube Music
+            // WKWebView (e.g. its search bar), AppKit reports the WKWebView itself as
+            // firstResponder, not a text-field type, so the check above misses it.
+            // NowPlayingManager tracks that case via a JS focusin/focusout bridge.
+            if NowPlayingManager.shared.isWebTextFieldFocused {
+                return event
             }
 
             if KeyboardCommandHandler.handle(keyCode: event.keyCode,
@@ -510,6 +508,110 @@ class StatusItemManager: NSObject {
             keyEventMonitor = nil
         }
         NotificationCenter.default.removeObserver(self, name: NSApplication.didResignActiveNotification, object: nil)
+    }
+    
+    // MARK: - Menu Bar Scroll-to-Volume Monitors
+    public func isMouseOverStatusButton(mouseLoc: NSPoint = NSEvent.mouseLocation) -> Bool {
+        guard let button = statusItem?.button, let buttonWindow = button.window else { return false }
+        
+        let windowFrame = buttonWindow.frame
+        if windowFrame.width > 0 && windowFrame.height > 0 {
+            let paddedWindow = windowFrame.insetBy(dx: -4, dy: -4)
+            if paddedWindow.contains(mouseLoc) {
+                return true
+            }
+        }
+        
+        let rectInWindow = button.convert(button.bounds, to: nil)
+        let screenRect = buttonWindow.convertToScreen(rectInWindow)
+        if screenRect.width > 0 && screenRect.height > 0 {
+            let paddedScreen = screenRect.insetBy(dx: -4, dy: -4)
+            if paddedScreen.contains(mouseLoc) {
+                return true
+            }
+        }
+        
+        return false
+    }
+    
+    @discardableResult
+    func handleScrollEvent(_ event: NSEvent) -> Bool {
+        let mouseLoc = NSEvent.mouseLocation
+        guard isMouseOverStatusButton(mouseLoc: mouseLoc) else {
+            trackpadScrollAccumulator = 0.0
+            return false
+        }
+        
+        // Deduplicate identical event timestamps
+        if abs(event.timestamp - lastScrollTimestamp) < 0.001 {
+            return true
+        }
+        lastScrollTimestamp = event.timestamp
+        
+        let delta: Float
+        if event.hasPreciseScrollingDeltas {
+            // Trackpad / Magic Mouse continuous scrolling
+            // Ignore momentum scrolling to prevent volume overshoot after fingers lift
+            if !event.momentumPhase.isEmpty {
+                trackpadScrollAccumulator = 0.0
+                return true
+            }
+            
+            let dy = event.scrollingDeltaY
+            trackpadScrollAccumulator += dy
+            
+            // Require 6 points of trackpad scroll per 2% volume step
+            let stepThreshold: CGFloat = 6.0
+            if abs(trackpadScrollAccumulator) >= stepThreshold {
+                let steps = Int(trackpadScrollAccumulator / stepThreshold)
+                trackpadScrollAccumulator -= CGFloat(steps) * stepThreshold
+                delta = Float(steps) * 0.02
+            } else {
+                return true
+            }
+            
+            if event.phase == .ended || event.phase == .cancelled {
+                trackpadScrollAccumulator = 0.0
+            }
+        } else {
+            // Discrete mouse wheel notch
+            let dy = event.scrollingDeltaY != 0 ? event.scrollingDeltaY : event.deltaY
+            guard abs(dy) >= 0.1 else { return false }
+            delta = dy > 0 ? 0.04 : -0.04
+        }
+        
+        let currentVol = AppVolumeManager.shared.getEffectiveVolume()
+        let newVol = max(0.0, min(1.0, currentVol + delta))
+        AppVolumeManager.shared.setEffectiveVolume(newVol)
+        return true
+    }
+    
+    private func setupScrollMonitors() {
+        stopScrollMonitors()
+        
+        // 1. Global monitor: captures scroll events when another application is active (background)
+        scrollGlobalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            _ = self?.handleScrollEvent(event)
+        }
+        
+        // 2. Local monitor: captures scroll events when Mooziac is active (foreground)
+        scrollLocalMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            if let handled = self?.handleScrollEvent(event), handled {
+                return nil // Consume event so underlying views don't scroll
+            }
+            return event
+        }
+    }
+    
+    private func stopScrollMonitors() {
+        if let monitor = scrollGlobalMonitor {
+            NSEvent.removeMonitor(monitor)
+            scrollGlobalMonitor = nil
+        }
+        if let monitor = scrollLocalMonitor {
+            NSEvent.removeMonitor(monitor)
+            scrollLocalMonitor = nil
+        }
     }
     
     @objc private func appDidResignActive() {
@@ -566,14 +668,28 @@ class StatusItemManager: NSObject {
     }
     
     @objc func quitFromMenu() {
-        let alert = NSAlert()
-        alert.messageText = "Quit Mooziac?"
-        alert.informativeText = "Are you sure you want to quit Mooziac?"
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "Quit")
-        alert.addButton(withTitle: "Cancel")
-        if alert.runModal() == .alertFirstButtonReturn {
+        // Stop audio playback immediately
+        NativeAudioPlayer.shared.pause()
+        NowPlayingManager.shared.pause()
+        
+        // Hide panels immediately
+        panel.orderOut(nil)
+        CenteredMenuBarLyricsWindowController.shared.window?.orderOut(nil)
+        
+        // Smooth fadeout animation of status bar icon before clean exit
+        if let button = statusItem?.button {
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = 0.22
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                button.animator().alphaValue = 0.0
+                button.animator().layer?.transform = CATransform3DMakeScale(0.7, 0.7, 1.0)
+            }, completionHandler: {
+                NSApplication.shared.terminate(nil)
+                exit(0)
+            })
+        } else {
             NSApplication.shared.terminate(nil)
+            exit(0)
         }
     }
 }

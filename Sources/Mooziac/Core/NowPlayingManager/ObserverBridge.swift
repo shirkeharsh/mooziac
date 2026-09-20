@@ -14,6 +14,37 @@ extension NowPlayingManager {
             if (typeof window.mooziacLyricsActive === 'undefined') {
                 window.mooziacLyricsActive = true;
             }
+
+            // Track whether an editable element currently has focus so native code
+            // knows not to steal Space (or other shortcut keys) for playback control
+            // while the user is typing into YouTube Music's own search bar, a
+            // playlist-name field, a comment box, etc.
+            function mooziacIsEditable(el) {
+                if (!el) return false;
+                var tag = el.tagName;
+                return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable === true;
+            }
+            function mooziacReportFocus(isEditable) {
+                try {
+                    window.webkit.messageHandlers.nowPlayingHandler.postMessage({
+                        event: 'focusChanged',
+                        isTextField: isEditable
+                    });
+                } catch (e) {}
+            }
+            document.addEventListener('focusin', function(e) {
+                if (mooziacIsEditable(e.target)) mooziacReportFocus(true);
+            }, true);
+            document.addEventListener('focusout', function(e) {
+                // Only clear the flag if focus isn't landing on another editable
+                // element in the same tick (e.g. tabbing between fields).
+                setTimeout(function() {
+                    mooziacReportFocus(mooziacIsEditable(document.activeElement));
+                }, 0);
+            }, true);
+            // Cover the case where focus was already on an editable element at
+            // injection time (e.g. after a same-document SPA navigation).
+            mooziacReportFocus(mooziacIsEditable(document.activeElement));
             
             window.mooziacQuery = function(selectorTiers, root) {
                 root = root || document;
@@ -794,6 +825,13 @@ extension NowPlayingManager {
             return
         }
 
+        // Handle focus-state changes so native keyDown interception (Space -> Play/Pause,
+        // arrow-key seek, etc.) knows to stand down while the user types into a web input.
+        if let event = dict["event"] as? String, event == "focusChanged" {
+            isWebTextFieldFocused = (dict["isTextField"] as? Bool) ?? false
+            return
+        }
+
         let isAd = (dict["isAd"] as? Bool) ?? false
         let isPlaying = (dict["isPlaying"] as? Bool) ?? false
         let title = (dict["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -852,18 +890,22 @@ extension NowPlayingManager {
 
             // Update Loudness Normalization
             let loudnessDb = dict["loudnessDb"] as? Double
+            let key = !videoId.isEmpty ? videoId : msgTrackID
             if let lDb = loudnessDb {
-                AppVolumeManager.shared.updateTrackLoudness(loudnessDb: lDb)
+                AppVolumeManager.shared.updateTrackLoudness(trackID: key, loudnessDb: lDb, smooth: false)
+            } else if let cached = AppVolumeManager.shared.getCachedTrackLoudness(id: key) {
+                AppVolumeManager.shared.updateTrackLoudness(trackID: key, loudnessDb: cached, smooth: false)
             } else if !videoId.isEmpty {
+                // Keep current safe level while fetching in background; do not reset to 100%
                 YTMClient.shared.fetchDirectStreamURL(videoId: videoId) { result in
                     if case .success(let stream) = result, let lDb = stream.loudnessDb {
                         DispatchQueue.main.async {
-                            AppVolumeManager.shared.updateTrackLoudness(loudnessDb: lDb)
+                            AppVolumeManager.shared.updateTrackLoudness(trackID: videoId, loudnessDb: lDb, smooth: true)
                         }
                     }
                 }
             } else {
-                AppVolumeManager.shared.updateTrackLoudness(loudnessDb: nil)
+                AppVolumeManager.shared.updateTrackLoudness(trackID: key, loudnessDb: nil, smooth: false)
             }
 
             // Manage active playlist context:
@@ -916,6 +958,12 @@ extension NowPlayingManager {
             if title.isEmpty || title == "Not Playing" {
                 return
             }
+        }
+
+        // If loudness data arrived after the initial track change, apply it smoothly
+        if !trackChanged && AppVolumeManager.shared.currentTrackLoudnessDb == nil, let lDb = dict["loudnessDb"] as? Double {
+            let key = !videoId.isEmpty ? videoId : msgTrackID
+            AppVolumeManager.shared.updateTrackLoudness(trackID: key, loudnessDb: lDb, smooth: true)
         }
         
         let jsReportedLiked = (dict["isLiked"] as? Bool) ?? false

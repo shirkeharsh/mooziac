@@ -25,6 +25,14 @@ class NowPlayingManager: NSObject, WKScriptMessageHandler {
     var lastUserToggledVideoId: String = ""
     var lastUserDesiredLiked: Bool = false
 
+    /// True while an editable element (input/textarea/contenteditable) inside the
+    /// YouTube Music WKWebView currently has keyboard focus. Kept in sync via a
+    /// focusin/focusout listener injected into the page (see ObserverBridge.swift).
+    /// Native keyDown interception (Space -> Play/Pause, etc.) must treat this the
+    /// same as focus being on a native NSTextField/NSSearchField, since AppKit's
+    /// firstResponder reports the WKWebView itself, not the DOM element inside it.
+    var isWebTextFieldFocused: Bool = false
+
     public func playOfflineTrack(_ track: LocalTrack, in queue: [LocalTrack] = []) {
         engineMode = .offline
         // Pause online WebKit playback cleanly and immediately
@@ -270,12 +278,18 @@ class NowPlayingManager: NSObject, WKScriptMessageHandler {
     }
 
     public func prefetchNextQueueLyrics() {
-        guard CenteredMenuBarLyricsWindowController.shared.isEnabled else { return }
         fetchQueue { items in
             guard let currentIdx = items.firstIndex(where: { $0.isSelected }),
                   currentIdx + 1 < items.count else { return }
             let nextItem = items[currentIdx + 1]
             guard !nextItem.title.isEmpty && !nextItem.title.hasPrefix("Track ") else { return }
+
+            // Prefetch loudness for next track so it is cached at 0.0s transition
+            if !nextItem.videoId.isEmpty {
+                AppVolumeManager.shared.prefetchTrackLoudness(videoId: nextItem.videoId)
+            }
+
+            guard CenteredMenuBarLyricsWindowController.shared.isEnabled else { return }
             let parsedDuration: Double = {
                 let parts = nextItem.duration.split(separator: ":").compactMap { Double($0) }
                 if parts.count == 2 {

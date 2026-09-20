@@ -137,6 +137,9 @@ class MainViewController: NSViewController, DynamicIslandPlayerViewDelegate, Hea
             playlistLibraryView.isHidden = true
             onChangeSize?(360, 650)
             webViewContainer.selectSongTab()
+            // Show YouTube Music's real page (video, backgrounds, clickable song tiles) instead
+            // of the mini-player's stripped-down compact styling.
+            webViewContainer.setCompactModeEnabled(false)
         } else {
             headerView.isHidden = true // Hide headerView in player mode!
             browserContainerView.alphaValue = 0.001
@@ -148,6 +151,8 @@ class MainViewController: NSViewController, DynamicIslandPlayerViewDelegate, Hea
             if let currentUrl = webViewContainer.webView.url?.absoluteString, !currentUrl.contains("music.youtube.com") {
                 webViewContainer.loadMusicHome()
             }
+            // Back to the compact mini-player: re-strip video/backgrounds so only album art shows.
+            webViewContainer.setCompactModeEnabled(true)
         }
     }
 

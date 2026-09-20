@@ -25,7 +25,7 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
     }
 
     public var currentVersion: String {
-        return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1.6"
+        return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1.7"
     }
 
     private var releasesAPIURL: URL? {

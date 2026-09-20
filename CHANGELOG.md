@@ -4,6 +4,22 @@ All notable changes to Mooziac are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.1.7] - 2026-09-21
+
+### Added
+- Menu bar status item scroll wheel and trackpad gesture support to adjust volume directly across all spaces and active applications.
+- Smooth menu bar status icon fadeout animation (0.22s ease-out) when quitting from the context menu.
+- Loudness metadata prefetching and in-memory caching for seamless track transitions.
+
+### Changed
+- Compacted menu bar track titles and artists to 15 characters with ellipsis (`...`) to prevent menu bar overcrowding while keeping continuous display active.
+- Universal 2 build pipeline with architecture-isolated scratch compilation directories (`.build/arm64` and `.build/x86_64`) and automated cache purging.
+
+### Fixed
+- Fixed loudness leveling volume surge on track change by removing unnormalized volume resets, correcting decibel normalization conversion math, and adding smooth 250ms cosine volume easing.
+- Replaced the confirmation dialog on quit with instant, clean process termination and zero orphaned background processes.
+- Prevented spacebar play/pause hotkey interception when typing into web search inputs, comments, and text fields.
+
 ## [1.1.6] - 2026-09-17
 
 ### Added
