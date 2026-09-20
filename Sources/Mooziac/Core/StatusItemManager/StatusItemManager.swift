@@ -459,7 +459,10 @@ class StatusItemManager: NSObject {
         keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
             guard let self = self, self.panel.isVisible else { return event }
             
-            // 1. If focus is on any native text input/editor, let the event pass through untouched
+            // 1. If focus is on any native text input/editor or web text field, let the event pass through untouched
+            if WebFocusState.isTextFieldFocused {
+                return event
+            }
             if let responder = self.panel.firstResponder {
                 if responder is NSText || responder is NSTextView || responder is NSTextField || responder is NSSearchField {
                     return event

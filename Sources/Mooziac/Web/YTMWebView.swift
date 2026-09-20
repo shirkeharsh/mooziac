@@ -2,6 +2,20 @@ import Foundation
 import WebKit
 import AppKit
 
+// MARK: - WebFocusState
+/// Tracks whether an editable text field inside WKWebView currently has focus.
+enum WebFocusState {
+    static var isTextFieldFocused: Bool = false
+}
+
+private class FocusScriptMessageHandler: NSObject, WKScriptMessageHandler {
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if let isFocused = message.body as? Bool {
+            WebFocusState.isTextFieldFocused = isFocused
+        }
+    }
+}
+
 // MARK: - WebPlaybackAudioOutput
 /// Keeps WebKit's audio output open across short music playback transitions.
 /// When macOS detects that audio playback has paused and the window is occluded/hidden,
@@ -133,6 +147,7 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
     private let progressView = NSProgressIndicator()
     private let offlineOverlay = OfflineOverlayView()
     private var hasRestoredInitialPosition = false
+    private let focusMessageHandler = FocusScriptMessageHandler()
     
     private var shouldRestoreSavedTime = false
     public var autoPlayOnHomeLoad = false
@@ -334,6 +349,67 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         )
         config.userContentController.addUserScript(audioOutputScript)
 
+        // Focus Bridge Script: Reports HTML input/textarea/contenteditable focus states to AppKit
+        let focusBridgeScript = WKUserScript(
+            source: """
+            (function() {
+                function isEditableElement(el) {
+                    if (!el) return false;
+                    var tag = (el.tagName || '').toUpperCase();
+                    if (tag === 'INPUT' || tag === 'TEXTAREA') return true;
+                    if (el.isContentEditable) return true;
+                    return false;
+                }
+
+                function checkTarget(e) {
+                    if (e.composedPath && e.composedPath().length > 0) {
+                        var path = e.composedPath();
+                        for (var i = 0; i < path.length; i++) {
+                            if (isEditableElement(path[i])) return true;
+                        }
+                    }
+                    return isEditableElement(e.target);
+                }
+
+                function notifyFocus(focused) {
+                    try {
+                        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.mooziacFocusBridge) {
+                            window.webkit.messageHandlers.mooziacFocusBridge.postMessage(focused);
+                        }
+                    } catch (_) {}
+                }
+
+                document.addEventListener('focusin', function(e) {
+                    if (checkTarget(e)) {
+                        notifyFocus(true);
+                    }
+                }, true);
+
+                document.addEventListener('focusout', function(e) {
+                    if (checkTarget(e)) {
+                        notifyFocus(false);
+                    }
+                }, true);
+
+                window.addEventListener('yt-navigate-start', function() {
+                    notifyFocus(false);
+                }, true);
+
+                window.addEventListener('popstate', function() {
+                    notifyFocus(false);
+                }, true);
+
+                if (document.activeElement && isEditableElement(document.activeElement)) {
+                    notifyFocus(true);
+                }
+            })();
+            """,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: false
+        )
+        config.userContentController.addUserScript(focusBridgeScript)
+        config.userContentController.add(focusMessageHandler, name: "mooziacFocusBridge")
+
         // Stealth sizing: Positioned offscreen at -9999px with standard 640x360 dimensions so YouTube
         // never triggers adaptive bitrate emergency downgrades or buffer throttling.
         let cssString = """
@@ -455,6 +531,7 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
     }
     
     deinit {
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "mooziacFocusBridge")
         webView.configuration.websiteDataStore.httpCookieStore.remove(self)
     }
     
@@ -621,6 +698,7 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
     }
     
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        WebFocusState.isTextFieldFocused = false
         progressView.isHidden = false
         progressView.doubleValue = 0.2
     }
@@ -646,6 +724,7 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        WebFocusState.isTextFieldFocused = false
         progressView.doubleValue = 1.0
         LikedSongsManager.shared.refreshSignInStatus()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
@@ -796,6 +875,7 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
     // mechanisms (WKWebsiteDataStore.default() cookies + UserDefaults) and
     // re-applies the last known track/position so playback can continue.
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        WebFocusState.isTextFieldFocused = false
         Log.web.error("WebContent process terminated - starting crash recovery")
         
         guard !isRecoveringFromTermination else {
@@ -856,11 +936,13 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
     }
     
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        WebFocusState.isTextFieldFocused = false
         progressView.isHidden = true
         handleNavigationFailure(error)
     }
     
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        WebFocusState.isTextFieldFocused = false
         progressView.isHidden = true
         handleNavigationFailure(error)
     }

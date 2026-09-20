@@ -1292,6 +1292,10 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     }
 
     public override func keyDown(with event: NSEvent) {
+        if WebFocusState.isTextFieldFocused {
+            super.keyDown(with: event)
+            return
+        }
         if let responder = window?.firstResponder {
             if responder is NSText || responder is NSTextView || responder is NSTextField || responder is NSSearchField {
                 super.keyDown(with: event)
