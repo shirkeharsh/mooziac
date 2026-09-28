@@ -217,18 +217,22 @@ public final class NativeAudioPlayer: NSObject {
         setupTimeObserver()
         setupEndObserver()
 
-        // Ensure WebKit online playback is paused when offline audio begins
-        NowPlayingManager.shared.engineMode = .offline
-        NowPlayingManager.shared.evaluateJS("""
-        (function() {
-            try {
-                var v = document.querySelector('video');
-                if (v) { v.pause(); }
-                var p = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
-                if (p && typeof p.pauseVideo === 'function') { p.pauseVideo(); }
-            } catch(e) {}
-        })();
-        """)
+        // Ensure WebKit online playback is paused when transitioning to offline audio
+        if NowPlayingManager.shared.engineMode == .online {
+            NowPlayingManager.shared.engineMode = .offline
+            NowPlayingManager.shared.evaluateJS("""
+            (function() {
+                try {
+                    var v = document.querySelector('video');
+                    if (v) { v.pause(); }
+                    var p = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
+                    if (p && typeof p.pauseVideo === 'function') { p.pauseVideo(); }
+                } catch(e) {}
+            })();
+            """)
+        } else {
+            NowPlayingManager.shared.engineMode = .offline
+        }
 
         player?.play()
         self.isPlaying = true
@@ -473,17 +477,22 @@ public final class NativeAudioPlayer: NSObject {
 
         NowPlayingManager.shared.currentState = state
         NowPlayingManager.shared.notifyObservers(state)
-        NowPlayingManager.shared.updateSystemNowPlayingInfo(state)
 
-        // Only update MPRemoteCommandCenter artwork on track change to save CPU/allocations
-        if lastArtworkTrackID != track.id {
+        let isNewTrack = (lastArtworkTrackID != track.id)
+        if isNewTrack {
             lastArtworkTrackID = track.id
-            if let artImg = track.artwork {
-                let center = MPNowPlayingInfoCenter.default()
-                var info = center.nowPlayingInfo ?? [:]
-                info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: artImg.size) { _ in artImg }
-                center.nowPlayingInfo = info
+            if let cachedArt = AppArtworkHelper.shared.getCachedThumbnail(for: track) {
+                NowPlayingManager.shared.updateSystemNowPlayingInfo(state, artwork: cachedArt)
+            } else {
+                NowPlayingManager.shared.updateSystemNowPlayingInfo(state, artwork: nil)
+                let trackID = track.id
+                AppArtworkHelper.shared.loadThumbnail(for: track) { [weak self] img in
+                    guard let self = self, self.currentTrack?.id == trackID, let loadedArt = img else { return }
+                    NowPlayingManager.shared.updateSystemNowPlayingInfo(state, artwork: loadedArt)
+                }
             }
+        } else {
+            NowPlayingManager.shared.updateSystemNowPlayingInfo(state)
         }
     }
 }

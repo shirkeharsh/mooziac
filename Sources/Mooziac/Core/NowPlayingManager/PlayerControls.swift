@@ -4,7 +4,7 @@ import MediaPlayer
 
 
 extension NowPlayingManager {
-    func updateSystemNowPlayingInfo(_ state: PlaybackState) {
+    func updateSystemNowPlayingInfo(_ state: PlaybackState, artwork: NSImage? = nil) {
         // When online, WebKit natively manages the single Now Playing session in Control Center.
         // We only use MPNowPlayingInfoCenter for local offline audio playback.
         guard engineMode == .offline else {
@@ -27,8 +27,14 @@ extension NowPlayingManager {
 
         let trackKey = state.videoId.isEmpty ? state.artworkUrl : state.videoId
         if lastNowPlayingTrackKey != trackKey {
-            info.removeValue(forKey: MPMediaItemPropertyArtwork)
             lastNowPlayingTrackKey = trackKey
+            if let artImg = artwork {
+                info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: artImg.size) { _ in artImg }
+            } else {
+                info.removeValue(forKey: MPMediaItemPropertyArtwork)
+            }
+        } else if let artImg = artwork {
+            info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: artImg.size) { _ in artImg }
         }
 
         center.nowPlayingInfo = info

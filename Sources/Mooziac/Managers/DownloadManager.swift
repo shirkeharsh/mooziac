@@ -654,7 +654,10 @@ public final class DownloadManager: NSObject {
                         allOutputLines.append(trimmed)
                     }
                     if let (pct, eta, spd) = DownloadManager.parseYtDlpProgress(line: line) {
-                        self.handleStreamingProgress(taskID: task.id, videoId: videoId, title: cleanT, progress: pct, eta: eta, speed: spd)
+                        let scaledProgress = 0.05 + (pct * 0.85)
+                        self.handleStreamingProgress(taskID: task.id, videoId: videoId, title: cleanT, progress: scaledProgress, eta: eta, speed: spd)
+                    } else if trimmed.contains("[ExtractAudio]") || trimmed.contains("[Fixup") || trimmed.contains("[Metadata]") {
+                        self.handleStreamingProgress(taskID: task.id, videoId: videoId, title: cleanT, progress: 0.93, eta: "1s", speed: "Converting...")
                     }
                 }
             }
@@ -702,6 +705,7 @@ public final class DownloadManager: NSObject {
     }
 
     private func finalizeSuccessfulJob(task: QueueTask, jobDir: URL, cleanA: String, cleanT: String, videoId: String?, safeFilename: String) {
+        self.handleStreamingProgress(taskID: task.id, videoId: videoId, title: cleanT, progress: 0.96, eta: "", speed: "Finalizing...")
         let musicDir = LocalLibraryManager.shared.musicFolderURL
 
         // 2. Validate Resulting Audio File in Job Sandbox
@@ -790,12 +794,12 @@ public final class DownloadManager: NSObject {
         queueLock.lock()
 
         let elapsedOK =
-            now - lastProgressNotificationTime >= 0.08 ||
-            progress >= 0.99
+            now - lastProgressNotificationTime >= 0.06 ||
+            progress >= 0.90
 
         let deltaOK =
-            abs(progress - lastBroadcastProgress) >= 0.02 ||
-            progress >= 0.99 ||
+            abs(progress - lastBroadcastProgress) >= 0.015 ||
+            progress >= 0.90 ||
             lastBroadcastProgress < 0
 
         if elapsedOK && deltaOK {

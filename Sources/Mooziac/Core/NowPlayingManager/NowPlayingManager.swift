@@ -144,11 +144,19 @@ class NowPlayingManager: NSObject, WKScriptMessageHandler {
         observer(currentState)
     }
     
+    private var lastObservedPlaybackKey: String = ""
+    private var lastObservedIsPlaying: Bool = false
+
     func notifyObservers(_ state: PlaybackState) {
         for obs in observers {
             obs(state)
         }
-        NotificationCenter.default.post(name: NSNotification.Name("Mooziac_PlaybackStateChanged"), object: nil)
+        let currentKey = "\(state.trackID)|\(state.title)|\(state.artist)"
+        if currentKey != lastObservedPlaybackKey || state.isPlaying != lastObservedIsPlaying {
+            lastObservedPlaybackKey = currentKey
+            lastObservedIsPlaying = state.isPlaying
+            NotificationCenter.default.post(name: NSNotification.Name("Mooziac_PlaybackStateChanged"), object: nil)
+        }
         let presenceKey = "\(state.title)|\(state.artist)|\(state.trackID)|\(state.isPlaying)"
         if presenceKey != lastDiscordPresenceKey {
             lastDiscordPresenceKey = presenceKey

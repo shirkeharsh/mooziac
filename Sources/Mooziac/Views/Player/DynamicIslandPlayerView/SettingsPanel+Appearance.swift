@@ -422,7 +422,12 @@ extension DynamicIslandPlayerView {
             chevron.contentTintColor = tone.secondaryText.withAlphaComponent(0.7)
         }
 
-        settingsVersionLabel?.textColor = tone.secondaryText.withAlphaComponent(0.6)
+        let utilityMuted = tone.secondaryText.withAlphaComponent(0.6)
+        settingsVersionLabel?.textColor = utilityMuted
+        settingsRateButton?.normalColor = utilityMuted
+        settingsRateButton?.hoverColor = tone.primaryText
+        settingsSupportButton?.normalColor = utilityMuted
+        settingsSupportButton?.hoverColor = tone.primaryText
 
         playlistSearchField?.applyPlaylistContainerStyle(tone: tone)
         playlistSearchField?.layer?.shadowOpacity = (tone == .light) ? 0.04 : 0.22

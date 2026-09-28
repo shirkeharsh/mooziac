@@ -112,34 +112,43 @@ extension DynamicIslandPlayerView {
     }
 
     func updateAmbientGlow(cgImage: CGImage) {
-        let dominantColor = ambientDominantColor(from: cgImage)
-        let converted = dominantColor.usingColorSpace(.sRGB) ?? dominantColor
-        // Enforce minimum luminance floor so dark album art never produces an unreadable pitch-black card on dark wallpapers
-        let r = max(0.06, min(1, converted.redComponent * 0.24))
-        let g = max(0.06, min(1, converted.greenComponent * 0.24))
-        let b = max(0.08, min(1, converted.blueComponent * 0.26))
-        let darkBg = NSColor(srgbRed: r, green: g, blue: b, alpha: 0.96)
-        
-        let br = max(0.20, min(1, converted.redComponent * 0.85))
-        let bg = max(0.20, min(1, converted.greenComponent * 0.85))
-        let bb = max(0.25, min(1, converted.blueComponent * 0.85))
-        let borderGlow = NSColor(srgbRed: br, green: bg, blue: bb, alpha: 0.45)
+        glowCalculationGeneration &+= 1
+        let currentGen = glowCalculationGeneration
 
-        self.lastAmbientBgColor = darkBg.cgColor
-        self.lastAmbientBorderColor = borderGlow.cgColor
-        self.lastAmbientAccentColor = dominantColor
+        DispatchQueue.global(qos: .userInteractive).async { [weak self] in
+            guard let self = self else { return }
+            let dominantColor = self.ambientDominantColor(from: cgImage)
+            let converted = dominantColor.usingColorSpace(.sRGB) ?? dominantColor
+            // Enforce minimum luminance floor so dark album art never produces an unreadable pitch-black card on dark wallpapers
+            let r = max(0.06, min(1, converted.redComponent * 0.24))
+            let g = max(0.06, min(1, converted.greenComponent * 0.24))
+            let b = max(0.08, min(1, converted.blueComponent * 0.26))
+            let darkBg = NSColor(srgbRed: r, green: g, blue: b, alpha: 0.96)
+            
+            let br = max(0.20, min(1, converted.redComponent * 0.85))
+            let bg = max(0.20, min(1, converted.greenComponent * 0.85))
+            let bb = max(0.25, min(1, converted.blueComponent * 0.85))
+            let borderGlow = NSColor(srgbRed: br, green: bg, blue: bb, alpha: 0.45)
 
-        DynamicIslandPlayerView.sharedAmbientBgColor = darkBg.cgColor
-        DynamicIslandPlayerView.sharedAmbientAccentColor = dominantColor
-        NotificationCenter.default.post(name: NSNotification.Name("YTM_ambientThemeChanged"), object: nil)
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self, self.glowCalculationGeneration == currentGen else { return }
+                self.lastAmbientBgColor = darkBg.cgColor
+                self.lastAmbientBorderColor = borderGlow.cgColor
+                self.lastAmbientAccentColor = dominantColor
 
-        if PlayerDesign.current == .adaptive {
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.5
-                self.containerPill.layer?.backgroundColor = darkBg.cgColor
-                self.containerPill.layer?.borderWidth = 1.0
-                self.containerPill.layer?.borderColor = borderGlow.cgColor
-                self.waveformProgressView.accentColor = dominantColor
+                DynamicIslandPlayerView.sharedAmbientBgColor = darkBg.cgColor
+                DynamicIslandPlayerView.sharedAmbientAccentColor = dominantColor
+                NotificationCenter.default.post(name: NSNotification.Name("YTM_ambientThemeChanged"), object: nil)
+
+                if PlayerDesign.current == .adaptive {
+                    NSAnimationContext.runAnimationGroup { context in
+                        context.duration = 0.5
+                        self.containerPill.layer?.backgroundColor = darkBg.cgColor
+                        self.containerPill.layer?.borderWidth = 1.0
+                        self.containerPill.layer?.borderColor = borderGlow.cgColor
+                        self.waveformProgressView.accentColor = dominantColor
+                    }
+                }
             }
         }
     }

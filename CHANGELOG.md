@@ -4,6 +4,20 @@ All notable changes to Mooziac are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.1.8] - 2026-09-29
+
+### Added
+- **Fluid Circular Download Animation**: Integrated GPU-accelerated Core Animation for real-time, buttery-smooth progress tracking during track downloads.
+- **Stage-Aware Download Progress**: Granular progress reporting across network downloading, audio conversion, and metadata/lyrics finalization to eliminate progress stalls.
+- **Help & Support Menu Item**: Added quick access to the Mooziac Support portal directly from the menu bar context menu.
+
+### Changed
+- **Redesigned Settings Footer**: Clean minimal 3-column utility bar featuring `Git Star` (aligned under preferences), a centered version badge (`v1.1.8`), and `Support` (Buy Me a Coffee).
+- **Theme-Adaptive Utility Styling**: Standardized typography, baseline alignment, and interactive hover highlights across all player appearances.
+
+### Fixed
+- Fixed download button progress skipping and premature state resets during post-processing.
+
 ## [1.1.7] - 2026-09-21
 
 ### Added

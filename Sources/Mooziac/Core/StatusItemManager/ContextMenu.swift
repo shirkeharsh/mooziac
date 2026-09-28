@@ -171,6 +171,9 @@ extension StatusItemManager {
         let settingsUpdateItem = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdatesFromMenu), keyEquivalent: "u")
         settingsUpdateItem.target = self
         settingsMenu.addItem(settingsUpdateItem)
+        let settingsSupportItem = NSMenuItem(title: "Help & Support", action: #selector(openSupportFromMenu), keyEquivalent: "")
+        settingsSupportItem.target = self
+        settingsMenu.addItem(settingsSupportItem)
         settingsParent.submenu = settingsMenu
         menu.addItem(settingsParent)
 
@@ -182,6 +185,7 @@ extension StatusItemManager {
         menu.addItem(syncItem)
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdatesFromMenu), keyEquivalent: "u"))
+        menu.addItem(NSMenuItem(title: "Help & Support", action: #selector(openSupportFromMenu), keyEquivalent: ""))
 
         menu.addItem(NSMenuItem(title: "Quit Mooziac", action: #selector(quitFromMenu), keyEquivalent: "q"))
         
@@ -301,6 +305,12 @@ extension StatusItemManager {
     
     @objc private func checkForUpdatesFromMenu() {
         UpdateManager.shared.checkForUpdates(userInitiated: true)
+    }
+
+    @objc private func openSupportFromMenu() {
+        if let url = URL(string: "https://mooziac.threeten.site/support.html") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     @objc private func importPlaylistFromMenu() {

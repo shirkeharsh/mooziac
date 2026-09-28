@@ -1,5 +1,100 @@
 import AppKit
 
+// MARK: - Minimal Native Settings Link Button
+final class SettingsLinkButton: NSButton {
+    var normalColor: NSColor = NSColor(white: 0.55, alpha: 0.6) {
+        didSet { updateAttributedTitle() }
+    }
+    var hoverColor: NSColor = NSColor(white: 0.95, alpha: 1.0) {
+        didSet { updateAttributedTitle() }
+    }
+    private var isHovered: Bool = false {
+        didSet { updateAttributedTitle() }
+    }
+    private var trackingArea: NSTrackingArea?
+
+    init(title: String, alignment: NSTextAlignment = .center, fontSize: CGFloat = 10.5) {
+        super.init(frame: .zero)
+        self.title = title
+        isBordered = false
+        setButtonType(.momentaryChange)
+        wantsLayer = true
+        focusRingType = .none
+        self.alignment = alignment
+        font = NSFont.systemFont(ofSize: fontSize, weight: .regular)
+        updateAttributedTitle()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override var intrinsicContentSize: NSSize {
+        let size = attributedTitle.size()
+        return NSSize(width: ceil(size.width), height: max(14, ceil(size.height)))
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let trackingArea = trackingArea {
+            removeTrackingArea(trackingArea)
+        }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeInActiveApp, .cursorUpdate],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        self.trackingArea = area
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        NSCursor.pointingHand.set()
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        isHovered = true
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        isHovered = false
+    }
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        addCursorRect(bounds, cursor: .pointingHand)
+    }
+
+    override var isHighlighted: Bool {
+        didSet { updateAttributedTitle() }
+    }
+
+    func updateAttributedTitle() {
+        let color: NSColor
+        if isHighlighted {
+            color = hoverColor.withAlphaComponent(0.7)
+        } else if isHovered {
+            color = hoverColor
+        } else {
+            color = normalColor
+        }
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = alignment
+        let attr = NSAttributedString(
+            string: title,
+            attributes: [
+                .font: font ?? NSFont.systemFont(ofSize: 9.5, weight: .regular),
+                .foregroundColor: color,
+                .paragraphStyle: paragraphStyle
+            ]
+        )
+        attributedTitle = attr
+    }
+}
+
 extension DynamicIslandPlayerView {
 
     var downloadsOrderKey: String { "MooziacDownloadsCustomOrder" }
@@ -77,19 +172,69 @@ extension DynamicIslandPlayerView {
         featuresStack.spacing = 3
         featuresStack.translatesAutoresizingMaskIntoConstraints = false
 
-        let versionLabel = NSTextField(labelWithString: "Mooziac v\(UpdateManager.shared.currentVersion)")
+        // -------------------------
+        // BOTTOM UTILITY BAR: Git Star (Left, aligned under #) | vX.X.X (Centered) | Support (Right)
+        // -------------------------
+        let utilityContainer = NSView()
+        utilityContainer.translatesAutoresizingMaskIntoConstraints = false
+
+        let rateButton = SettingsLinkButton(title: "Git Star", alignment: .left, fontSize: 9.5)
+        rateButton.translatesAutoresizingMaskIntoConstraints = false
+        rateButton.toolTip = "Star on GitHub"
+        rateButton.target = self
+        rateButton.action = #selector(handleRateMooziacTapped)
+        rateButton.setContentHuggingPriority(.required, for: .horizontal)
+        rateButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+        settingsRateButton = rateButton
+
+        let versionLabel = NSTextField(labelWithString: "v\(UpdateManager.shared.currentVersion)")
         versionLabel.font = NSFont.systemFont(ofSize: 9.5, weight: .regular)
         versionLabel.alignment = .center
         versionLabel.isEditable = false
         versionLabel.isSelectable = false
         versionLabel.refusesFirstResponder = true
+        versionLabel.drawsBackground = false
+        versionLabel.isBordered = false
         versionLabel.translatesAutoresizingMaskIntoConstraints = false
+        versionLabel.setContentHuggingPriority(.required, for: .horizontal)
+        versionLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
         settingsVersionLabel = versionLabel
+
+        let supportButton = SettingsLinkButton(title: "Support", alignment: .right, fontSize: 9.5)
+        supportButton.translatesAutoresizingMaskIntoConstraints = false
+        supportButton.toolTip = "Buy Me a Coffee"
+        supportButton.target = self
+        supportButton.action = #selector(handleSupportTapped)
+        supportButton.setContentHuggingPriority(.required, for: .horizontal)
+        supportButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+        settingsSupportButton = supportButton
+
+        utilityContainer.addSubview(rateButton)
+        utilityContainer.addSubview(versionLabel)
+        utilityContainer.addSubview(supportButton)
+
+        NSLayoutConstraint.activate([
+            // Version label is mathematically centered in the middle
+            versionLabel.centerXAnchor.constraint(equalTo: utilityContainer.centerXAnchor),
+            versionLabel.centerYAnchor.constraint(equalTo: utilityContainer.centerYAnchor),
+
+            // Git Star pinned to the left, aligned directly under the # icon (constant: 6)
+            rateButton.leadingAnchor.constraint(equalTo: utilityContainer.leadingAnchor, constant: 6),
+            rateButton.centerYAnchor.constraint(equalTo: utilityContainer.centerYAnchor),
+            rateButton.trailingAnchor.constraint(lessThanOrEqualTo: versionLabel.leadingAnchor, constant: -6),
+
+            // Support button pinned to the right (constant: -6)
+            supportButton.trailingAnchor.constraint(equalTo: utilityContainer.trailingAnchor, constant: -6),
+            supportButton.centerYAnchor.constraint(equalTo: utilityContainer.centerYAnchor),
+            supportButton.leadingAnchor.constraint(greaterThanOrEqualTo: versionLabel.trailingAnchor, constant: 6),
+
+            utilityContainer.heightAnchor.constraint(equalToConstant: 16)
+        ])
 
         let mainStack = NSStackView(views: [
             featuresSectionLabel,
             featuresStack,
-            versionLabel
+            utilityContainer
         ])
         mainStack.orientation = .vertical
         mainStack.alignment = .leading
@@ -632,8 +777,8 @@ extension DynamicIslandPlayerView {
             subView.bottomAnchor.constraint(equalTo: settingsContainerView.bottomAnchor, constant: -4),
 
             featuresStack.widthAnchor.constraint(equalTo: mainStack.widthAnchor),
-            versionLabel.widthAnchor.constraint(equalTo: mainStack.widthAnchor),
-            versionLabel.heightAnchor.constraint(equalToConstant: 14),
+            utilityContainer.widthAnchor.constraint(equalTo: mainStack.widthAnchor),
+            utilityContainer.heightAnchor.constraint(equalToConstant: 16),
 
             themeRow.widthAnchor.constraint(equalTo: featuresStack.widthAnchor),
             progressRow.widthAnchor.constraint(equalTo: featuresStack.widthAnchor),
@@ -677,5 +822,17 @@ extension DynamicIslandPlayerView {
         applySearchCreateFieldState(animated: false)
         refreshPlaylistsSection()
         updateSettingsThemeHighlight()
+    }
+
+    @objc func handleRateMooziacTapped() {
+        if let url = URL(string: "https://github.com/shirkeharsh/mooziac") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    @objc func handleSupportTapped() {
+        if let url = URL(string: "https://buymeacoffee.com/shirkeharsh") {
+            NSWorkspace.shared.open(url)
+        }
     }
 }

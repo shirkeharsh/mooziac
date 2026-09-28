@@ -157,6 +157,8 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     var lyricsToggle = NativeCapsuleToggleView()
     var discordToggle = NativeCapsuleToggleView()
     var settingsVersionLabel: NSTextField?
+    var settingsRateButton: SettingsLinkButton?
+    var settingsSupportButton: SettingsLinkButton?
     var themeToggle = NativeCapsuleStepToggleView()
     var progressToggle = NativeCapsuleStepToggleView()
     var progressDescLabel: NSTextField?
@@ -197,6 +199,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     var lastAmbientBgColor: CGColor?
     var lastAmbientBorderColor: CGColor?
     var lastAmbientAccentColor: NSColor?
+    var glowCalculationGeneration: UInt64 = 0
     
     var controlsStackCenterX: NSLayoutConstraint?
     var controlsStackLeading: NSLayoutConstraint?
@@ -226,6 +229,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         DistributedNotificationCenter.default().addObserver(self, selector: #selector(appearanceChangedNotification), name: NSNotification.Name("AppleInterfaceThemeChangedNotification"), object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(networkStatusChanged(_:)), name: NetworkMonitor.statusChangedNotification, object: nil)
         applyTheme()
+        checkPostUpdateNotice()
     }
     
     required init?(coder: NSCoder) {
@@ -236,6 +240,18 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         DistributedNotificationCenter.default().addObserver(self, selector: #selector(appearanceChangedNotification), name: NSNotification.Name("AppleInterfaceThemeChangedNotification"), object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(networkStatusChanged(_:)), name: NetworkMonitor.statusChangedNotification, object: nil)
         applyTheme()
+        checkPostUpdateNotice()
+    }
+
+    private func checkPostUpdateNotice() {
+        let currentVer = UpdateManager.shared.currentVersion
+        let lastNotifiedVer = UserDefaults.standard.string(forKey: "Mooziac_LastNotifiedVersion") ?? ""
+        if lastNotifiedVer != currentVer {
+            UserDefaults.standard.set(currentVer, forKey: "Mooziac_LastNotifiedVersion")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+                self?.showToastBanner(message: "✨ Updated to Mooziac \(currentVer)")
+            }
+        }
     }
     
     func restoreSavedState() {
@@ -742,12 +758,26 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
 
         if NowPlayingManager.shared.engineMode == .offline {
             if let offlineTrack = NativeAudioPlayer.shared.currentTrack {
-                let art = offlineTrack.artwork ?? AppArtworkHelper.defaultArtwork
-                if self.artworkImageView.image != art {
-                    self.artworkImageView.image = art
-                    self.artworkImageView.layer?.borderColor = NSColor(white: 1.0, alpha: 0.15).cgColor
-                    if let cg = art.cgImage(forProposedRect: nil, context: nil, hints: nil) {
-                        self.updateAmbientGlow(cgImage: cg)
+                if let cached = AppArtworkHelper.shared.getCachedThumbnail(for: offlineTrack) {
+                    if self.artworkImageView.image != cached {
+                        self.artworkImageView.image = cached
+                        self.artworkImageView.layer?.borderColor = NSColor(white: 1.0, alpha: 0.15).cgColor
+                        if let cg = cached.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                            self.updateAmbientGlow(cgImage: cg)
+                        }
+                    }
+                } else {
+                    let targetID = offlineTrack.id
+                    AppArtworkHelper.shared.loadThumbnail(for: offlineTrack) { [weak self] img in
+                        guard let self = self, NativeAudioPlayer.shared.currentTrack?.id == targetID else { return }
+                        let resolved = img ?? AppArtworkHelper.defaultArtwork
+                        if self.artworkImageView.image != resolved {
+                            self.artworkImageView.image = resolved
+                            self.artworkImageView.layer?.borderColor = NSColor(white: 1.0, alpha: 0.15).cgColor
+                            if let cg = resolved.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                                self.updateAmbientGlow(cgImage: cg)
+                            }
+                        }
                     }
                 }
             } else if self.artworkImageView.image != AppArtworkHelper.defaultArtwork {

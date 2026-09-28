@@ -668,10 +668,23 @@ public final class LocalDatabaseManager {
         if let cleanupStmt = cleanupStmt {
             sqlite3_finalize(cleanupStmt)
         }
+
+        likedCacheLock.lock()
+        for path in filePaths {
+            likedCache.removeValue(forKey: path)
+        }
+        likedCacheLock.unlock()
     }
 
     // MARK: - Toggle / Set Liked
+    private var likedCache: [String: Bool] = [:]
+    private let likedCacheLock = NSLock()
+
     public func setLiked(filePath: String, isLiked: Bool) {
+        likedCacheLock.lock()
+        likedCache[filePath] = isLiked
+        likedCacheLock.unlock()
+
         guard let db = db else { return }
         let sql = "UPDATE tracks SET is_liked = ? WHERE file_path = ? OR id = ? OR (yt_video_id = ? AND yt_video_id != '');"
         var stmt: OpaquePointer?
@@ -687,6 +700,13 @@ public final class LocalDatabaseManager {
     }
 
     public func isLiked(filePath: String) -> Bool {
+        likedCacheLock.lock()
+        if let cached = likedCache[filePath] {
+            likedCacheLock.unlock()
+            return cached
+        }
+        likedCacheLock.unlock()
+
         guard let db = db else { return false }
         let sql = "SELECT is_liked FROM tracks WHERE file_path = ? OR id = ? OR (yt_video_id = ? AND yt_video_id != '') LIMIT 1;"
         var stmt: OpaquePointer?
@@ -701,6 +721,11 @@ public final class LocalDatabaseManager {
             }
         }
         sqlite3_finalize(stmt)
+
+        likedCacheLock.lock()
+        likedCache[filePath] = liked
+        likedCacheLock.unlock()
+
         return liked
     }
 
