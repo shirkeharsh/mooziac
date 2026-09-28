@@ -6,9 +6,10 @@
 
 <p align="center">
   <a href="https://github.com/shirkeharsh/mooziac/releases/latest"><img src="https://img.shields.io/github/v/release/shirkeharsh/mooziac?style=flat-square&logo=github&logoColor=white&color=8B7BFF" alt="Latest Release"></a>
+  <a href="https://github.com/shirkeharsh/mooziac/stargazers"><img src="https://img.shields.io/github/stars/shirkeharsh/mooziac?style=flat-square&logo=github&color=FA4059" alt="GitHub Stars"></a>
   <a href="https://github.com/shirkeharsh/mooziac/releases/latest"><img src="https://img.shields.io/badge/macOS-13.0%2B-000000?style=flat-square&logo=apple&logoColor=white" alt="macOS 13.0+ Compatibility"></a>
   <a href="https://github.com/shirkeharsh/mooziac/releases/latest"><img src="https://img.shields.io/badge/Architecture-Universal-2ea44f?style=flat-square" alt="Universal Binary (Apple Silicon & Intel)"></a>
-  <a href="#privacy-first-architecture"><img src="https://img.shields.io/badge/Privacy-100%25%20Local--First-28cd41?style=flat-square&logo=shield&logoColor=white" alt="Zero Telemetry (100% Local-First)"></a>
+  <a href="#-privacy-first-architecture"><img src="https://img.shields.io/badge/Privacy-100%25%20Local--First-28cd41?style=flat-square&logo=shield&logoColor=white" alt="Zero Telemetry (100% Local-First)"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="MIT License"></a>
 </p>
 
@@ -28,113 +29,106 @@
 
 <br>
 
----
-
-## Overview
-
-Mooziac is a native macOS music player written in Swift and AppKit. It lives in the macOS menu bar, providing instant playback controls, YouTube Music integration, offline audio playback, real-time synchronized lyrics in menu bar, and trackpad edge volume gestures with minimal resource usage.
-
----
-
 <p align="center">
-  <img src="Resources/Animals 2.png" alt="Mooziac macOS Menu Bar Interface" width="700">
+  <b>Mooziac is an ultra-lightweight, 100% native Swift & AppKit music player built specifically for macOS.</b><br>
+  Tucked right into your menu bar, it combines YouTube Music streaming and local hi-res audio playback with an invisible trackpad edge volume slider, real-time synchronized lyrics, and zero battery-draining Electron bloat.
 </p>
 
-## Core Features
+---
 
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>Native Menu Bar Interface</h3>
-      <ul>
-        <li><b>Grid Layout:</b> Compact 3-row layout engineered specifically for macOS menu bar presentation.</li>
-        <li><b>Interactive Waveform:</b> Real-time audio waveform visualization with drag seeking.</li>
-        <li><b>Adaptive Palette:</b> Dynamically samples primary colors from active album artwork.</li>
-        <li><b>Native Animations:</b> Smooth spring-based animations on playback interactions.</li>
-      </ul>
-    </td>
-    <td width="50%" valign="top">
-      <h3>MultiTouch Edge Gestures</h3>
-      <ul>
-        <li><b>Edge Volume Slider:</b> Slide along the rightmost 1mm trackpad border for smooth volume adjustment.</li>
-        <li><b>Haptic Feedback:</b> Tactile ticks as system volume changes.</li>
-        <li><b>Corner Taps:</b> Configurable corner taps to skip tracks or toggle playback.</li>
-        <li><b>Input Filtering:</b> Touch ID and single-finger filters prevent unintended gesture activation.</li>
-      </ul>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>Dual Audio Engines</h3>
-      <ul>
-        <li><b>YouTube Music Bridge:</b> Sandboxed WebKit bridge syncing playlists, liked songs, and listening history.</li>
-        <li><b>Offline Playback:</b> Native AVFoundation engine supporting MP3, FLAC, WAV, AAC, and M4A.</li>
-        <li><b>Unified Queue:</b> Seamless transition between online streams and local audio files.</li>
-        <li><b>Offline Storage:</b> Integrated yt-dlp downloader with automatic metadata extraction.</li>
-      </ul>
-    </td>
-    <td width="50%" valign="top">
-      <h3>Synchronized Lyrics HUD</h3>
-      <ul>
-        <li><b>Line-by-Line LRC:</b> Real-time synchronized lyrics fetched via LRCLib and fallback providers.</li>
-        <li><b>Menu Bar Anchored:</b> Floating, non-intrusive HUD positioned below the active menu bar item.</li>
-        <li><b>Plain Text Fallback:</b> Automatically displays unsynced lyrics when timing markers are unavailable.</li>
-        <li><b>Local Cache:</b> Lyrics are cached locally for offline and instant retrieval.</li>
-      </ul>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>Discord Rich Presence</h3>
-      <ul>
-        <li><b>Native Unix Socket IPC:</b> Direct connection to local Discord client with zero third-party dependencies.</li>
-        <li><b>Now Playing Card:</b> Displays track title, artist, elapsed time, and album art.</li>
-        <li><b>Status Synchronization:</b> Real-time playback status updates on pause and resume.</li>
-      </ul>
-    </td>
-    <td width="50%" valign="top">
-      <h3 id="privacy-first-architecture">Privacy-First Architecture</h3>
-      <ul>
-        <li><b>Zero Telemetry:</b> No analytics SDKs, error tracking beacons, or remote logging.</li>
-        <li><b>Local SQLite Database:</b> Playlists, history, and preferences are stored exclusively on your Mac.</li>
-        <li><b>Isolated Credentials:</b> Google and YouTube authentication stays inside Apple's sandboxed WKWebView.</li>
-      </ul>
-    </td>
-  </tr>
-</table>
+## ✨ See Mooziac in Action
+
+<p align="center">
+  <img src="Resources/gif.gif" alt="Mooziac Menu Bar Interface & Synced Lyrics" width="460" style="border-radius: 12px; box-shadow: 0 16px 40px rgba(0,0,0,0.4);">
+  <br>
+  <sub><i>Floating real-time synchronized lyrics HUD, dynamic waveform seekbar, and instant menu bar access.</i></sub>
+</p>
 
 ---
 
-## Gestures and Keyboard Shortcuts
+## ⚡️ Why Mooziac?
+
+Most desktop music players are heavy Electron wrappers that bundle a full Chromium browser, devouring hundreds of megabytes of RAM and draining laptop battery life. Mooziac was built from scratch in **pure native Swift and AppKit** with zero third-party dependencies.
+
+| Feature | ⚡️ Mooziac | 🌐 Official YTM Web / Desktop | 📦 Electron Wrappers |
+| :--- | :---: | :---: | :---: |
+| **Technology** | **100% Native Swift & AppKit** | Chromium / Web App | Heavy Chromium + Node.js |
+| **Idle RAM Footprint** | **~35 – 60 MB** | ~600 – 1,200 MB | ~500 – 900 MB |
+| **Trackpad Edge Volume** | **✅ Yes (with haptic feedback)** | ❌ No | ❌ No |
+| **Synchronized Lyrics HUD** | **✅ Line-by-line LRC** | ⚠️ Basic / Unsynced | ❌ No |
+| **Local Offline Audio** | **✅ FLAC, MP3, WAV, AAC, M4A** | ❌ Cloud only | ❌ No |
+| **Background Media Keys** | **✅ Native macOS integration** | ⚠️ Browser permissions | ⚠️ Inconsistent |
+| **Discord Rich Presence** | **✅ Native Unix socket (0 deps)** | ❌ No | ⚠️ Third-party plugins |
+| **Telemetry & Privacy** | **🔒 100% Local (Zero tracking)** | ⚠️ Extensive Google telemetry | ⚠️ Varies |
+
+---
+
+## 🎛️ Core Highlights
+
+### 1. Invisible Trackpad Edge Volume Slider
+Turn the rightmost edge of your MacBook trackpad into an invisible hardware volume dial.
+* **1mm Border Gesture:** Slide your finger along the far-right edge of the trackpad to adjust system volume smoothly.
+* **Haptic Ticks:** Feel physical tactile clicks through the Mac trackpad Taptic Engine as the volume levels step up or down.
+* **Smart Filtering:** Intelligent finger and palm rejection prevents accidental triggers during typing or regular cursor movement.
+
+### 2. Floating Synchronized Lyrics HUD
+Sing along with real-time, line-by-line synchronized lyrics right on your desktop.
+* **Line-by-Line LRC:** Fetched automatically from LRCLib and official YouTube Music synced endpoints.
+* **Non-Intrusive HUD:** Floats cleanly beneath your active menu bar item without blocking your workspace.
+* **Offline Caching:** Cached locally into SQLite for instant retrieval upon repeat listens.
+
+### 3. Dual Audio Engine (Cloud + Local Hi-Res)
+One unified player for all your music.
+* **YouTube Music Bridge:** Seamlessly access your cloud playlists, liked songs, and listening history.
+* **Native Offline Engine:** Pure AVFoundation playback supporting lossless FLAC, ALAC, WAV, MP3, AAC, and M4A.
+* **Unified Queue:** Mix and match streaming tracks and local disk files seamlessly.
+* **Built-in Offline Downloader:** Integrated `yt-dlp` pipeline with automatic tag and artwork embedding.
+
+### 4. Interactive Waveform & Adaptive Theming
+* **Live Audio Visualizer:** Interactive waveform seeker with scrub support.
+* **Dynamic Palette:** Real-time color sampling from the playing track's artwork for a vibrant, ambient interface.
+
+### 5. Native Discord Rich Presence
+* **Zero Overhead:** Connects directly to the local Discord client via native Unix domain sockets without heavy Node.js or Python bridges.
+* **Rich Status Card:** Shows active song title, artist, elapsed/total time, and album artwork.
+
+### 6. 🔒 Privacy-First Architecture
+* **Zero Telemetry:** No analytics beacons, no tracking SDKs, no remote logging, no crash reporters phoning home.
+* **100% Local Storage:** Playlists, cached lyrics, and listening history live solely in a local SQLite database on your Mac.
+* **Secure WebKit Sandbox:** Google and YouTube credentials never leave Apple's official `WKWebsiteDataStore`.
+
+---
+
+## ⌨️ Gestures & Shortcuts
 
 ### Trackpad MultiTouch Gestures
 
 | Gesture | Trackpad Region | Action |
 | :--- | :--- | :--- |
-| **Edge Slide** | Far-right 1mm border | Adjust system volume with tactile haptics |
+| **Edge Slide** | Far-right 1mm border | Smooth volume adjustment with tactile haptics |
 | **Double Tap** | Bottom-right corner | Next Track |
 | **Triple Tap** | Bottom-right corner | Previous Track |
 | **Double Tap** | Bottom-left corner | Play / Pause Toggle |
-| **Scroll** | Over Menu Bar Icon | Volume Adjustment |
+| **Scroll** | Over Menu Bar Icon | Fast Volume Stepping |
 
 ### Keyboard Shortcuts
 
 | Shortcut | Action |
 | :--- | :--- |
 | `Space` | Play / Pause |
-| `Command + Right Arrow` | Next Track |
-| `Command + Left Arrow` | Previous Track |
+| `⌘ + Right Arrow` | Next Track |
+| `⌘ + Left Arrow` | Previous Track |
 | `L` | Like / Unlike Song |
-| `Command + R` | Reload Web Engine |
-| `Command + Q` | Quit Mooziac |
+| `⌘ + R` | Reload Web Engine |
+| `⌘ + Q` | Quit Mooziac |
 
 ---
 
-## Installation
+## 🚀 Installation
 
-### Homebrew (Recommended)
+### Option 1: Homebrew (Recommended)
 
-Install directly via the official tap:
+Install directly via the official Homebrew tap:
 
 ```bash
 brew install shirkeharsh/tap/mooziac
@@ -145,89 +139,82 @@ To update in the future:
 brew upgrade --cask mooziac
 ```
 
-### Pre-built Binary
+### Option 2: Direct Download
 
 1. Download [`Mooziac.dmg`](https://github.com/shirkeharsh/mooziac/releases/latest/download/Mooziac.dmg) or [`Mooziac.zip`](https://github.com/shirkeharsh/mooziac/releases/latest/download/Mooziac.zip).
 2. Open `Mooziac.dmg` and drag **Mooziac** into your **Applications** folder.
-3. Launch Mooziac from Spotlight (`Command + Space`) or `/Applications`.
+3. Launch Mooziac from Spotlight (`⌘ + Space`) or Launchpad.
 
-### Gatekeeper Note
-Because Mooziac is distributed directly outside the Mac App Store:
-- **System Settings:** If prompted, open *System Settings > Privacy & Security* and select *Open Anyway*.
-- **Terminal Command:** Alternatively, clear the quarantine attribute:
-  ```bash
-  xattr -cr /Applications/Mooziac.app
-  ```
-
----
-
-## Architecture and Project Structure
-
-Mooziac is built as a Swift Package Manager project with zero third-party dependencies, leveraging native macOS frameworks (AppKit, AVFoundation, WebKit, SQLite3, and Unified Logging):
-
-```
-Mooziac/
-├── .github/workflows/ci.yml              # Headless GitHub Actions CI (build and test)
-├── Package.swift                         # SPM Manifest (macOS 13+, Swift 5.9)
-├── Mooziac.entitlements                  # Hardened Runtime security entitlements
-├── build_app.sh                          # Development build and launch script
-├── mooziac.sh                            # Universal binary DMG packager
-├── Sources/Mooziac/                      # Main application target
-│   ├── App/                              # Application lifecycle, AppDelegate, background media
-│   ├── Audio/                            # CoreAudio volume hooks and AVFoundation native player
-│   ├── Core/                             # Central state coordinators and logging (Log.swift)
-│   │   ├── NowPlayingManager/            # Now playing session and media controls
-│   │   └── StatusItemManager/            # Menu bar status item, menu, and controllers
-│   ├── Input/                            # MultiTouch gesture engine and keyboard shortcuts
-│   ├── Managers/                         # Local SQLite3, download queue, synced lyrics, updates
-│   ├── Models/                           # Data models and state representations
-│   ├── Support/                          # Color palettes, string utilities, system extensions
-│   ├── Views/                            # Menu bar player UI, waveform, lyrics HUD
-│   │   ├── Components/                   # Reusable UI controls, buttons, search field
-│   │   ├── Libraries/                    # Local, offline, and playlist management views
-│   │   ├── Player/                       # Dynamic Island and settings drawer views
-│   │   └── Windows/                      # Floating HUD, tutorial, and overlay windows
-│   └── Web/                              # Sandboxed WebKit bridge for YouTube Music
-├── Tests/MooziacTests/                   # Comprehensive unit test suite
-│   ├── DownloadManagerURLTests.swift     # URL extraction and validation tests
-│   ├── DownloadQueuePersistenceTests.swift# Queue serialization and persistence tests
-│   ├── MooziacTests.swift                # Environment and build sanity tests
-│   ├── SyncedLyricsParserTests.swift     # LRC timestamp and line parsing tests
-│   └── URLFilterTests.swift              # Search query URL filter tests
-└── Resources/                            # Visual assets, SVG banner, themes, and icons
-```
+> [!NOTE]
+> **macOS Gatekeeper:** Because Mooziac is distributed directly outside the Mac App Store:
+> - If macOS prompts that the app cannot be verified, go to **System Settings > Privacy & Security** and click **Open Anyway**.
+> - Or run this one-line command in Terminal:
+>   ```bash
+>   xattr -cr /Applications/Mooziac.app
+>   ```
 
 ---
 
-## Building from Source
+## 🛠️ Building from Source
 
-### Requirements
-- macOS 13.0 or later
+### Prerequisites
+- macOS 13.0 (Ventura) or later
 - Xcode 15+ or Xcode Command Line Tools (`xcode-select --install`)
-- Swift 5.9 toolchain
-
-### Build Commands
+- Swift 5.9+ toolchain
 
 ```bash
-# Build debug binary
-swift build
+# Clone repository
+git clone https://github.com/shirkeharsh/mooziac.git
+cd mooziac
 
 # Run unit tests
 swift test --parallel
 
-# Build optimized release binary
-swift build -c release
-
-# Build and run the app locally
+# Build and launch debug app locally
 ./build_app.sh
 
-# Build release package without launching
+# Build universal release binary & DMG package
 ./build_app.sh --release-only
 ```
 
 ---
 
-## License and Disclaimer
+## 📂 Architecture and Project Structure
 
-- **License:** Distributed under the [MIT License](LICENSE). Copyright 2026 ThreeTen.
+Mooziac is architected cleanly into modular Swift packages with native macOS frameworks:
+
+```
+Mooziac/
+├── Package.swift                         # SPM Manifest (macOS 13+, Swift 5.9)
+├── Mooziac.entitlements                  # Hardened Runtime security entitlements
+├── build_app.sh                          # Universal build & packaging pipeline
+├── Sources/Mooziac/                      # Main application target
+│   ├── App/                              # Application lifecycle, AppDelegate, background media
+│   ├── Audio/                            # CoreAudio volume hooks, AVFoundation audio player
+│   ├── Core/                             # Central coordinators, NowPlaying, StatusItem
+│   ├── Input/                            # MultiTouch gesture engine & global shortcuts
+│   ├── Managers/                         # Local SQLite3, YTMClient, synced lyrics, yt-dlp
+│   ├── Models/                           # State representations, playlist records, audio configs
+│   ├── Views/                            # Dynamic Island player UI, waveform, lyrics HUD
+│   └── Web/                              # Sandboxed WebKit bridge for YouTube Music
+└── Tests/MooziacTests/                   # Parallelized unit test suite
+```
+
+---
+
+## ⭐️ Support & Community
+
+If you find Mooziac useful, please consider **starring the repository** — it helps more Mac users discover native, lightweight open-source software!
+
+[![Star History Chart](https://api.star-history.com/svg?repos=shirkeharsh/mooziac&type=Date)](https://star-history.com/#shirkeharsh/mooziac&Date)
+
+- 🐛 **Found a bug?** [Open an issue](https://github.com/shirkeharsh/mooziac/issues)
+- 💡 **Have a feature idea?** [Submit a feature request](https://github.com/shirkeharsh/mooziac/issues/new)
+- 🌐 **Official Website:** [mooziac.threeten.site](https://mooziac.threeten.site)
+
+---
+
+## 📄 License & Disclaimer
+
+- **License:** Distributed under the [MIT License](LICENSE). Copyright © 2026 ThreeTen.
 - **Disclaimer:** YouTube Music is a trademark of Google LLC. Mooziac is an independent open-source project and is not affiliated with, authorized, or endorsed by Google LLC.
