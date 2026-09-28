@@ -48,12 +48,11 @@
 
 ## ⚡️ Why Mooziac?
 
-Most desktop music players are heavy Electron wrappers that bundle a full Chromium browser, devouring hundreds of megabytes of RAM and draining laptop battery life. Mooziac was built from scratch in **pure native Swift and AppKit** with zero third-party dependencies.
+Most desktop music players are heavy Electron wrappers that bundle a full Chromium browser, devouring system resources and draining laptop battery life. Mooziac was built from scratch in **pure native Swift and AppKit** with zero third-party dependencies.
 
 | Feature | ⚡️ Mooziac | 🌐 Official YTM Web / Desktop | 📦 Electron Wrappers |
 | :--- | :---: | :---: | :---: |
 | **Technology** | **100% Native Swift & AppKit** | Chromium / Web App | Heavy Chromium + Node.js |
-| **Idle RAM Footprint** | **~35 – 60 MB** | ~600 – 1,200 MB | ~500 – 900 MB |
 | **Trackpad Edge Volume** | **✅ Yes (with haptic feedback)** | ❌ No | ❌ No |
 | **Synchronized Lyrics HUD** | **✅ Line-by-line LRC** | ⚠️ Basic / Unsynced | ❌ No |
 | **Local Offline Audio** | **✅ FLAC, MP3, WAV, AAC, M4A** | ❌ Cloud only | ❌ No |
