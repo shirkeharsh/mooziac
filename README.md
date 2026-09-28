@@ -39,9 +39,9 @@
 ## ✨ See Mooziac in Action
 
 <p align="center">
-  <img src="Resources/gif.gif" alt="Mooziac Menu Bar Interface & Synced Lyrics" width="460" style="border-radius: 12px; box-shadow: 0 16px 40px rgba(0,0,0,0.4);">
+  <img src="Resources/gif.gif" alt="Mooziac macOS Interface & Preferences" width="750" style="border-radius: 12px; box-shadow: 0 16px 40px rgba(0,0,0,0.4);">
   <br>
-  <sub><i>Floating real-time synchronized lyrics HUD, dynamic waveform seekbar, and instant menu bar access.</i></sub>
+  <sub><i>Interactive player preferences, themes, live audio waveforms, and native macOS menu bar playback controls.</i></sub>
 </p>
 
 ---
