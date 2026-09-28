@@ -39,7 +39,7 @@
 ## ✨ See Mooziac in Action
 
 <p align="center">
-  <img src="Resources/gif.gif" alt="Mooziac macOS Interface & Preferences" width="750" style="border-radius: 12px; box-shadow: 0 16px 40px rgba(0,0,0,0.4);">
+  <img src="Resources/gif.gif" alt="Mooziac macOS Interface & Preferences" width="100%" style="border-radius: 12px; box-shadow: 0 16px 40px rgba(0,0,0,0.4);">
   <br>
   <sub><i>Interactive player preferences, themes, live audio waveforms, and native macOS menu bar playback controls.</i></sub>
 </p>
