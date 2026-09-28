@@ -31,7 +31,7 @@
 
 <p align="center">
   <b>Mooziac is an ultra-lightweight, 100% native Swift & AppKit music player built specifically for macOS.</b><br>
-  Tucked right into your menu bar, it combines YouTube Music streaming and local hi-res audio playback with an invisible trackpad edge volume slider, real-time synchronized lyrics, and zero battery-draining Electron bloat.
+  The native alternative to YouTube Music Desktop, Spotify, and Electron players — tucked right into your menu bar with an invisible trackpad edge volume slider, real-time synchronized lyrics HUD, and zero battery-draining Chromium bloat.
 </p>
 
 ---
@@ -62,7 +62,7 @@ Most desktop music players are heavy Electron wrappers that bundle a full Chromi
 
 ---
 
-## 🎛️ Core Highlights
+## 🎛️ Native macOS Features: Trackpad Gestures, Synced Lyrics & Audio Engine
 
 <table>
   <tr>
@@ -229,6 +229,49 @@ Mooziac/
 │   └── Web/                              # Sandboxed WebKit bridge for YouTube Music
 └── Tests/MooziacTests/                   # Parallelized unit test suite
 ```
+
+---
+
+## ❓ Frequently Asked Questions (FAQ)
+
+<details>
+<summary><b>Is Mooziac free and open-source?</b></summary>
+<p>Yes. Mooziac is 100% free and open-source software distributed under the permissive MIT License. There are no subscriptions, paywalls, ads, or hidden tracking.</p>
+</details>
+
+<details>
+<summary><b>Does Mooziac require a YouTube Music Premium account?</b></summary>
+<p>No. Mooziac works seamlessly with both free YouTube Music accounts and YouTube Music Premium accounts. Free users get access to the full standard catalog, while Premium users enjoy higher-bitrate audio streams.</p>
+</details>
+
+<details>
+<summary><b>How is Mooziac different from the official YouTube Music web or desktop apps?</b></summary>
+<p>Official and third-party desktop wrappers are built on Electron or Chromium, often consuming 500 MB to 1.2 GB of RAM and impacting laptop battery life. Mooziac is engineered in pure native Swift and AppKit with zero third-party dependencies, consuming minimal system resources while running directly in the macOS menu bar.</p>
+</details>
+
+<details>
+<summary><b>How does the MacBook trackpad volume gesture work?</b></summary>
+<p>Mooziac captures multi-touch events along the rightmost 1mm border of your MacBook trackpad. Gliding your finger along that outer edge smoothly adjusts system volume while triggering physical tactile clicks through the Mac's built-in Taptic Engine. Intelligent palm rejection prevents accidental triggers during typing.</p>
+</details>
+
+<details>
+<summary><b>Does Mooziac collect any personal data or listening history?</b></summary>
+<p>None. Mooziac features a zero-telemetry architecture: no analytics beacons, no tracking SDKs, and no crash reporters. Your listening history, playlists, and liked songs are saved solely in a local SQLite database on your Mac, and credentials remain sandboxed in Apple's official <code>WKWebsiteDataStore</code>.</p>
+</details>
+
+<details>
+<summary><b>How do I install or update Mooziac using Homebrew?</b></summary>
+<p>Install via the official tap with one command:
+<pre><code>brew install shirkeharsh/tap/mooziac</code></pre>
+To upgrade in the future, run:
+<pre><code>brew upgrade --cask mooziac</code></pre>
+</p>
+</details>
+
+<details>
+<summary><b>Can I play local audio files (FLAC, MP3, WAV) offline?</b></summary>
+<p>Yes. Mooziac features a dual audio engine: alongside YouTube Music streaming, it includes a native AVFoundation offline player supporting FLAC, ALAC, WAV, MP3, AAC, and M4A, complete with album artwork and integrated offline caching.</p>
+</details>
 
 ---
 
