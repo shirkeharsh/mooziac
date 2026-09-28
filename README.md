@@ -64,37 +64,68 @@ Most desktop music players are heavy Electron wrappers that bundle a full Chromi
 
 ## 🎛️ Core Highlights
 
-### 1. Invisible Trackpad Edge Volume Slider
-Turn the rightmost edge of your MacBook trackpad into an invisible hardware volume dial.
-* **1mm Border Gesture:** Slide your finger along the far-right edge of the trackpad to adjust system volume smoothly.
-* **Haptic Ticks:** Feel physical tactile clicks through the Mac trackpad Taptic Engine as the volume levels step up or down.
-* **Smart Filtering:** Intelligent finger and palm rejection prevents accidental triggers during typing or regular cursor movement.
-
-### 2. Floating Synchronized Lyrics HUD
-Sing along with real-time, line-by-line synchronized lyrics right on your desktop.
-* **Line-by-Line LRC:** Fetched automatically from LRCLib and official YouTube Music synced endpoints.
-* **Non-Intrusive HUD:** Floats cleanly beneath your active menu bar item without blocking your workspace.
-* **Offline Caching:** Cached locally into SQLite for instant retrieval upon repeat listens.
-
-### 3. Dual Audio Engine (Cloud + Local Hi-Res)
-One unified player for all your music.
-* **YouTube Music Bridge:** Seamlessly access your cloud playlists, liked songs, and listening history.
-* **Native Offline Engine:** Pure AVFoundation playback supporting lossless FLAC, ALAC, WAV, MP3, AAC, and M4A.
-* **Unified Queue:** Mix and match streaming tracks and local disk files seamlessly.
-* **Built-in Offline Downloader:** Integrated `yt-dlp` pipeline with automatic tag and artwork embedding.
-
-### 4. Interactive Waveform & Adaptive Theming
-* **Live Audio Visualizer:** Interactive waveform seeker with scrub support.
-* **Dynamic Palette:** Real-time color sampling from the playing track's artwork for a vibrant, ambient interface.
-
-### 5. Native Discord Rich Presence
-* **Zero Overhead:** Connects directly to the local Discord client via native Unix domain sockets without heavy Node.js or Python bridges.
-* **Rich Status Card:** Shows active song title, artist, elapsed/total time, and album artwork.
-
-### 6. 🔒 Privacy-First Architecture
-* **Zero Telemetry:** No analytics beacons, no tracking SDKs, no remote logging, no crash reporters phoning home.
-* **100% Local Storage:** Playlists, cached lyrics, and listening history live solely in a local SQLite database on your Mac.
-* **Secure WebKit Sandbox:** Google and YouTube credentials never leave Apple's official `WKWebsiteDataStore`.
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h4>🎛️ Invisible Trackpad Volume Slider</h4>
+      <p>Turn the rightmost 1mm border of your MacBook trackpad into an invisible hardware volume dial.</p>
+      <ul>
+        <li><b>1mm Border Edge:</b> Slide along the outer bezel for fine-grained system volume adjustment.</li>
+        <li><b>Tactile Taptic Engine:</b> Real physical haptic ticks as volume levels increment or decrement.</li>
+        <li><b>Zero Ghost Touches:</b> Palm and Touch ID rejection prevents accidental triggers during typing.</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
+      <h4>🎤 Floating Synchronized Lyrics HUD</h4>
+      <p>Sing along with real-time, line-by-line synchronized LRC lyrics right beneath your menu bar.</p>
+      <ul>
+        <li><b>Line-by-Line LRC:</b> Powered by LRCLib and native YouTube Music synced endpoints.</li>
+        <li><b>Non-Intrusive HUD:</b> Floats discreetly without taking window focus or blocking your workspace.</li>
+        <li><b>Instant Local Cache:</b> Stored in SQLite for zero-latency retrieval on repeat listens.</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h4>⚡️ Dual Audio Engine (Cloud + Local Hi-Res)</h4>
+      <p>Stream your cloud favorites or play lossless offline libraries in one seamless unified queue.</p>
+      <ul>
+        <li><b>YouTube Music Bridge:</b> Direct access to your cloud playlists, liked songs, and history.</li>
+        <li><b>Lossless Hi-Res:</b> Pure <code>AVFoundation</code> playback supporting FLAC, ALAC, WAV, MP3, AAC, and M4A.</li>
+        <li><b>Built-in Downloader:</b> Integrated <code>yt-dlp</code> pipeline with automatic tag and artwork embedding.</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
+      <h4>🌊 Interactive Waveform & Adaptive Glow</h4>
+      <p>Dynamic ambient interface that harmonizes with your music and desktop wallpaper.</p>
+      <ul>
+        <li><b>Live Audio Visualizer:</b> Interactive waveform scrub bar with real-time seeking.</li>
+        <li><b>Adaptive Palette:</b> Real-time color sampling from active album artwork.</li>
+        <li><b>Curated Themes:</b> OLED Pitch Black, Crystal Glass, and Liquid Fluid visual styles.</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h4>🎮 Native Discord Rich Presence</h4>
+      <p>Broadcast your now-playing status without third-party bloat or background daemons.</p>
+      <ul>
+        <li><b>Native Unix Socket IPC:</b> Direct connection with zero Node.js or Python runtime overhead.</li>
+        <li><b>Rich Status Card:</b> Displays active song title, artist, album art, and live elapsed timestamps.</li>
+        <li><b>Auto-Pause Sync:</b> Updates status in real time when playback is paused or resumed.</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
+      <h4>🔒 100% Local & Privacy-First</h4>
+      <p>Architected with strict privacy principles — your music and listening data remain strictly on your Mac.</p>
+      <ul>
+        <li><b>Zero Telemetry:</b> No analytics SDKs, trackers, beacons, or crash reporters phoning home.</li>
+        <li><b>Local SQLite3:</b> History, likes, and cached playlists stay entirely in your local storage.</li>
+        <li><b>Sandboxed WebKit:</b> Credentials remain safely inside Apple's official <code>WKWebsiteDataStore</code>.</li>
+      </ul>
+    </td>
+  </tr>
+</table>
 
 ---
 
