@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  
+  <title>Mooziac — Native macOS Music Player</title>
+  <meta name="description" content="Mooziac is a beautiful native macOS music player built with Swift and SwiftUI. Stream YouTube Music, play local FLAC/MP3 files, and control playback with trackpad edge gestures.">
+  <meta name="keywords" content="Mooziac, Mooziac macOS, Mooziac music player, Mooziac GitHub, Mooziac YouTube Music, macOS music player, Swift, SwiftUI, native macOS app, menu bar music player">
+  <meta name="author" content="ThreeTen">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+  <meta name="google-site-verification" content="UsoSLJyeA39gdQAo8-pHwOYh9w4ynlNT1ZjiyTENxwo">
+  <link rel="canonical" href="https://mooziac.threeten.site/">
+  <link rel="icon" type="image/png" href="assets/favicon-32.png">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://mooziac.threeten.site/">
+  <meta property="og:site_name" content="Mooziac">
+  <meta property="og:title" content="Mooziac — Native macOS Music Player">
+  <meta property="og:description" content="A fast, distraction-free YouTube Music & local audio player tucked right into your Mac’s menu bar.">
+  <meta property="og:image" content="https://mooziac.threeten.site/assets/MOOZIAC.png">
+  <meta property="og:image:width" content="1254">
+  <meta property="og:image:height" content="1254">
+  <meta property="og:image:type" content="image/png">
+
+  <!-- Twitter / X Card -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Mooziac — Native macOS Music Player">
+  <meta name="twitter:description" content="A fast, distraction-free YouTube Music & local audio player tucked right into your Mac’s menu bar.">
+  <meta name="twitter:image" content="https://mooziac.threeten.site/assets/MOOZIAC.png">
+
+  <!-- JSON-LD Structured Data for Google Sitelinks & Knowledge Graph -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://mooziac.threeten.site/#website",
+        "name": "Mooziac",
+        "url": "https://mooziac.threeten.site",
+        "description": "Native macOS menu bar music player for YouTube Music and local audio with trackpad gestures.",
+        "publisher": {
+          "@type": "Organization",
+          "name": "ThreeTen",
+          "url": "https://mooziac.threeten.site",
+          "sameAs": [
+            "https://github.com/shirkeharsh/mooziac"
+          ]
+        }
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://mooziac.threeten.site/#software",
+        "name": "Mooziac",
+        "operatingSystem": "macOS 13.0 or later",
+        "applicationCategory": "MultimediaApplication",
+        "url": "https://mooziac.threeten.site",
+        "downloadUrl": "https://mooziac.threeten.site/download.html",
+        "releaseNotes": "https://mooziac.threeten.site/changelog.html",
+        "softwareVersion": "1.0.1",
+        "featureList": [
+          "Trackpad edge volume control",
+          "Menu bar YouTube Music player",
+          "Synchronized lyrics HUD",
+          "FLAC, MP3, AAC and local audio playback",
+          "Discord Rich Presence",
+          "Ambient album tinting"
+        ],
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD",
+          "availability": "https://schema.org/InStock"
+        },
+        "description": "Native macOS YouTube Music and local audio player with trackpad edge gestures and synchronized lyrics.",
+        "author": {
+          "@type": "Organization",
+          "name": "ThreeTen",
+          "url": "https://mooziac.threeten.site"
+        }
+      }
+    ]
+  }
+  </script>
+
+  <!-- Core Stylesheets -->
+  <link rel="stylesheet" href="css/player2.css?v=2.5">
+  <link rel="stylesheet" href="css/theme.css?v=2.2">
+  <link rel="stylesheet" href="css/landing.css?v=2.5">
+  <link rel="stylesheet" href="css/cookie-banner.css?v=4.5">
+  <link rel="stylesheet" href="css/mooziac-chat.css?v=4.5">
+</head>
+<body class="theme-dark">
+
+  <!-- Ambient Background Layers -->
+  <div class="bg-grid"></div>
+  <div class="theme-orb"></div>
+
+  <!-- Navigation -->
+  <header class="site-nav">
+    <div class="header-inner">
+      <a href="#" class="brand" aria-label="Mooziac Home">
+        <div class="brand-logo-wrap">
+          <img src="assets/launch_transparent.png" alt="Mooziac Logo" class="nav-brand-img" id="navLogo">
+          <div class="music-wave-indicator" aria-hidden="true">
+            <span class="mbar b1"></span>
+            <span class="mbar b2"></span>
+            <span class="mbar b3"></span>
+            <span class="mbar b4"></span>
+          </div>
+        </div>
+      </a>
+    </div>
+  </header>
+
+  <main class="site">
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="eyebrow">
+          <i></i>
+          <span>Native macOS 13+ · Apple Silicon &amp; Intel</span>
+        </div>
+
+        <h1 class="hero-title">
+          <span class="gradient-word">The native macOS YouTube menu bar player</span>
+        </h1>
+
+        <p>
+          Mooziac is a fast, distraction-free YouTube Music &amp; local audio player tucked right into your Mac's menu bar. Real-time synced lyrics, 3D menu bar playback, and trackpad edge volume gestures.
+        </p>
+
+        <div class="hero-actions">
+          <a href="#download" class="primary-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>Download for Mac</span>
+          </a>
+
+          <a href="https://github.com/shirkeharsh/mooziac" target="_blank" rel="noopener noreferrer" class="github-btn">
+            <svg viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+            <span>GitHub</span>
+          </a>
+
+          <span class="micro-copy">macOS 13.0+ · Universal Binary</span>
+        </div>
+
+        <div class="hero-stats">
+          <div class="hstat">
+            <strong>Menubar App</strong>
+            <span>Zero Electron Bloat</span>
+          </div>
+          <div class="hstat">
+            <strong>Pure Swift &amp; AppKit</strong>
+            <span>100% Native Architecture</span>
+          </div>
+          <div class="hstat">
+            <strong>0% Telemetry</strong>
+            <span>Private &amp; Local SQLite</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3D Interactive Model Stage -->
+      <div class="player-stage">
+        <div class="orb"></div>
+        <div class="float-wrap">
+          <div class="stage" id="stage">
+            <!-- Toast Notification Banner -->
+            <div class="toast-banner" id="toastBanner" aria-live="polite">
+              <span class="toast-text" id="toastText"></span>
+            </div>
+            <!-- Floating Live Lyric Flow Bar (Just Above The Player) -->
+            <div class="floating-lyrics-bar lyrics-hidden" id="lyricsBar" aria-live="polite" title="Live Lyric Flow">
+              <span class="lyric-icon" id="lyricIcon">&#9835;</span>
+              <span class="lyric-line" id="lyricLine">&#9834; Live Lyric Flow</span>
+            </div>
+
+            <section class="mooziac-player" id="playerPill" aria-label="Mooziac Menu Bar Player">
+              <!-- Ambient Dynamic Glow Backdrop -->
+              <div class="ambient-glow" id="ambientGlow"></div>
+
+              <!-- Specular Optical Sheen (for Liquid Fluid Mode) -->
+              <div class="liquid-sheen" id="liquidSheen"></div>
+
+              <!-- ROW 1: Artwork + Title/Artist + Top Right Actions -->
+              <div class="top-row">
+                <div class="artwork-container" id="artworkContainer">
+                  <img id="artwork" class="artwork" alt="Album Artwork" src="" />
+                  <div class="artwork-glint"></div>
+                </div>
+
+                <div class="track-text">
+                  <div class="title" id="title">Not Playing</div>
+                  <div class="artist" id="artist">Mooziac Web Player</div>
+                </div>
+
+                <div class="top-actions">
+                  <span class="badge-hq" id="badgeHq">HQ</span>
+                  <button class="icon-button download-button" id="btnDownload" title="Download Song" aria-label="Download"></button>
+                  <button class="icon-button" id="btnFullscreen" title="Open Full Web Browser View" aria-label="Fullscreen"></button>
+                  <button class="icon-button" id="btnSettings" title="Player Settings &amp; Options" aria-label="Settings"></button>
+                </div>
+              </div>
+
+              <!-- ROW 2: Playback Controls & Expandable Search Bar -->
+              <div class="controls-row" id="controlsRow">
+                <div class="controls-stack" id="controlsStack">
+                  <button class="icon-button" id="btnPlaylist" title="Add to Playlist" aria-label="Add to Playlist"></button>
+                  <button class="icon-button" id="btnRepeat" title="Repeat Track / Playlist" aria-label="Repeat"></button>
+                  <button class="icon-button" id="btnPrev" title="Previous" aria-label="Previous"></button>
+                  <button class="play-button" id="btnPlay" title="Play/Pause" aria-label="Play/Pause"></button>
+                  <button class="icon-button" id="btnNext" title="Next" aria-label="Next"></button>
+                  <button class="icon-button like-button" id="btnLike" title="Like Track" aria-label="Like"></button>
+                  <button class="icon-button search-button" id="btnSearch" title="Search YouTube Music" aria-label="Search"></button>
+                </div>
+
+                <!-- Expandable Search Field: slides controls left and smoothly expands right -->
+                <div class="search-field-wrapper" id="searchWrapper">
+                  <div class="search-field-inner">
+                    <span class="search-inner-icon" id="searchInnerIcon"></span>
+                    <input type="text" class="search-input" id="searchInput" placeholder="Search YouTube Music..." autocomplete="off" spellcheck="false" />
+                    <button class="search-clear-btn" id="searchClearBtn" title="Clear search" aria-label="Clear">&times;</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ROW 3: Timeline Progress Seeker & Timecode -->
+              <div class="progress-row" id="progressRow">
+                <div class="seeker-container" id="seekerContainer" aria-label="Seek Progress">
+                  <!-- 1. 32-Bar Waveform -->
+                  <div class="waveform-view" id="waveform"></div>
+
+                  <!-- 2. Neon Glow Capsule -->
+                  <div class="neon-view" id="neonView" style="display:none">
+                    <div class="neon-track-bg"></div>
+                    <div class="neon-fill" id="neonFill">
+                      <div class="neon-core"></div>
+                      <div class="neon-head" id="neonHead"></div>
+                    </div>
+                  </div>
+
+                  <!-- 3. Cyber Dots Matrix -->
+                  <div class="cyber-view" id="cyberView" style="display:none"></div>
+
+                  <!-- 4. Minimal Precision Line -->
+                  <div class="minimal-view" id="minimalView" style="display:none">
+                    <div class="minimal-track-bg"></div>
+                    <div class="minimal-fill" id="minimalFill"></div>
+                  </div>
+                </div>
+                <div class="timecode" id="time">0:00 / 0:00</div>
+              </div>
+
+              <!-- DRAWER 1: Settings Panel (when 3 dots clicked) -->
+              <div class="settings-panel" id="settingsPanel">
+                <div class="settings-divider"></div>
+                <div class="settings-section-header">PLAYER PREFERENCES</div>
+
+                <div class="feature-rows-stack">
+                  <!-- 1. Player Themes Row -->
+                  <div class="feature-row" id="rowThemes">
+                    <div class="feature-icon" id="iconThemes"></div>
+                    <div class="feature-text">
+                      <div class="feature-title">Player Themes</div>
+                      <div class="feature-desc" id="themeDesc">Deep pitch-black dark contrast</div>
+                    </div>
+                    <div class="step-toggle" id="themeStepToggle" title="Click to cycle theme">
+                      <span class="step-dot" data-step="0" title="Adaptive"></span>
+                      <span class="step-dot active" data-step="1" title="OLED Dark"></span>
+                      <span class="step-dot" data-step="2" title="Crystal Glass"></span>
+                      <span class="step-dot" data-step="3" title="Watery Transparent"></span>
+                    </div>
+                  </div>
+
+                  <!-- 2. Timeline Track Row -->
+                  <div class="feature-row" id="rowProgressStyle">
+                    <div class="feature-icon" id="iconProgress"></div>
+                    <div class="feature-text">
+                      <div class="feature-title">Timeline Track</div>
+                      <div class="feature-desc" id="progressDesc">Dynamic 32-bar reactive waves</div>
+                    </div>
+                    <div class="step-toggle" id="progressStepToggle" title="Click to cycle seeker style">
+                      <span class="step-dot active" data-step="0" title="Waveform"></span>
+                      <span class="step-dot" data-step="1" title="Neon Glow"></span>
+                      <span class="step-dot" data-step="2" title="Cyber Dots"></span>
+                      <span class="step-dot" data-step="3" title="Minimal Line"></span>
+                    </div>
+                  </div>
+
+                  <!-- 3. Loudness Leveling Row -->
+                  <div class="feature-row">
+                    <div class="feature-icon" id="iconLoudness"></div>
+                    <div class="feature-text">
+                      <div class="feature-title">Loudness Leveling</div>
+                      <div class="feature-desc">Consistent volume across tracks</div>
+                    </div>
+                    <div class="capsule-toggle on" id="toggleLoudness" role="switch" aria-checked="true"></div>
+                  </div>
+
+                  <!-- 4. Edge Gestures Row -->
+                  <div class="feature-row">
+                    <div class="feature-icon" id="iconGestures"></div>
+                    <div class="feature-text">
+                      <div class="feature-title">Edge Gestures</div>
+                      <div class="feature-desc">Edge swipes and trackpad taps</div>
+                    </div>
+                    <div class="capsule-toggle on" id="toggleGestures" role="switch" aria-checked="true"></div>
+                  </div>
+
+                  <!-- 5. Live Lyric Flow Row -->
+                  <div class="feature-row">
+                    <div class="feature-icon" id="iconLyrics"></div>
+                    <div class="feature-text">
+                      <div class="feature-title">Live Lyric Flow</div>
+                      <div class="feature-desc">Realtime synchronized lyric bar</div>
+                    </div>
+                    <div class="capsule-toggle" id="toggleLyrics" role="switch" aria-checked="false"></div>
+                  </div>
+
+                  <!-- 6. Discord Status Row -->
+                  <div class="feature-row">
+                    <div class="feature-icon" id="iconDiscord"></div>
+                    <div class="feature-text">
+                      <div class="feature-title">Discord Status</div>
+                      <div class="feature-desc">Broadcast live track on Discord</div>
+                    </div>
+                    <div class="capsule-toggle on" id="toggleDiscord" role="switch" aria-checked="true"></div>
+                  </div>
+                </div>
+
+                <!-- Utility Link Bar -->
+                <div class="utility-bar">
+                  <a href="https://github.com/shirkeharsh/mooziac" target="_blank" rel="noopener noreferrer" class="utility-link" id="linkGitStar">Git Star</a>
+                  <span class="utility-version" id="lblVersion">v2.0.0</span>
+                  <a href="https://buymeacoffee.com/shirkeharsh" target="_blank" rel="noopener noreferrer" class="utility-link" id="linkSupport">Support</a>
+                </div>
+              </div>
+
+              <!-- DRAWER 2: Playlist & Library Drawer (when Playlist button clicked) -->
+              <div class="playlist-drawer" id="playlistDrawer">
+                <div class="settings-divider"></div>
+
+                <!-- Library Navigation 4 Tabs -->
+                <div class="library-nav">
+                  <button class="lib-tab active" data-tab="playlists">
+                    <span class="lib-tab-icon" id="tabIconPlaylists"></span>
+                    <span class="lib-tab-label">Playlists</span>
+                  </button>
+                  <button class="lib-tab" data-tab="liked">
+                    <span class="lib-tab-icon" id="tabIconLiked"></span>
+                    <span class="lib-tab-label">Liked</span>
+                  </button>
+                  <button class="lib-tab" data-tab="downloads">
+                    <span class="lib-tab-icon" id="tabIconDownloads"></span>
+                    <span class="lib-tab-label">Downloads</span>
+                  </button>
+                  <button class="lib-tab" data-tab="history">
+                    <span class="lib-tab-icon" id="tabIconHistory"></span>
+                    <span class="lib-tab-label">History</span>
+                  </button>
+                </div>
+
+                <!-- Library Search & Actions Header -->
+                <div class="library-action-row">
+                  <input type="text" class="library-search" id="libSearchInput" placeholder="Search your library…" />
+                  <div class="lib-actions-group">
+                    <button class="lib-ctrl-btn" id="btnLibPlayAll" title="Play All"></button>
+                    <button class="lib-ctrl-btn" id="btnLibShuffle" title="Shuffle"></button>
+                  </div>
+                </div>
+
+                <!-- Library Items Scroll List -->
+                <div class="library-list" id="libraryList"></div>
+
+                <button class="create-playlist-btn" id="btnCreatePlaylist">+  Create Playlist</button>
+              </div>
+
+            </section>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="hint">✨ Interactive 3D Model — Move cursor to tilt in 3D space. Click buttons to play &amp; customize.</div>
+
+    <!-- Features Section -->
+    <section class="section" id="features">
+      <div class="features-head">
+        <span class="kicker">Engineered For macOS</span>
+        <h2 class="features-title">
+          Everything you love. <span class="features-grad">Zero bloat.</span>
+        </h2>
+        <p class="features-sub">
+          Engineered natively with AppKit, WebKit, and CoreAudio for blistering speed and minimal battery footprint.
+        </p>
+      </div>
+
+      <div class="features-grid">
+        <!-- 1. Menu Bar -->
+        <div class="fcard" style="--ic:#fa4059">
+          <div class="ficon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="18" rx="3"/><line x1="2" y1="8" x2="22" y2="8"/><circle cx="5" cy="5.5" r="0.8" fill="currentColor"/><circle cx="8" cy="5.5" r="0.8" fill="currentColor"/><rect x="15" y="4.5" width="4" height="2" rx="1" fill="currentColor"/><rect x="7" y="12" width="10" height="4" rx="2" fill="none"/></svg>
+          </div>
+          <h3>Lives in Menu Bar</h3>
+          <p>Tucked neatly into the macOS status bar. Access your entire queue without switching spaces or juggling heavy desktop windows.</p>
+        </div>
+
+        <!-- 2. YouTube Music -->
+        <div class="fcard" style="--ic:#ff0033">
+          <div class="ficon">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm-2-7v5l4.5-2.5-4.5-2.5z"/></svg>
+          </div>
+          <h3>YouTube Music Sync</h3>
+          <p>Sign in securely with standard Google session cookies. Sync all your Liked Songs, artist albums, and custom playlists instantly.</p>
+        </div>
+
+        <!-- 3. Trackpad Gestures -->
+        <div class="fcard" style="--ic:#38ef7d">
+          <div class="ficon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><line x1="17.5" y1="4" x2="17.5" y2="20" stroke-dasharray="2 2" stroke-width="1.8"/><polyline points="15 8.5 17.5 6 20 8.5"/><polyline points="15 15.5 17.5 18 20 15.5"/><line x1="17.5" y1="6" x2="17.5" y2="18" stroke-width="2"/></svg>
+          </div>
+          <h3>Trackpad Edge Gestures</h3>
+          <p>Slide your finger along the far-right 1mm edge of your MacBook trackpad to adjust volume with realistic tactile haptic feedback.</p>
+        </div>
+
+        <!-- 4. Synced Lyrics -->
+        <div class="fcard" style="--ic:#ffd166">
+          <div class="ficon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3" fill="currentColor"/><circle cx="18" cy="16" r="3" fill="currentColor"/><line x1="3" y1="8" x2="7" y2="8"/><line x1="3" y1="12" x2="6" y2="12"/></svg>
+          </div>
+          <h3>Synchronized Lyrics</h3>
+          <p>Real-time scrolling lyrics synced directly with your tracks via LRCLib and Lyrics.ovh for an effortless sing-along experience.</p>
+        </div>
+
+        <!-- 5. Discord Rich Presence -->
+        <div class="fcard" style="--ic:#5865F2">
+          <div class="ficon">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+          </div>
+          <h3>Discord Rich Presence</h3>
+          <p>Share your music live on Discord. Displays your currently playing song, artist, album artwork, and time remaining automatically.</p>
+        </div>
+
+        <!-- 6. 100% Private & Local -->
+        <div class="fcard" style="--ic:#00e5ff">
+          <div class="ficon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+          </div>
+          <h3>100% Private &amp; Local</h3>
+          <p>Zero tracking SDKs, zero ads, and zero server telemetry. Your favorites and listening history stay locked in your local SQLite database.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- User Feedback / Testimonials Section -->
+    <section class="section" id="feedback">
+      <div class="section-head">
+        <span class="kicker">User Feedback</span>
+        <h2 class="section-title">What People Are <span class="grad2">Saying</span></h2>
+        <p class="section-sub">Real words from real people running Mooziac on their Macs.</p>
+      </div>
+
+      <div class="reviews" id="reviews">
+        <div class="reviews-grid" id="reviewsGrid">
+
+          <article class="review-card">
+            <div class="stars" aria-label="5 out of 5 stars">★★★★★</div>
+            <p>&ldquo;The trackpad edge volume control is such a clever idea. Also really appreciate that it&rsquo;s native and not another Electron wrapper 😄&rdquo;</p>
+            <div class="review-by">
+              <div class="avatar">ZE</div>
+              <div>
+                <b>Ze*********</b>
+                <span>Early Tester</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="review-card">
+            <div class="stars" aria-label="5 out of 5 stars">★★★★★</div>
+            <p>&ldquo;The ambient album tint in the menu bar and synced lyrics HUD look gorgeous. Always looking for lightweight alternatives for YouTube Music excited to give this a run!&rdquo;</p>
+            <div class="review-by">
+              <div class="avatar">SA</div>
+              <div>
+                <b>sa*********</b>
+                <span>GNOME / Linux User</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="review-card">
+            <div class="stars" aria-label="5 out of 5 stars">★★★★★</div>
+            <p>&ldquo;Soy usuario linux con gnome pero me encanta!, ojala existiera algo asi de bueno en linux, las que existen no se ven igual de bonitas, robustas y optimizadas. Muchas felicidades!&rdquo;</p>
+            <div class="review-by">
+              <div class="avatar">SE</div>
+              <div>
+                <b>se*********</b>
+                <span>Local Playback Fan</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="review-card">
+            <div class="stars" aria-label="5 out of 5 stars">★★★★★</div>
+            <p>&ldquo;Nice, a native menu bar player with local playback is right up my street.&rdquo;</p>
+            <div class="review-by">
+              <div class="avatar">MR</div>
+              <div>
+                <b>-mr*******</b>
+                <span>Menu Bar Minimalist</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="review-card">
+            <div class="stars" aria-label="5 out of 5 stars">★★★★★</div>
+            <p>&ldquo;looks pretty nice! also cool how you present the player on the website with some interactable elements.&rdquo;</p>
+            <div class="review-by">
+              <div class="avatar">JU</div>
+              <div>
+                <b>Ju*********</b>
+                <span>First-Time Visitor</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="review-card review-cta">
+            <div class="stars" aria-hidden="true">★★★★★</div>
+            <p>Enjoying Mooziac? Drop us a star rating and a sentence &mdash; it genuinely helps other people find the app.</p>
+            <div class="review-by">
+              <a class="review-cta-btn" href="support.html">Share your feedback</a>
+            </div>
+          </article>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- Download Section -->
+    <section class="section" id="download">
+      <div class="dl-panel">
+        <div class="dl-glow"></div>
+        <div class="dl-logo">
+          <img src="assets/launch_transparent.png" alt="Mooziac Logo" id="dlLogo">
+        </div>
+        
+        <h2 class="dl-title">Get Mooziac for Mac</h2>
+        <p class="dl-sub">Download the latest DMG release or compile from source. 100% free and open source under the MIT License.</p>
+        
+        <div class="dl-actions">
+          <a href="https://github.com/shirkeharsh/mooziac/releases/latest/download/Mooziac.dmg" class="primary-btn dl-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>Download for macOS (.dmg)</span>
+          </a>
+
+          <div class="dl-stats-badge">
+            <div class="dl-stats-dot-wrap">
+              <span class="dl-stats-dot-ping"></span>
+              <span class="dl-stats-dot"></span>
+            </div>
+            <div class="dl-stats-text">
+              <strong class="dl-stats-num" id="liveTotalDownloadsCount">1,069+</strong>
+              <span class="dl-stats-label">Total Downloads</span>
+            </div>
+          </div>
+
+          <!-- First-Time Installation Terminal Command -->
+          <div class="dl-cmd-card" style="margin-top: 18px; width: 100%; max-width: 480px; background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 12px 14px; text-align: left; box-sizing: border-box;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px;">
+              <span style="font-size: 11.5px; font-weight: 600; color: rgba(255, 255, 255, 0.7); display: flex; align-items: center; gap: 6px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 6-6-6-6"/><path d="M12 19h8"/></svg>
+                First-time launch command (if blocked by macOS):
+              </span>
+              <span style="font-size: 10px; color: #30D158; background: rgba(48, 209, 88, 0.12); padding: 2px 7px; border-radius: 999px; border: 1px solid rgba(48, 209, 88, 0.3); font-weight: 700;">Terminal</span>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 7px 10px;">
+              <code style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; color: #38ef7d; word-break: break-all;">xattr -cr /Applications/Mooziac.app</code>
+              <button type="button" onclick="copyInstallCmd(this)" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; border-radius: 6px; padding: 4px 9px; font-size: 11px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s ease; flex-shrink: 0;" aria-label="Copy Command">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                <span>Copy</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="dl-links">
+            <a href="https://github.com/shirkeharsh/mooziac" target="_blank" rel="noopener noreferrer">View on GitHub</a>
+            <a href="https://github.com/shirkeharsh/mooziac/releases" target="_blank" rel="noopener noreferrer">Release Notes</a>
+            <a href="https://github.com/shirkeharsh/mooziac/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>
+            <a href="privacy.html">Privacy Policy</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Semantic Footer with Crawlable Sitelink Navigation -->
+  <footer class="footer">
+    <div class="footer-container" style="max-width: 1080px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 16px;">
+      <nav class="footer-nav" aria-label="Footer Navigation" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 24px; font-weight: 500; font-size: 13px;">
+        <a href="download.html" style="color: rgba(255, 255, 255, 0.75); text-decoration: none; transition: color 0.2s ease;">Download</a>
+        <a href="changelog.html" style="color: rgba(255, 255, 255, 0.75); text-decoration: none; transition: color 0.2s ease;">Changelog</a>
+        <a href="support.html" style="color: rgba(255, 255, 255, 0.75); text-decoration: none; transition: color 0.2s ease;">Support</a>
+        <a href="privacy.html" style="color: rgba(255, 255, 255, 0.75); text-decoration: none; transition: color 0.2s ease;">Privacy</a>
+        <a href="terms.html" style="color: rgba(255, 255, 255, 0.75); text-decoration: none; transition: color 0.2s ease;">Terms</a>
+        <a href="https://github.com/shirkeharsh/mooziac" target="_blank" rel="noopener noreferrer" style="color: rgba(255, 255, 255, 0.75); text-decoration: none; transition: color 0.2s ease;">GitHub</a>
+      </nav>
+      <span style="font-size: 11.5px; color: var(--ld-faint); letter-spacing: 0.2px;">&copy; 2026 Mooziac · Built by ThreeTen · Released under the MIT License</span>
+    </div>
+  </footer>
+
+  <!-- Interactive JavaScript Libraries -->
+  <script src="js/vendor/gsap.min.js"></script>
+  <script src="js/vendor/ScrollTrigger.min.js"></script>
+  <script src="js/vendor/anime.min.js"></script>
+  <script src="js/player2.js?v=2.5"></script>
+  <script src="js/landing.js?v=2.2"></script>
+
+  <!-- Secure Server-Side Download Event Logger -->
+  <script>
+    (function() {
+      function logDownload(event) {
+        try {
+          const target = event.currentTarget || event.target;
+          const btnText = (target.textContent || '').trim().replace(/\s+/g, ' ') || 'Download Button';
+          const section = target.closest('section')?.id ||
+                          target.closest('header')?.className ||
+                          target.closest('.hero')?.className ||
+                          (target.closest('.mooziac-player') ? '3D Player Pill' : 'Landing Page');
+
+          const payload = {
+            btnText: btnText,
+            section: section,
+            platform: navigator.platform || 'macOS',
+            language: navigator.language || 'en',
+            screenRes: `${window.screen.width}x${window.screen.height}`,
+            referrer: document.referrer || 'Direct Visit',
+            userAgent: (navigator.userAgent || 'Unknown').slice(0, 250)
+          };
+
+          fetch('/api/download-alert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            keepalive: true
+          }).catch(function() {});
+        } catch (e) {}
+      }
+
+      document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('a[href*=".dmg"], a[href*="releases/latest/download"], #btnDownload, .nav-cta, .dl-btn').forEach(function(btn) {
+          btn.addEventListener('click', logDownload, { passive: true });
+        });
+      });
+    })();
+  </script>
+
+  <!-- Live GitHub Fast-Forwarding Counter Animation & Ecosystem Synchronizer -->
+  <style>
+    .dl-stats-badge {
+      margin-top: 15px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 7px 18px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
+    }
+    .dl-stats-badge:hover {
+      transform: translateY(-1px);
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.04) 100%);
+      border-color: rgba(255, 255, 255, 0.24);
+      box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 0 20px rgba(48, 209, 88, 0.12);
+    }
+    .dl-stats-dot-wrap {
+      position: relative;
+      width: 8px;
+      height: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .dl-stats-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #30D158;
+      box-shadow: 0 0 8px #30D158, 0 0 2px #30D158;
+      position: relative;
+      z-index: 1;
+    }
+    .dl-stats-dot-ping {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: rgba(48, 209, 88, 0.6);
+      animation: liveDotPing 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+    }
+    @keyframes liveDotPing {
+      0% { transform: scale(1); opacity: 0.8; }
+      60%, 100% { transform: scale(2.8); opacity: 0; }
+    }
+    .dl-stats-text {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 6px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.72);
+      letter-spacing: 0.1px;
+    }
+    .dl-stats-num {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-weight: 700;
+      color: #ffffff;
+      font-size: 0.92rem;
+      letter-spacing: -0.2px;
+    }
+    .dl-stats-label {
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.68);
+      letter-spacing: 0.12px;
+    }
+    @keyframes counterGlowPulse {
+      0% { text-shadow: 0 0 0 rgba(48, 209, 88, 0); transform: scale(1); }
+      50% { text-shadow: 0 0 16px rgba(48, 209, 88, 0.9), 0 0 30px rgba(48, 209, 88, 0.4); transform: scale(1.12); color: #30D158; }
+      100% { text-shadow: 0 0 8px rgba(48, 209, 88, 0.5); transform: scale(1); color: #ffffff; }
+    }
+    .counter-fast-forwarding {
+      display: inline-block;
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s ease;
+      font-variant-numeric: tabular-nums;
+    }
+    .counter-landing-burst {
+      animation: counterGlowPulse 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+
+  <script>
+    (function() {
+      // Universal Ecosystem: 965 Git Clones + 25 Web Mirrors + 25 Legacy Releases = 1,015 Base
+      const HISTORICAL_BASE_COUNT = 1015;
+      const MINIMUM_FLOOR = 1069;
+
+      // Load cached peak to ensure numbers never regress if older releases are deleted
+      let cachedPeak = MINIMUM_FLOOR;
+      try {
+        const stored = parseInt(localStorage.getItem('mooziac_peak_downloads'), 10);
+        if (!isNaN(stored) && stored >= MINIMUM_FLOOR) {
+          cachedPeak = stored;
+        }
+      } catch (e) {}
+
+      let targetCount = cachedPeak;
+      let currentAnimatedValue = 0;
+      let hasAnimated = false;
+
+      function animateFastForwardCount(target) {
+        const countEl = document.getElementById('liveTotalDownloadsCount');
+        if (!countEl) return;
+        
+        targetCount = target;
+        countEl.classList.add('counter-fast-forwarding');
+        
+        const duration = 1800; // 1.8s smooth rolling fast-forward
+        const startTime = performance.now();
+        const startValue = currentAnimatedValue > 0 ? currentAnimatedValue : 0;
+
+        function updateFrame(currentTime) {
+          const elapsed = currentTime - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          
+          // Exponential ease-out curve for fast initial roll and smooth deceleration
+          const easeOutExpo = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+          const currentVal = Math.round(startValue + (targetCount - startValue) * easeOutExpo);
+          
+          countEl.textContent = currentVal.toLocaleString();
+
+          if (progress < 1) {
+            requestAnimationFrame(updateFrame);
+          } else {
+            countEl.textContent = targetCount.toLocaleString() + '+';
+            currentAnimatedValue = targetCount;
+            countEl.classList.remove('counter-landing-burst');
+            void countEl.offsetWidth; // Trigger reflow for animation
+            countEl.classList.add('counter-landing-burst');
+          }
+        }
+
+        requestAnimationFrame(updateFrame);
+      }
+
+      async function syncLiveEcosystemStats() {
+        const countEl = document.getElementById('liveTotalDownloadsCount');
+        if (!countEl) return;
+
+        // Trigger animation when badge scrolls into view or on direct load
+        const badge = document.querySelector('.dl-stats-badge') || countEl;
+        if ('IntersectionObserver' in window) {
+          const observer = new IntersectionObserver(function(entries) {
+            entries.forEach(function(entry) {
+              if (entry.isIntersecting && !hasAnimated) {
+                hasAnimated = true;
+                animateFastForwardCount(targetCount);
+              }
+            });
+          }, { threshold: 0.15 });
+          observer.observe(badge);
+        } else {
+          hasAnimated = true;
+          animateFastForwardCount(targetCount);
+        }
+
+        try {
+          const res = await fetch('https://api.github.com/repos/shirkeharsh/mooziac/releases', {
+            headers: { 'Accept': 'application/vnd.github.v3+json' }
+          });
+          if (res.ok) {
+            const releases = await res.json();
+            if (Array.isArray(releases)) {
+              let activeReleasesDownloads = 0;
+              releases.forEach(function(rel) {
+                (rel.assets || []).forEach(function(asset) {
+                  if (typeof asset.download_count === 'number') {
+                    activeReleasesDownloads += asset.download_count;
+                  }
+                });
+              });
+
+              // Cumulative downloads: historical base + all active release asset downloads
+              const calculatedTotal = HISTORICAL_BASE_COUNT + activeReleasesDownloads;
+              const finalTotal = Math.max(MINIMUM_FLOOR, cachedPeak, calculatedTotal);
+
+              if (finalTotal > cachedPeak) {
+                cachedPeak = finalTotal;
+                try {
+                  localStorage.setItem('mooziac_peak_downloads', finalTotal.toString());
+                } catch (e) {}
+              }
+
+              if (finalTotal > targetCount || !hasAnimated) {
+                targetCount = finalTotal;
+                if (hasAnimated) {
+                  animateFastForwardCount(targetCount);
+                }
+              }
+            }
+          }
+        } catch (e) {}
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', syncLiveEcosystemStats);
+      } else {
+        syncLiveEcosystemStats();
+      }
+    })();
+  </script>
+
+  <!-- Staggered Scroll-Reveal for the User Feedback Cards -->
+  <script>
+    (function() {
+      const root = document.getElementById('reviews');
+      if (!root) return;
+
+      // Query the wrapper, not the inner grid — the CTA bar sits
+      // outside .reviews-grid and must be revealed too.
+      const cards = Array.prototype.slice.call(root.querySelectorAll('.review-card'));
+      if (!cards.length) return;
+
+      const prefersReducedMotion = window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      function revealAll() {
+        cards.forEach(function(card, i) {
+          card.style.setProperty('--reveal-delay', (i * 90) + 'ms');
+          card.classList.add('is-revealed');
+        });
+      }
+
+      if (prefersReducedMotion || !('IntersectionObserver' in window)) {
+        revealAll();
+        return;
+      }
+
+      let hasRevealed = false;
+      const observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+          if (entry.isIntersecting && !hasRevealed) {
+            hasRevealed = true;
+            revealAll();
+            observer.disconnect();
+          }
+        });
+      }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+
+      observer.observe(root);
+    })();
+  </script>
+
+  <!-- Mooziac Privacy Consent & AI Support Widget -->
+  <script src="js/cookie-banner.js?v=4.5"></script>
+  <script src="js/mooziac-chat.js?v=5.0"></script>
+</body>
+</html>

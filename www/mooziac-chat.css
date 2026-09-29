@@ -1,0 +1,901 @@
+/* =========================================================
+   MOOZIAC LIQUID GLASS SUPPORT WIDGET (mooziac-chat.css)
+   Pure Apple-Style Liquid Glassmorphism & Minimalist Design
+   ========================================================= */
+
+:root {
+  --mzc-glass-bg: rgba(18, 18, 22, 0.78);
+  --mzc-glass-surface: rgba(255, 255, 255, 0.05);
+  --mzc-glass-hover: rgba(255, 255, 255, 0.09);
+  --mzc-border: rgba(255, 255, 255, 0.12);
+  --mzc-border-light: rgba(255, 255, 255, 0.18);
+  --mzc-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 1px 0 rgba(255, 255, 255, 0.12) inset;
+  
+  /* Neutral / Blue Accent */
+  --mzc-accent: #3b82f6;
+  --mzc-accent-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  --mzc-green: #10b981;
+  --mzc-amber: #f59e0b;
+
+  --mzc-txt-main: #ffffff;
+  --mzc-txt-mut: rgba(255, 255, 255, 0.65);
+  --mzc-txt-faint: rgba(255, 255, 255, 0.4);
+  --mzc-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", system-ui, sans-serif;
+  --mzc-radius: 20px;
+}
+
+/* Base Widget Container */
+.mzc-widget-root {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 999999;
+  font-family: var(--mzc-font);
+  color: var(--mzc-txt-main);
+  -webkit-font-smoothing: antialiased;
+  pointer-events: none;
+}
+
+.mzc-widget-root * {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Floating Launcher Pill */
+.mzc-launcher {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--mzc-glass-bg);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid var(--mzc-border-light);
+  padding: 10px 18px 10px 14px;
+  border-radius: 40px;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  user-select: none;
+  pointer-events: auto;
+}
+
+.mzc-launcher:hover {
+  transform: translateY(-2px);
+  background: rgba(26, 26, 32, 0.88);
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.mzc-launcher-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.mzc-launcher-label {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.2px;
+}
+
+/* Main Chat Window (Liquid Glass) */
+.mzc-window {
+  display: none !important;
+  width: 375px;
+  height: 520px;
+  background: var(--mzc-glass-bg);
+  backdrop-filter: blur(40px) saturate(190%);
+  -webkit-backdrop-filter: blur(40px) saturate(190%);
+  border: 1px solid var(--mzc-border);
+  border-radius: var(--mzc-radius);
+  box-shadow: var(--mzc-shadow);
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  animation: mzc-pop-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  pointer-events: none;
+}
+
+.mzc-widget-root.mzc-is-open {
+  pointer-events: auto;
+}
+
+.mzc-widget-root.mzc-is-open .mzc-window {
+  display: flex !important;
+  pointer-events: auto;
+}
+
+.mzc-widget-root.mzc-is-open .mzc-launcher {
+  display: none !important;
+}
+
+@keyframes mzc-pop-in {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Toast Alert Bar (Non-intrusive rate limits & hints) */
+.mzc-toast {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 15, 18, 0.92);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 500;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  animation: mzc-fade-in 0.2s ease-out;
+  white-space: nowrap;
+}
+
+@keyframes mzc-fade-in {
+  from { opacity: 0; transform: translate(-50%, -6px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* Minimalist Glass Header */
+.mzc-header {
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--mzc-border);
+}
+
+.mzc-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mzc-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--mzc-glass-surface);
+  border: 1px solid var(--mzc-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  position: relative;
+}
+
+.mzc-online-dot {
+  position: absolute;
+  bottom: 0px;
+  right: 0px;
+  width: 8.5px;
+  height: 8.5px;
+  border-radius: 50%;
+  background: var(--mzc-green);
+  border: 2px solid #141418;
+}
+
+.mzc-online-dot.offline {
+  background: var(--mzc-amber);
+}
+
+.mzc-profile-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.mzc-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  color: #fff;
+}
+
+.mzc-status {
+  font-size: 11px;
+  color: var(--mzc-txt-mut);
+}
+
+.mzc-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mzc-action-btn {
+  background: transparent;
+  border: none;
+  color: var(--mzc-txt-mut);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.mzc-action-btn:hover {
+  background: var(--mzc-glass-hover);
+  color: #fff;
+}
+
+/* Messages Feed */
+.mzc-messages {
+  flex: 1 1 0%;
+  padding: 16px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  scroll-behavior: smooth;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.mzc-messages::-webkit-scrollbar {
+  width: 4px;
+}
+
+.mzc-messages::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+/* WhatsApp / iMessage Style Bubble Containers */
+.mzc-msg {
+  display: flex;
+  flex-direction: column;
+  max-width: 82%;
+  width: fit-content;
+  min-width: 48px;
+  box-sizing: border-box;
+}
+
+.mzc-msg.bot {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.mzc-msg.user {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.mzc-bubble {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  padding: 10px 14px;
+  border-radius: 18px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  letter-spacing: -0.1px;
+  position: relative;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  white-space: normal;
+  box-sizing: border-box;
+}
+
+.mzc-bubble p {
+  margin: 0;
+  padding: 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.mzc-bubble p + p {
+  margin-top: 6px;
+}
+
+.mzc-msg.bot .mzc-bubble {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  color: #fff;
+  border-bottom-left-radius: 4px;
+}
+
+.mzc-msg.user .mzc-bubble {
+  background: #007AFF;
+  background: var(--mzc-accent-gradient);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.mzc-time {
+  font-size: 10px;
+  color: var(--mzc-txt-faint);
+  margin-top: 3px;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+.mzc-msg.bot .mzc-time {
+  align-self: flex-start;
+}
+
+.mzc-msg.user .mzc-time {
+  align-self: flex-end;
+}
+
+/* Quick Issue Options Group */
+.mzc-options-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.mzc-option-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 8px 12px;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+  user-select: none;
+}
+
+.mzc-option-pill:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.mzc-option-pill:active {
+  transform: scale(0.98);
+}
+
+.mzc-time {
+  font-size: 9.5px;
+  color: var(--mzc-txt-faint);
+  margin-top: 4px;
+  align-self: flex-start;
+}
+
+.mzc-msg.user .mzc-time {
+  align-self: flex-end;
+}
+
+/* Embedded Media / Screenshots */
+.mzc-bubble-img {
+  display: block;
+  max-width: 100%;
+  max-height: 190px;
+  border-radius: 10px;
+  margin-top: 6px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.mzc-bubble-img:hover {
+  opacity: 0.9;
+}
+
+/* Offline Ticket Card (Minimalist Glass) */
+.mzc-offline-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--mzc-border);
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.mzc-offline-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.mzc-offline-desc {
+  font-size: 11.5px;
+  color: var(--mzc-txt-mut);
+}
+
+.mzc-offline-form {
+  display: flex;
+  gap: 6px;
+}
+
+.mzc-offline-input {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--mzc-border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: #fff;
+  font-size: 12px;
+  outline: none;
+}
+
+.mzc-offline-input:focus {
+  border-color: var(--mzc-accent);
+}
+
+.mzc-offline-btn {
+  background: var(--mzc-accent);
+  color: #fff;
+  border: none;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.mzc-offline-btn:hover {
+  opacity: 0.9;
+}
+
+.mzc-offline-success {
+  font-size: 11.5px;
+  color: var(--mzc-green);
+  line-height: 1.4;
+}
+
+/* Typing Indicator */
+.mzc-typing {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  margin-left: 4px;
+  margin-bottom: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  width: fit-content;
+}
+
+.mzc-typing-dot {
+  width: 4.5px;
+  height: 4.5px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  animation: mzc-blink 1.4s infinite ease-in-out;
+}
+
+.mzc-typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.mzc-typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes mzc-blink {
+  0%, 100% { opacity: 0.3; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+/* Attachment Preview Strip */
+.mzc-preview-bar {
+  display: flex;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(0, 0, 0, 0.4);
+  border-top: 1px solid var(--mzc-border);
+  overflow-x: auto;
+}
+
+.mzc-preview-chip {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  border: 1px solid var(--mzc-border-light);
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #000;
+}
+
+.mzc-preview-chip img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mzc-preview-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  border: none;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* Minimal Input Bar */
+.mzc-input-bar {
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.3);
+  border-top: 1px solid var(--mzc-border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mzc-attach-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--mzc-border);
+  color: var(--mzc-txt-mut);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.mzc-attach-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.mzc-input-field {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--mzc-border);
+  border-radius: 20px;
+  padding: 8px 14px;
+  color: #fff;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.mzc-input-field:focus {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.mzc-input-field::placeholder {
+  color: var(--mzc-txt-faint);
+}
+
+.mzc-send-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--mzc-accent);
+  border: none;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.mzc-send-btn:hover {
+  opacity: 0.9;
+  transform: scale(1.04);
+}
+
+/* =========================================================
+   NATIVE iOS / MOBILE MESSENGER STYLING (@media max-width: 640px)
+   ========================================================= */
+@media (max-width: 640px) {
+  body.mzc-chat-locked {
+    overflow: hidden !important;
+    touch-action: none !important;
+  }
+
+  /* Fixed Floating Launcher Button in Bottom-Right */
+  .mzc-widget-root {
+    position: fixed !important;
+    bottom: max(20px, env(safe-area-inset-bottom)) !important;
+    right: 16px !important;
+    left: auto !important;
+    top: auto !important;
+    width: auto !important;
+    height: auto !important;
+    z-index: 999999 !important;
+    pointer-events: none !important;
+    transition: bottom 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  }
+
+  /* When Cookie Banner is visible on mobile, float support button cleanly above it */
+  body.mzc-has-cookie-banner .mzc-widget-root {
+    bottom: calc(max(14px, env(safe-area-inset-bottom)) + 125px) !important;
+  }
+
+  .mzc-widget-root.mzc-is-open {
+    bottom: 0 !important;
+  }
+
+  .mzc-launcher {
+    pointer-events: auto !important;
+    display: flex !important;
+    padding: 8px 16px 8px 12px;
+    border-radius: 30px;
+    gap: 6px;
+    background: rgba(22, 22, 28, 0.92);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  }
+
+  .mzc-launcher-icon svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .mzc-launcher-label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: -0.2px;
+  }
+
+  .mzc-window {
+    display: none !important;
+    pointer-events: none !important;
+  }
+
+  /* Full Screen Mobile Window (Native iOS Messages Layout) */
+  .mzc-widget-root.mzc-is-open {
+    position: fixed !important;
+    inset: 0 !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    width: 100% !important;
+    height: 100dvh !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    z-index: 9999999 !important;
+    overflow: hidden;
+    pointer-events: auto !important;
+    transform: none !important;
+  }
+
+  .mzc-widget-root.mzc-is-open .mzc-launcher {
+    display: none !important;
+  }
+
+  .mzc-widget-root.mzc-is-open .mzc-window {
+    width: 100% !important;
+    height: 100% !important;
+    height: 100dvh !important;
+    max-height: 100% !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: rgba(14, 14, 18, 0.98) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    pointer-events: auto !important;
+    animation: none !important;
+    transform: none !important;
+  }
+
+  /* Native Apple Style Navigation Header */
+  .mzc-header {
+    padding-top: max(16px, env(safe-area-inset-top)) !important;
+    padding-bottom: 12px !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    background: rgba(22, 22, 28, 0.92) !important;
+    backdrop-filter: blur(30px) saturate(190%) !important;
+    -webkit-backdrop-filter: blur(30px) saturate(190%) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    flex-shrink: 0;
+  }
+
+  .mzc-avatar {
+    width: 34px !important;
+    height: 34px !important;
+    font-size: 16px !important;
+  }
+
+  .mzc-name {
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.2px;
+  }
+
+  .mzc-status {
+    font-size: 11px !important;
+    color: rgba(255, 255, 255, 0.55) !important;
+  }
+
+  .mzc-action-btn {
+    width: 32px !important;
+    height: 32px !important;
+    background: rgba(255, 255, 255, 0.1) !important;
+    border-radius: 50% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .mzc-action-btn svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+
+  /* Native Messages Feed */
+  .mzc-messages {
+    flex: 1 1 0% !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior: contain !important;
+    padding: 16px 14px !important;
+    gap: 10px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .mzc-msg {
+    max-width: 85% !important;
+    width: fit-content !important;
+    min-width: 48px !important;
+    box-sizing: border-box !important;
+  }
+
+  .mzc-msg.bot {
+    align-self: flex-start !important;
+    align-items: flex-start !important;
+  }
+
+  .mzc-msg.user {
+    align-self: flex-end !important;
+    align-items: flex-end !important;
+  }
+
+  /* WhatsApp / iOS Messenger Bubble Geometry */
+  .mzc-bubble {
+    font-size: 14.5px !important;
+    line-height: 1.45 !important;
+    padding: 10px 14px !important;
+    border-radius: 18px !important;
+    width: fit-content !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    word-wrap: break-word !important;
+    white-space: normal !important;
+  }
+
+  .mzc-bubble p {
+    margin: 0 !important;
+    padding: 0 !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    word-wrap: break-word !important;
+    white-space: pre-wrap !important;
+  }
+
+  .mzc-bubble p + p {
+    margin-top: 6px !important;
+  }
+
+  .mzc-msg.user .mzc-bubble {
+    background: #0A84FF !important;
+    color: #ffffff !important;
+    border-radius: 18px 18px 4px 18px !important;
+    border: none !important;
+    box-shadow: 0 2px 8px rgba(10, 132, 255, 0.3) !important;
+  }
+
+  .mzc-msg.bot .mzc-bubble {
+    background: rgba(255, 255, 255, 0.12) !important;
+    color: #ffffff !important;
+    border-radius: 18px 18px 18px 4px !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  }
+
+  .mzc-time {
+    font-size: 10.5px !important;
+    color: rgba(255, 255, 255, 0.45) !important;
+    margin-top: 3px !important;
+    padding: 0 4px !important;
+    white-space: nowrap !important;
+  }
+
+  .mzc-msg.bot .mzc-time {
+    align-self: flex-start !important;
+  }
+
+  .mzc-msg.user .mzc-time {
+    align-self: flex-end !important;
+  }
+
+  .mzc-option-pill {
+    padding: 10px 13px !important;
+    font-size: 12.5px !important;
+    border-radius: 12px !important;
+    background: rgba(255, 255, 255, 0.09) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  }
+
+  /* Native Bottom Composer Bar */
+  .mzc-input-bar {
+    padding-top: 10px !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+    padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
+    background: rgba(22, 22, 28, 0.95) !important;
+    backdrop-filter: blur(30px) saturate(190%) !important;
+    -webkit-backdrop-filter: blur(30px) saturate(190%) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+    gap: 8px !important;
+    flex-shrink: 0;
+  }
+
+  .mzc-input-field {
+    font-size: 16px !important;
+    padding: 9px 14px !important;
+    border-radius: 22px !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    color: #ffffff !important;
+  }
+
+  .mzc-attach-btn {
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 50% !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: #0A84FF !important;
+  }
+
+  .mzc-send-btn {
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 50% !important;
+    background: #0A84FF !important;
+    color: #ffffff !important;
+  }
+}

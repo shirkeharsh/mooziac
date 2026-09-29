@@ -1,0 +1,1286 @@
+/* =========================================================
+   MOOZIAC WEB PLAYER — EXACT DITTO STYLING
+   1:1 macOS Menu Bar Player Specification
+   =========================================================
+
+   EMBEDDED IN THE LANDING PAGE.
+   All rules are scoped under .player-stage / .stage so this
+   stylesheet cannot leak into the rest of the site.
+   The document-level reset and body background are owned by
+   css/theme.css and css/landing.css — do not re-declare them here.
+   ========================================================= */
+
+.player-stage {
+  color-scheme: dark;
+  --bg-pill: rgba(20, 20, 26, 0.98);
+  --border-pill: rgba(255, 255, 255, 0.15);
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.70);
+  --text-tertiary: rgba(255, 255, 255, 0.55);
+  --icon-tint: rgba(255, 255, 255, 0.85);
+  --icon-play: #ffffff;
+  --accent: #00d9ff;
+  --ambient-color: rgba(0, 217, 255, 0.35);
+  --divider-color: rgba(255, 255, 255, 0.10);
+  --row-hover-bg: rgba(255, 255, 255, 0.06);
+  --input-bg: rgba(255, 255, 255, 0.08);
+  --input-border: rgba(255, 255, 255, 0.14);
+}
+
+/* =========================================================
+   STAGE & 3D PERSPECTIVE WRAPPER
+   ========================================================= */
+.stage {
+  width: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  perspective: 1100px;
+  position: relative;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Inter, sans-serif;
+  color: var(--text-primary);
+}
+
+/* =========================================================
+   FLOATING NOTIFICATION TOAST BANNER
+   ========================================================= */
+.toast-banner {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-10px);
+  background: rgba(25, 25, 32, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.20);
+  border-radius: 12px;
+  padding: 5px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(14px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.2, 0.9, 0.3, 1);
+  z-index: 1000;
+}
+
+.toast-banner.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* =========================================================
+   FLOATING LIVE LYRIC FLOW BAR (Just Above Player)
+   1:1 CenteredMenuBarLyricsWindowController.swift reproduction
+   ========================================================= */
+.floating-lyrics-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 340px;
+  height: 28px;
+  padding: 0 14px;
+  margin-bottom: 12px;
+  border-radius: 999px;
+  background: rgba(18, 18, 24, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.40);
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transform: translateY(0);
+  opacity: 1;
+  transition:
+    opacity 0.28s ease,
+    transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1),
+    height 0.28s ease,
+    margin-bottom 0.28s ease,
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease;
+  z-index: 50;
+  will-change: opacity, transform;
+}
+
+.floating-lyrics-bar:hover {
+  background: rgba(26, 26, 36, 0.92);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+/* Collapses the bar's own height, border and margin as well as fading it,
+   otherwise the reserved 28px + 12px stays as a dead gap above the player
+   and the 1px borders keep a 2px sliver on screen. */
+.floating-lyrics-bar.lyrics-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px);
+  height: 0;
+  margin-bottom: 0;
+  border-width: 0;
+  overflow: hidden;
+}
+
+.lyric-icon {
+  font-size: 12px;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  transition: transform 0.2s ease, color 0.3s ease;
+}
+
+.playing .floating-lyrics-bar .lyric-icon {
+  animation: lyricPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes lyricPulse {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.22); opacity: 1; }
+}
+
+.lyric-line {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 290px;
+  line-height: 1.2;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.lyric-line.animating {
+  opacity: 0;
+  transform: translateY(-3px);
+}
+
+/* Theme overrides for lyrics bar */
+.theme-oled .floating-lyrics-bar {
+  background: rgba(0, 0, 0, 0.88);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
+.theme-glass .floating-lyrics-bar {
+  background: rgba(239, 242, 240, 0.92);
+  border-color: rgba(0, 0, 0, 0.14);
+  color: #0a0a0a;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.theme-fluid .floating-lyrics-bar {
+  background: rgba(255, 255, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.30);
+  color: #ffffff;
+}
+
+/* =========================================================
+   MAIN MOOZIAC MENU BAR PLAYER PILL
+   Exact Dimensions: 360px width, 20px border radius
+   ========================================================= */
+.mooziac-player {
+  position: relative;
+  width: 360px;
+  max-width: calc(100vw - 24px);
+  padding: 12px 16px 12px;
+  border-radius: 20px;
+  background: var(--bg-pill);
+  border: 1px solid var(--border-pill);
+  box-shadow:
+    0 24px 65px rgba(0, 0, 0, 0.55),
+    0 2px 10px rgba(0, 0, 0, 0.35);
+  transform-style: preserve-3d;
+  transform: rotateX(0deg) rotateY(0deg);
+  will-change: transform, height, background-color, border-color;
+  transition:
+    background-color 0.4s ease,
+    border-color 0.4s ease,
+    box-shadow 0.4s ease,
+    transform 0.18s cubic-bezier(0.2, 0.8, 0.4, 1);
+  isolation: isolate;
+  overflow: hidden;
+}
+
+/* Ambient Radial Dynamic Glow */
+.ambient-glow {
+  position: absolute;
+  inset: -45%;
+  z-index: -2;
+  opacity: 0.38;
+  filter: blur(52px);
+  background: radial-gradient(circle at 40% 30%, var(--ambient-color), transparent 55%);
+  pointer-events: none;
+  transition: background 0.6s ease, opacity 0.4s ease;
+}
+
+/* Specular meniscus glint for Liquid Fluid / Glass Mode */
+.liquid-sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.04) 30%, transparent 60%);
+  transition: opacity 0.4s ease;
+}
+
+/* =========================================================
+   ROW 1: ARTWORK + TITLE / ARTIST + TOP RIGHT ACTIONS
+   ========================================================= */
+.top-row {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  width: 100%;
+}
+
+.artwork-container {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #111216;
+}
+
+.artwork {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: opacity 0.35s ease;
+}
+
+.artwork-glint {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 50%);
+}
+
+.track-text {
+  flex: 1;
+  min-width: 0;
+  margin-left: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.artist {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+  line-height: 1.2;
+}
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex: none;
+}
+
+.badge-hq {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 16px;
+  border-radius: 4px;
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.14);
+  border: 0.5px solid rgba(255, 255, 255, 0.25);
+}
+
+/* Generic Icon Buttons */
+.icon-button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--icon-tint);
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  outline: none;
+  flex: none;
+  transition: transform 0.12s ease, color 0.15s ease, background-color 0.15s ease;
+}
+
+.icon-button svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  pointer-events: none;
+}
+
+.icon-button:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
+  transform: scale(1.12);
+}
+
+.icon-button:active {
+  transform: scale(0.88);
+}
+
+/* Play/Pause Button */
+.play-button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--icon-play);
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  outline: none;
+  flex: none;
+  transition: transform 0.12s ease, color 0.15s ease, background-color 0.15s ease;
+}
+
+.play-button svg {
+  width: 17px;
+  height: 17px;
+  display: block;
+  pointer-events: none;
+}
+
+.play-button:hover {
+  background: rgba(255, 255, 255, 0.10);
+  transform: scale(1.14);
+}
+
+.play-button:active {
+  transform: scale(0.88);
+}
+
+/* Like Heart Button */
+.like-button.liked {
+  color: #ff3b5c !important;
+  animation: heartPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes heartPop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.45); }
+  75% { transform: scale(0.85); }
+  100% { transform: scale(1); }
+}
+
+/* Repeat Button Active */
+.icon-button.repeat-on {
+  color: var(--accent) !important;
+}
+
+/* Download Button Progress Ring */
+.download-button.downloading svg {
+  animation: dlSpin 1.4s linear infinite;
+  color: var(--accent);
+}
+
+.download-button.downloaded {
+  color: #2ecc71 !important;
+}
+
+@keyframes dlSpin {
+  100% { transform: rotate(360deg); }
+}
+
+/* =========================================================
+   ROW 2: PLAYBACK CONTROLS & EXPANDABLE SEARCH BAR
+   Matches Core.swift controlsStack & searchField layout
+   ========================================================= */
+.controls-row {
+  margin-top: 10px;
+  height: 28px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.controls-stack {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 0 auto;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), margin 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform, margin;
+}
+
+/* When search expands: controls stack slides smoothly to left margin */
+.search-open .controls-stack {
+  margin-left: 0;
+  margin-right: 0;
+  transform: translateX(0);
+}
+
+/* Expandable Search Input Container */
+.search-field-wrapper {
+  position: absolute;
+  right: 0;
+  top: 2px;
+  bottom: 2px;
+  left: 236px;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: scaleX(0.85);
+  transform-origin: left center;
+  transition:
+    opacity 0.16s ease,
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 10;
+}
+
+.search-open .search-field-wrapper {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scaleX(1);
+}
+
+.search-field-inner {
+  width: 100%;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  padding: 0 6px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(8px);
+}
+
+.search-inner-icon {
+  width: 12px;
+  height: 12px;
+  margin-right: 4px;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.search-inner-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 0;
+}
+
+.search-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.search-clear-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 2px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.search-clear-btn:hover {
+  color: var(--text-primary);
+}
+
+/* =========================================================
+   ROW 3: PROGRESS TIMELINE & TIMECODE
+   Exact reproduction of WaveformProgressView.swift
+   ========================================================= */
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  height: 22px;
+  width: 100%;
+}
+
+.seeker-container {
+  flex: 1;
+  height: 22px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;
+  padding: 4px 0;
+}
+
+/* 1. Waveform View (32 bars) */
+.waveform-view {
+  width: 100%;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.waveform-bar {
+  flex: 1;
+  min-width: 2px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.20);
+  height: 3px;
+  transition: background-color 0.12s ease;
+  pointer-events: none;
+  will-change: height;
+}
+
+.waveform-bar.active {
+  background: var(--accent);
+}
+
+/* 2. Neon Glow View */
+.neon-view {
+  width: 100%;
+  height: 14px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.neon-track-bg {
+  width: 100%;
+  height: 4.5px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.neon-fill {
+  position: absolute;
+  left: 0;
+  height: 4.5px;
+  width: 0%;
+  border-radius: 99px;
+  background: var(--accent);
+  box-shadow: 0 0 7px var(--accent);
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.neon-core {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  height: 2.2px;
+  background: #ffffff;
+  border-radius: 99px;
+}
+
+.neon-head {
+  position: absolute;
+  right: -4.5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 9px var(--accent);
+}
+
+/* 3. Cyber Dots View */
+.cyber-view {
+  width: 100%;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.cyber-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  transition: transform 0.12s ease, background 0.12s ease;
+  pointer-events: none;
+}
+
+.cyber-dot.active {
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+}
+
+/* 4. Minimal Precision Line View */
+.minimal-view {
+  width: 100%;
+  height: 14px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.minimal-track-bg {
+  width: 100%;
+  height: 2.5px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.minimal-fill {
+  position: absolute;
+  left: 0;
+  height: 2.5px;
+  width: 0%;
+  border-radius: 99px;
+  background: var(--accent);
+}
+
+/* Monospaced Digit Timecode */
+.timecode {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  flex: none;
+  text-align: right;
+  min-width: 65px;
+}
+
+/* =========================================================
+   DIVIDERS & DRAWER COMMON STYLES
+   ========================================================= */
+.settings-divider {
+  width: 100%;
+  height: 1px;
+  background: var(--divider-color);
+  margin: 12px 0 8px;
+}
+
+/* =========================================================
+   DRAWER 1: SETTINGS PANEL
+   Exact reproduction of SettingsPanel.swift & SettingsPanel+Appearance.swift
+   ========================================================= */
+.settings-panel {
+  display: none;
+  width: 100%;
+  animation: drawerSlideDown 0.24s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}
+
+.settings-open .settings-panel {
+  display: block;
+}
+
+@keyframes drawerSlideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.settings-section-header {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.feature-rows-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.feature-row {
+  display: flex;
+  align-items: center;
+  height: 35px;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: transparent;
+  transition: background-color 0.12s ease;
+}
+
+.feature-row:hover {
+  background: var(--row-hover-bg);
+}
+
+.feature-icon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  flex: none;
+}
+
+.feature-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.feature-text {
+  flex: 1;
+  min-width: 0;
+  margin-left: 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.feature-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.feature-desc {
+  font-size: 9.5px;
+  font-weight: 400;
+  color: var(--text-tertiary);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+/* 4-Step Capsule Switch for Theme & Progress Style */
+.step-toggle {
+  width: 36px;
+  height: 18px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--divider-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px;
+  cursor: pointer;
+  flex: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.step-toggle:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.step-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.step-dot.active {
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+  transform: scale(1.35);
+}
+
+/* Apple iOS/macOS Capsule Toggle Switch */
+.capsule-toggle {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid var(--divider-color);
+  cursor: pointer;
+  flex: none;
+  transition: background-color 0.22s ease, border-color 0.22s ease;
+}
+
+.capsule-toggle::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.capsule-toggle.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.capsule-toggle.on::after {
+  transform: translateX(14px);
+}
+
+/* Bottom Utility Bar: Git Star (Left) | v2.0.0 (Center) | Support (Right) */
+.utility-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 18px;
+  margin-top: 8px;
+  padding: 0 4px;
+}
+
+.utility-link {
+  font-size: 9.5px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.utility-link:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+
+.utility-version {
+  font-size: 9.5px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+/* =========================================================
+   DRAWER 2: PLAYLIST & LIBRARY DRAWER
+   Matches SettingsPanel+Drawers.swift
+   ========================================================= */
+.playlist-drawer {
+  display: none;
+  width: 100%;
+  animation: drawerSlideDown 0.24s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}
+
+.playlist-open .playlist-drawer {
+  display: block;
+}
+
+.library-nav {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.lib-tab {
+  flex: 1;
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.lib-tab:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--text-primary);
+}
+
+.lib-tab.active {
+  background: rgba(0, 217, 255, 0.15);
+  border-color: rgba(0, 217, 255, 0.45);
+  color: var(--accent);
+}
+
+.lib-tab-icon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lib-tab-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.lib-tab-label {
+  font-size: 9px;
+  font-weight: 600;
+}
+
+/* Library Action Row (Search + Controls) */
+.library-action-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.library-search {
+  flex: 1;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 11px;
+  padding: 0 8px;
+  outline: none;
+}
+
+.library-search::placeholder {
+  color: var(--text-tertiary);
+}
+
+.lib-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lib-ctrl-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.lib-ctrl-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.lib-ctrl-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* Library List Items */
+.library-list {
+  max-height: 160px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+  padding-right: 2px;
+}
+
+.library-list::-webkit-scrollbar {
+  width: 4px;
+}
+.library-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.lib-item-row {
+  display: flex;
+  align-items: center;
+  height: 38px;
+  padding: 0 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--divider-color);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.lib-item-row:hover {
+  background: rgba(255, 255, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.lib-item-row.active {
+  background: rgba(0, 217, 255, 0.14);
+  border-color: rgba(0, 217, 255, 0.55);
+}
+
+.lib-item-play-btn {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  margin-right: 8px;
+  flex: none;
+}
+
+.lib-item-play-btn svg {
+  width: 11px;
+  height: 11px;
+}
+
+.lib-item-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.lib-item-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lib-item-sub {
+  font-size: 9.5px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lib-item-badge {
+  flex: none;
+  margin-left: 6px;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+}
+
+.lib-item-badge svg {
+  width: 14px;
+  height: 14px;
+}
+
+.create-playlist-btn {
+  width: 100%;
+  height: 26px;
+  border-radius: 13px;
+  border: 1px solid rgba(0, 217, 255, 0.35);
+  background: rgba(0, 217, 255, 0.12);
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.create-playlist-btn:hover {
+  background: rgba(0, 217, 255, 0.22);
+  transform: translateY(-1px);
+}
+
+/* =========================================================
+   THEMES (Adaptive, OLED Dark, Crystal Glass, Watery Fluid)
+   Exact reproduction of ArtworkTheme.swift
+   ========================================================= */
+
+/* 1. Adaptive Mode (Default): Ambient colors driven by track accent */
+
+/* 2. OLED Dark Mode: Pitch black */
+.theme-oled {
+  --bg-pill: #000000 !important;
+  --border-pill: rgba(255, 255, 255, 0.18) !important;
+  --text-primary: #ffffff !important;
+  --text-secondary: rgba(255, 255, 255, 0.65) !important;
+  --text-tertiary: rgba(255, 255, 255, 0.45) !important;
+  --icon-tint: #ffffff !important;
+  --icon-play: #ffffff !important;
+  --accent: #ffffff !important;
+  --ambient-color: transparent !important;
+  --divider-color: rgba(255, 255, 255, 0.12) !important;
+  --row-hover-bg: rgba(255, 255, 255, 0.08) !important;
+  --input-bg: rgba(255, 255, 255, 0.08) !important;
+  --input-border: rgba(255, 255, 255, 0.16) !important;
+}
+
+/* 3. Crystal Glass Mode (Mooziac Light Theme #EFF2F0) */
+.theme-glass {
+  --bg-pill: #EFF2F0 !important;
+  --border-pill: rgba(0, 0, 0, 0.16) !important;
+  --text-primary: #0a0a0a !important;
+  --text-secondary: rgba(0, 0, 0, 0.65) !important;
+  --text-tertiary: rgba(0, 0, 0, 0.48) !important;
+  --icon-tint: rgba(0, 0, 0, 0.75) !important;
+  --icon-play: #0a0a0a !important;
+  --accent: #0a0a0a !important;
+  --ambient-color: rgba(255, 255, 255, 0.5) !important;
+  --divider-color: rgba(0, 0, 0, 0.12) !important;
+  --row-hover-bg: rgba(0, 0, 0, 0.04) !important;
+  --input-bg: rgba(0, 0, 0, 0.05) !important;
+  --input-border: rgba(0, 0, 0, 0.14) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25) !important;
+}
+
+.theme-glass .waveform-bar {
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.theme-glass .badge-hq {
+  color: #0a0a0a;
+  background: rgba(0, 0, 0, 0.08);
+  border-color: rgba(0, 0, 0, 0.18);
+}
+
+.theme-glass .icon-button:hover,
+.theme-glass .play-button:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #000;
+}
+
+.theme-glass .step-toggle {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.theme-glass .capsule-toggle {
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.theme-glass .capsule-toggle.on {
+  background: #0a0a0a;
+  border-color: #0a0a0a;
+}
+
+/* 4. Watery Transparent Mode (Liquid Fluid) */
+.theme-fluid {
+  --bg-pill: rgba(255, 255, 255, 0.08) !important;
+  --border-pill: rgba(255, 255, 255, 0.35) !important;
+  --text-primary: #ffffff !important;
+  --accent: #00d9ff !important;
+  backdrop-filter: blur(28px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+}
+
+.theme-fluid .liquid-sheen {
+  opacity: 1;
+}
+
+/* =========================================================
+   CLICK MUSICAL NOTE PARTICLES
+   ========================================================= */
+.floating-music-bubble {
+  position: fixed;
+  font-size: 17px;
+  font-weight: 700;
+  pointer-events: none;
+  z-index: 99999;
+  user-select: none;
+  animation: noteBubbleFloat 1.1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: transform, opacity;
+}
+
+@keyframes noteBubbleFloat {
+  0% {
+    opacity: 1;
+    transform: translate3d(-50%, -50%, 0) scale(0.6) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, -55px)), 0) scale(1.35) rotate(var(--rot, 20deg));
+  }
+}
+
+/* =========================================================
+   EMBEDDED MODE (INSIDE MACBOOK 3D RETINA DISPLAY)
+   ========================================================= */
+html.embedded-mode,
+body.embedded-mode {
+  background: transparent !important;
+  background-color: transparent !important;
+  min-height: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+body.embedded-mode .stage {
+  min-height: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  padding-top: 10px !important;
+  background: transparent !important;
+  perspective: none !important;
+}
+
+body.embedded-mode .mooziac-player {
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.7), 0 0 40px rgba(56, 189, 248, 0.25) !important;
+}
+
+body.embedded-mode .floating-lyrics-bar {
+  margin-bottom: 6px !important;
+}

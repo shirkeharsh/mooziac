@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  
+  <title>Download Mooziac for Mac | Native Menu Bar Music Player</title>
+  <meta name="description" content="Download Mooziac for macOS. A fast, free, open-source native menu bar player for YouTube Music and local audio with trackpad gestures and synced lyrics. Universal binary for Apple Silicon & Intel.">
+  <meta name="keywords" content="Download Mooziac, Mooziac for Mac, macOS music player download, Mooziac dmg, YouTube Music Mac app, native macOS music player, menu bar music player">
+  <meta name="author" content="ThreeTen">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="https://mooziac.threeten.site/download.html">
+  <link rel="icon" type="image/png" href="assets/favicon-32.png">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://mooziac.threeten.site/download.html">
+  <meta property="og:site_name" content="Mooziac">
+  <meta property="og:title" content="Download Mooziac for Mac — Native Menu Bar Music Player">
+  <meta property="og:description" content="Get the lightweight, open-source native macOS player for YouTube Music & local audio. Apple Silicon & Intel Universal DMG.">
+  <meta property="og:image" content="https://mooziac.threeten.site/assets/MOOZIAC.png">
+
+  <!-- Twitter / X Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Download Mooziac for Mac">
+  <meta name="twitter:description" content="A fast, distraction-free YouTube Music & local audio player tucked right into your Mac's menu bar.">
+  <meta name="twitter:image" content="https://mooziac.threeten.site/assets/MOOZIAC.png">
+
+  <!-- Schema.org SoftwareApplication JSON-LD -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Mooziac",
+    "operatingSystem": "macOS 13.0 or later",
+    "applicationCategory": "MultimediaApplication",
+    "url": "https://mooziac.threeten.site/download.html",
+    "downloadUrl": "https://github.com/shirkeharsh/mooziac/releases/latest/download/Mooziac.dmg",
+    "softwareVersion": "1.0.1",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD",
+      "availability": "https://schema.org/InStock"
+    },
+    "description": "Download Mooziac for Mac: A lightweight, open-source native macOS menu bar music player with trackpad gestures and synced lyrics.",
+    "author": {
+      "@type": "Organization",
+      "name": "ThreeTen",
+      "url": "https://mooziac.threeten.site"
+    }
+  }
+  </script>
+
+  <link rel="stylesheet" href="css/landing.css?v=2.2">
+  <style>
+    :root {
+      --bg-dark: #07090e;
+      --card-bg: rgba(18, 22, 33, 0.72);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-border-hover: rgba(250, 64, 89, 0.45);
+      --accent-pink: #fa4059;
+      --accent-glow: rgba(250, 64, 89, 0.28);
+      --accent-purple: #8b7bff;
+      --text-muted: rgba(244, 244, 246, 0.7);
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .dl-wrapper {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+      width: 100%;
+      box-sizing: border-box;
+      flex: 1;
+    }
+
+    .dl-nav-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13.5px;
+      font-weight: 600;
+      margin-bottom: 32px;
+      transition: color 0.2s ease, transform 0.2s ease;
+    }
+    .dl-nav-back:hover {
+      color: #fff;
+      transform: translateX(-3px);
+    }
+
+    .dl-hero-card {
+      background: linear-gradient(180deg, rgba(26, 32, 48, 0.6) 0%, rgba(13, 16, 24, 0.75) 100%);
+      border: 1px solid var(--card-border);
+      border-radius: 28px;
+      padding: 52px 40px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+
+    .dl-hero-card::before {
+      content: "";
+      position: absolute;
+      top: -120px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 380px;
+      height: 240px;
+      background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .dl-app-icon {
+      width: 96px;
+      height: 96px;
+      border-radius: 22px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.12);
+      margin-bottom: 22px;
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .dl-app-icon:hover {
+      transform: scale(1.05) rotate(-2deg);
+    }
+
+    .dl-pill-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 14px;
+      border-radius: 999px;
+      background: rgba(48, 209, 88, 0.12);
+      border: 1px solid rgba(48, 209, 88, 0.3);
+      color: #30D158;
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      margin-bottom: 18px;
+    }
+
+    .dl-title {
+      font-size: clamp(32px, 5vw, 46px);
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      margin: 0 0 12px;
+      color: #ffffff;
+      line-height: 1.1;
+    }
+
+    .dl-subtitle {
+      font-size: 16px;
+      line-height: 1.6;
+      color: var(--text-muted);
+      max-width: 580px;
+      margin: 0 auto 32px;
+    }
+
+    .dl-cta-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .dl-main-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 16px 36px;
+      background: linear-gradient(135deg, #fa4059 0%, #e02447 100%);
+      color: #ffffff;
+      font-size: 16px;
+      font-weight: 700;
+      border-radius: 999px;
+      text-decoration: none;
+      box-shadow: 0 10px 30px rgba(250, 64, 89, 0.42), 0 0 0 1px rgba(255, 255, 255, 0.2) inset;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .dl-main-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 16px 40px rgba(250, 64, 89, 0.58), 0 0 0 1px rgba(255, 255, 255, 0.3) inset;
+    }
+    .dl-main-btn svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .dl-meta-badge {
+      font-size: 12.5px;
+      color: rgba(255, 255, 255, 0.55);
+      font-weight: 500;
+      letter-spacing: 0.2px;
+    }
+
+    .dl-alt-links {
+      display: flex;
+      gap: 20px;
+      margin-top: 10px;
+      font-size: 13px;
+    }
+    .dl-alt-links a {
+      color: var(--text-muted);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      transition: color 0.2s ease;
+    }
+    .dl-alt-links a:hover {
+      color: #fff;
+    }
+
+    /* Specs & Installation Grid */
+    .dl-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+      margin-top: 36px;
+    }
+
+    .dl-card {
+      background: rgba(20, 24, 36, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 24px 20px;
+      backdrop-filter: blur(14px);
+      transition: border-color 0.25s ease, transform 0.25s ease;
+    }
+    .dl-card:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+      transform: translateY(-3px);
+    }
+    .dl-card-icon {
+      font-size: 22px;
+      margin-bottom: 12px;
+      display: inline-block;
+    }
+    .dl-card h3 {
+      font-size: 15px;
+      font-weight: 700;
+      margin: 0 0 6px;
+      color: #ffffff;
+    }
+    .dl-card p {
+      font-size: 12.5px;
+      line-height: 1.55;
+      color: var(--text-muted);
+      margin: 0;
+    }
+
+    /* Installation Steps */
+    .dl-steps-section {
+      margin-top: 48px;
+    }
+    .dl-steps-title {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 20px;
+      text-align: center;
+      color: #fff;
+    }
+    .dl-steps-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+    .dl-step-item {
+      background: rgba(16, 20, 30, 0.5);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 22px 18px;
+      position: relative;
+    }
+    .dl-step-num {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: rgba(250, 64, 89, 0.16);
+      color: var(--accent-pink);
+      border: 1px solid rgba(250, 64, 89, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 12px;
+    }
+    .dl-step-item h4 {
+      font-size: 14px;
+      font-weight: 700;
+      margin: 0 0 6px;
+      color: #fff;
+    }
+    .dl-step-item p {
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text-muted);
+      margin: 0;
+    }
+
+    .dl-tip-box {
+      margin-top: 28px;
+      padding: 16px 20px;
+      border-radius: 16px;
+      background: rgba(255, 184, 77, 0.08);
+      border: 1px solid rgba(255, 184, 77, 0.25);
+      font-size: 12.5px;
+      line-height: 1.6;
+      color: #ffd285;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    /* Semantic Sitelink Footer */
+    .footer {
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 36px 20px 48px;
+      margin-top: 60px;
+      text-align: center;
+      background: rgba(5, 7, 10, 0.8);
+      backdrop-filter: blur(10px);
+    }
+    .footer-container {
+      max-width: 1080px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+    .footer-nav {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 24px;
+      font-weight: 500;
+      font-size: 13px;
+    }
+    .footer-nav a {
+      color: rgba(255, 255, 255, 0.72);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+    .footer-nav a:hover, .footer-nav a.active {
+      color: #ffffff;
+    }
+    .footer-copy {
+      font-size: 11.5px;
+      color: rgba(255, 255, 255, 0.45);
+      letter-spacing: 0.2px;
+    }
+
+    @media (max-width: 768px) {
+      .dl-hero-card {
+        padding: 36px 20px;
+      }
+      .dl-grid, .dl-steps-row {
+        grid-template-columns: 1fr;
+      }
+      .footer-nav {
+        gap: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="dl-wrapper">
+    <a href="/" class="dl-nav-back" aria-label="Back to Homepage">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Back to Mooziac
+    </a>
+
+    <header class="dl-hero-card">
+      <img src="assets/launch_transparent.png" alt="Mooziac macOS App Icon" class="dl-app-icon" width="96" height="96">
+      <br>
+      <div class="dl-pill-tag">
+        <span>●</span> macOS 13+ · Universal Build
+      </div>
+      <h1 class="dl-title">Download Mooziac for Mac</h1>
+      <p class="dl-subtitle">
+        A fast, distraction-free YouTube Music and local audio player that lives right in your macOS menu bar with edge trackpad gestures.
+      </p>
+
+      <div class="dl-cta-group">
+        <a href="https://github.com/shirkeharsh/mooziac/releases/latest/download/Mooziac.dmg" class="dl-main-btn" id="directDownloadBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download for macOS (Universal DMG)
+        </a>
+        <span class="dl-meta-badge">Version 1.0.1 · Apple Silicon (M1/M2/M3/M4) &amp; Intel · ~25 MB</span>
+        
+        <!-- First-Time Installation Terminal Command -->
+        <div class="dl-cmd-container" style="margin-top: 18px; width: 100%; max-width: 500px; background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 16px; padding: 14px 16px; text-align: left; box-sizing: border-box;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 9px;">
+            <span style="font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.7); display: flex; align-items: center; gap: 6px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 6-6-6-6"/><path d="M12 19h8"/></svg>
+              If blocked by macOS Gatekeeper:
+            </span>
+            <span style="font-size: 10px; color: #30D158; background: rgba(48, 209, 88, 0.14); padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(48, 209, 88, 0.35); font-weight: 700;">Terminal Command</span>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 9px; padding: 8px 12px;">
+            <code style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12.5px; color: #38ef7d; word-break: break-all;">xattr -cr /Applications/Mooziac.app</code>
+            <button type="button" onclick="copyInstallCmd(this)" style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.18); color: #fff; border-radius: 6px; padding: 5px 11px; font-size: 11.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.2s ease; flex-shrink: 0;" aria-label="Copy Command">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              <span>Copy</span>
+            </button>
+          </div>
+          <span style="display: block; font-size: 11px; color: rgba(255, 255, 255, 0.45); margin-top: 8px;">Run this command in Terminal after moving Mooziac to Applications.</span>
+        </div>
+
+        <div class="dl-alt-links">
+          <a href="https://github.com/shirkeharsh/mooziac/releases" target="_blank" rel="noopener noreferrer">All Releases on GitHub</a>
+          <a href="changelog.html">View Changelog</a>
+        </div>
+      </div>
+    </header>
+
+    <!-- Compatibility & Specs -->
+    <section class="dl-grid">
+      <div class="dl-card">
+        <span class="dl-card-icon">⚡</span>
+        <h3>Pure Native Swift</h3>
+        <p>Built with Swift and AppKit. Under 50MB RAM footprint without Chromium or Electron bloat.</p>
+      </div>
+      <div class="dl-card">
+        <span class="dl-card-icon">🍏</span>
+        <h3>Apple Silicon &amp; Intel</h3>
+        <p>Universal binary compiled natively for Apple M1, M2, M3, M4 chips and Intel x86_64 processors.</p>
+      </div>
+      <div class="dl-card">
+        <span class="dl-card-icon">🔒</span>
+        <h3>100% Free &amp; Private</h3>
+        <p>No telemetry, no tracking, and no account logins required. Free and open source under MIT.</p>
+      </div>
+    </section>
+
+    <!-- Installation Steps -->
+    <section class="dl-steps-section">
+      <h2 class="dl-steps-title">Simple 3-Step Setup</h2>
+      <div class="dl-steps-row">
+        <div class="dl-step-item">
+          <div class="dl-step-num">1</div>
+          <h4>Download DMG</h4>
+          <p>Click the download button above to grab the latest <code>Mooziac.dmg</code> release package.</p>
+        </div>
+        <div class="dl-step-item">
+          <div class="dl-step-num">2</div>
+          <h4>Drag to Applications</h4>
+          <p>Open the disk image and drag <code>Mooziac.app</code> into your Mac's <code>/Applications</code> directory.</p>
+        </div>
+        <div class="dl-step-item">
+          <div class="dl-step-num">3</div>
+          <h4>Launch &amp; Enjoy</h4>
+          <p>Launch Mooziac from Spotlight. The music icon will appear in your top menu bar ready to play.</p>
+        </div>
+      </div>
+
+      <div class="dl-tip-box">
+        <span style="font-size: 18px;">💡</span>
+        <div>
+          <strong>First Launch Note:</strong> As an independent open-source release, if macOS Gatekeeper displays <em>"developer cannot be verified"</em>, simply <strong>Right-Click (Control-Click) Mooziac.app &rarr; Open</strong>, or run <code>xattr -cr /Applications/Mooziac.app</code> in Terminal.
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Semantic Footer with Crawlable Sitelink Navigation -->
+  <footer class="footer">
+    <div class="footer-container">
+      <nav class="footer-nav" aria-label="Footer Navigation">
+        <a href="download.html" class="active">Download</a>
+        <a href="changelog.html">Changelog</a>
+        <a href="support.html">Support</a>
+        <a href="privacy.html">Privacy</a>
+        <a href="terms.html">Terms</a>
+        <a href="https://github.com/shirkeharsh/mooziac" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </nav>
+      <span class="footer-copy">&copy; 2026 Mooziac · Built by ThreeTen · Released under the MIT License</span>
+    </div>
+  </footer>
+
+  <!-- Cookie Consent & Live Chat Widget -->
+  <link rel="stylesheet" href="css/cookie-banner.css?v=4.5">
+  <link rel="stylesheet" href="css/mooziac-chat.css?v=4.5">
+  <script src="js/cookie-banner.js?v=4.5"></script>
+  <script src="js/mooziac-chat.js?v=5.0"></script>
+
+  <script>
+    function copyInstallCmd(btn) {
+      const code = "xattr -cr /Applications/Mooziac.app";
+      navigator.clipboard.writeText(code).then(() => {
+        const span = btn.querySelector("span");
+        if (span) {
+          const original = span.textContent;
+          span.textContent = "Copied!";
+          btn.style.borderColor = "#30D158";
+          btn.style.color = "#30D158";
+          setTimeout(() => {
+            span.textContent = original;
+            btn.style.borderColor = "";
+            btn.style.color = "";
+          }, 2000);
+        }
+      });
+    }
+  </script>
+</body>
+</html>

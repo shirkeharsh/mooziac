@@ -7,10 +7,16 @@ dist/
 .DS_Store
 *.DS_Store
 
-# Secrets
+# Secrets & Credentials
 client_secret*.json
 *.secret.json
 credentials.json
+.env
+*.env
+**/.env
+*.pem
+support_tickets.json
+backup/
 
 # Local dev tooling & artifacts (never published)
 dev/
@@ -45,6 +51,5 @@ docs/reports/
 docs/notes/
 scripts/
 webplayer/
-www/
 .agent-sandbox/
 README.old.md

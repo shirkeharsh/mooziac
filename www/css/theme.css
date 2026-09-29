@@ -1,0 +1,62 @@
+/* =========================================================
+   MOOZIAC — THEME SYSTEM
+   Website is permanently dark/black.
+   The player is themed independently by css/player2.css.
+   ========================================================= */
+
+:root {
+  color-scheme: dark;
+  --page-bg: #050505;
+  --page-bg2: #0d0d0d;
+  --page-text: #ffffff;
+  --page-muted: rgba(255,255,255,.62);
+  --page-line: rgba(255,255,255,.12);
+  --page-card: rgba(255,255,255,.045);
+  --page-accent: #ffffff;
+  --page-glow: rgba(255,255,255,.09);
+}
+
+/* Global reset — previously lived in the old css/player.css.
+   Kept here so the landing page keeps border-box and a zeroed body margin.
+   NOTE: deliberately no user-select:none — text must stay selectable for the
+   install-command copy block and general readability. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background:
+    radial-gradient(850px 620px at 78% 40%, var(--page-glow), transparent 64%),
+    radial-gradient(900px 600px at 12% 8%, rgba(255,255,255,.035), transparent 65%),
+    linear-gradient(135deg, var(--page-bg2), var(--page-bg)) !important;
+  color: var(--page-text) !important;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: -10%;
+  pointer-events: none;
+  background: radial-gradient(circle at 70% 45%, var(--page-glow) 0%, rgba(250,64,89,0.06) 30%, transparent 60%);
+  opacity: .7;
+  transform: translate3d(0, 0, 0);
+  contain: paint;
+}
+
+.theme-orb {
+  background: radial-gradient(circle, var(--page-glow) 0%, rgba(250,64,89,0.08) 40%, transparent 70%) !important;
+  transform: translate3d(0, 0, 0);
+  contain: paint;
+}
+
+/* The old .player-pill light/dark theme blocks that used to live here are
+   gone — theming is now owned by the player itself via the theme-oled /
+   theme-glass / theme-fluid classes in css/player2.css. */

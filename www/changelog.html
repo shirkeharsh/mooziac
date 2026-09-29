@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  
+  <title>Changelog &amp; Releases | Mooziac for Mac</title>
+  <meta name="description" content="Official release notes and changelog for Mooziac — the native macOS menu-bar music player for YouTube Music and local audio. Track new features and bug fixes.">
+  <meta name="keywords" content="Mooziac changelog, Mooziac release notes, Mooziac updates, macOS music player changelog, Mooziac versions">
+  <meta name="author" content="ThreeTen">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="https://mooziac.threeten.site/changelog.html">
+  <link rel="icon" type="image/png" href="assets/favicon-32.png">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://mooziac.threeten.site/changelog.html">
+  <meta property="og:site_name" content="Mooziac">
+  <meta property="og:title" content="Changelog &amp; Releases — Mooziac for Mac">
+  <meta property="og:description" content="Stay up to date with new features, audio streaming improvements, and bug fixes in Mooziac for macOS.">
+  <meta property="og:image" content="https://mooziac.threeten.site/assets/MOOZIAC.png">
+
+  <!-- Twitter / X Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Changelog — Mooziac for Mac">
+  <meta name="twitter:description" content="Official release notes and update history for Mooziac macOS music player.">
+  <meta name="twitter:image" content="https://mooziac.threeten.site/assets/MOOZIAC.png">
+
+  <!-- Schema.org JSON-LD -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "Mooziac Changelog & Releases",
+    "url": "https://mooziac.threeten.site/changelog.html",
+    "description": "Official changelog and release notes for Mooziac native macOS music player.",
+    "publisher": {
+      "@type": "Organization",
+      "name": "ThreeTen",
+      "url": "https://mooziac.threeten.site"
+    }
+  }
+  </script>
+
+  <link rel="stylesheet" href="css/landing.css?v=2.2">
+  <style>
+    :root {
+      --bg-dark: #07090e;
+      --card-bg: rgba(18, 22, 33, 0.72);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent-pink: #fa4059;
+      --accent-purple: #8b7bff;
+      --text-muted: rgba(244, 244, 246, 0.7);
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .cl-wrapper {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+      width: 100%;
+      box-sizing: border-box;
+      flex: 1;
+    }
+
+    .cl-nav-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13.5px;
+      font-weight: 600;
+      margin-bottom: 32px;
+      transition: color 0.2s ease, transform 0.2s ease;
+    }
+    .cl-nav-back:hover {
+      color: #fff;
+      transform: translateX(-3px);
+    }
+
+    .cl-header {
+      margin-bottom: 44px;
+    }
+    .cl-title {
+      font-size: clamp(30px, 5vw, 42px);
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      margin: 0 0 10px;
+      color: #ffffff;
+    }
+    .cl-desc {
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--text-muted);
+      margin: 0;
+    }
+
+    /* Timeline styles */
+    .timeline {
+      position: relative;
+      padding-left: 32px;
+    }
+    .timeline::before {
+      content: "";
+      position: absolute;
+      left: 11px;
+      top: 10px;
+      bottom: 20px;
+      width: 2px;
+      background: linear-gradient(180deg, rgba(250, 64, 89, 0.6) 0%, rgba(139, 123, 255, 0.4) 50%, rgba(255, 255, 255, 0.05) 100%);
+    }
+
+    .release-card {
+      position: relative;
+      background: rgba(18, 22, 33, 0.65);
+      border: 1px solid var(--card-border);
+      border-radius: 22px;
+      padding: 32px 28px;
+      margin-bottom: 36px;
+      backdrop-filter: blur(14px);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+      transition: border-color 0.2s ease;
+    }
+    .release-card:hover {
+      border-color: rgba(255, 255, 255, 0.16);
+    }
+
+    .release-dot {
+      position: absolute;
+      left: -40px;
+      top: 36px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #fa4059;
+      box-shadow: 0 0 12px #fa4059, 0 0 0 4px var(--bg-dark);
+    }
+    .release-dot.upcoming {
+      background: #8b7bff;
+      box-shadow: 0 0 12px #8b7bff, 0 0 0 4px var(--bg-dark);
+    }
+
+    .release-meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .version-tag {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #ffffff;
+    }
+    .badge-latest {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(48, 209, 88, 0.14);
+      border: 1px solid rgba(48, 209, 88, 0.35);
+      color: #30D158;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .badge-upcoming {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(139, 123, 255, 0.14);
+      border: 1px solid rgba(139, 123, 255, 0.35);
+      color: #a79aff;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .release-date {
+      font-size: 12.5px;
+      color: rgba(255, 255, 255, 0.45);
+      font-weight: 500;
+    }
+
+    .release-headline {
+      font-size: 16px;
+      font-weight: 700;
+      margin: 0 0 18px;
+      color: rgba(255, 255, 255, 0.95);
+    }
+
+    .change-list {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 20px;
+    }
+    .change-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+    .change-item:last-child {
+      margin-bottom: 0;
+    }
+    .change-icon {
+      font-size: 14px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .change-item strong {
+      color: #ffffff;
+    }
+
+    .release-dl-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent-pink);
+      text-decoration: none;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      width: 100%;
+      transition: gap 0.2s ease;
+    }
+    .release-dl-action:hover {
+      gap: 12px;
+    }
+
+    /* Semantic Sitelink Footer */
+    .footer {
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 36px 20px 48px;
+      margin-top: 60px;
+      text-align: center;
+      background: rgba(5, 7, 10, 0.8);
+      backdrop-filter: blur(10px);
+    }
+    .footer-container {
+      max-width: 1080px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+    .footer-nav {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 24px;
+      font-weight: 500;
+      font-size: 13px;
+    }
+    .footer-nav a {
+      color: rgba(255, 255, 255, 0.72);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+    .footer-nav a:hover, .footer-nav a.active {
+      color: #ffffff;
+    }
+    .footer-copy {
+      font-size: 11.5px;
+      color: rgba(255, 255, 255, 0.45);
+      letter-spacing: 0.2px;
+    }
+
+    @media (max-width: 640px) {
+      .timeline {
+        padding-left: 20px;
+      }
+      .release-dot {
+        left: -28px;
+      }
+      .release-card {
+        padding: 24px 18px;
+      }
+      .footer-nav {
+        gap: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="cl-wrapper">
+    <a href="/" class="cl-nav-back" aria-label="Back to Homepage">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Back to Mooziac
+    </a>
+
+    <header class="cl-header">
+      <h1 class="cl-title">Mooziac Changelog</h1>
+      <p class="cl-desc">All release updates, audio streaming improvements, and feature rollouts.</p>
+    </header>
+
+    <div class="timeline">
+
+      <!-- Version 1.0.1 -->
+      <article class="release-card">
+        <div class="release-dot"></div>
+        <div class="release-meta">
+          <span class="version-tag">v1.0.1</span>
+          <span class="badge-latest">Latest Release</span>
+          <span class="release-date">September 2026</span>
+        </div>
+        <div class="release-headline">Performance, Audio Streaming &amp; Gesture Refinements</div>
+        <ul class="change-list">
+          <li class="change-item">
+            <span class="change-icon">✨</span>
+            <div><strong>Trackpad Edge Deadzone:</strong> Refined the edge touch trigger zone to a calibrated 1mm margin to prevent accidental volume triggers during system gestures and full-screen games.</div>
+          </li>
+          <li class="change-item">
+            <span class="change-icon">⚡</span>
+            <div><strong>YouTube Music Stream Resiliency:</strong> Added automated zero-drop audio stream recovery and background buffer warming for slow internet connections.</div>
+          </li>
+          <li class="change-item">
+            <span class="change-icon">📝</span>
+            <div><strong>Synced Lyrics HUD:</strong> Improved <code>.lrc</code> timestamp matching precision and added smooth auto-scrolling with current line spotlight highlighting.</div>
+          </li>
+          <li class="change-item">
+            <span class="change-icon">🎧</span>
+            <div><strong>High-Res Local Metadata:</strong> Enhanced ID3v2, Vorbis Comments, and embedded artwork extraction for FLAC, M4A, WAV, and MP3 files.</div>
+          </li>
+          <li class="change-item">
+            <span class="change-icon">🍏</span>
+            <div><strong>Universal Binary:</strong> Fully native performance on Apple Silicon (M1/M2/M3/M4) and Intel Macs with sub-50MB RAM footprint.</div>
+          </li>
+        </ul>
+        <a href="https://github.com/shirkeharsh/mooziac/releases/tag/v1.0.1" target="_blank" rel="noopener noreferrer" class="release-dl-action">
+          Download v1.0.1 DMG on GitHub &rarr;
+        </a>
+      </article>
+
+      <!-- Version 1.0.0 -->
+      <article class="release-card">
+        <div class="release-dot"></div>
+        <div class="release-meta">
+          <span class="version-tag">v1.0.0</span>
+          <span class="release-date">August 2026</span>
+        </div>
+        <div class="release-headline">Initial Public Release</div>
+        <ul class="change-list">
+          <li class="change-item">
+            <span class="change-icon">🚀</span>
+            <div><strong>Native Menu Bar Player:</strong> Tucked directly into the top macOS status bar with album artwork, playback transport, and seek controls.</div>
+          </li>
+          <li class="change-item">
+            <span class="change-icon">👆</span>
+            <div><strong>Trackpad Edge Volume Control:</strong> First-of-its-kind gesture allowing users to adjust system volume simply by sliding fingers along the trackpad's right edge.</div>
+          </li>
+          <li class="change-item">
+            <span class="change-icon">🎨</span>
+            <div><strong>Ambient Album Tinting:</strong> Live adaptive color grading for the menu bar and mini player based on active album artwork.</div>
+          </li>
+          <li class="change-item">
+            <span class="change-icon">💬</span>
+            <div><strong>Discord Rich Presence:</strong> Automatic status broadcasts showing currently playing track title, artist, and album artwork on Discord.</div>
+          </li>
+          <li class="change-item">
+            <span class="change-icon">🔒</span>
+            <div><strong>Zero Telemetry &amp; Privacy First:</strong> Built with local-first architecture. No user data leaves your Mac, and no account logins are required.</div>
+          </li>
+        </ul>
+        <a href="https://github.com/shirkeharsh/mooziac/releases/tag/v1.0.0" target="_blank" rel="noopener noreferrer" class="release-dl-action">
+          View v1.0.0 Release on GitHub &rarr;
+        </a>
+      </article>
+
+      <!-- Upcoming Roadmap -->
+      <article class="release-card" style="border-style: dashed;">
+        <div class="release-dot upcoming"></div>
+        <div class="release-meta">
+          <span class="version-tag">v1.1.0 Roadmap</span>
+          <span class="badge-upcoming">In Development</span>
+        </div>
+        <div class="release-headline">Upcoming Features in Testing</div>
+        <ul class="change-list">
+          <li class="change-item">
+            <span class="change-icon">🎵</span>
+            <div><strong>Spotify &amp; Apple Music Integration:</strong> Seamless switching between YouTube Music, Spotify, and Apple Music inside the same lightweight menu bar interface.</div>
+          </li>
+          <li class="change-item">
+            <span class="change-icon">🔍</span>
+            <div><strong>Raycast / Spotlight Command Palette:</strong> Global hotkey popup to search any track, playlist, or artist instantly across all connected services.</div>
+          </li>
+          <li class="change-item">
+            <span class="change-icon">⏭️</span>
+            <div><strong>15s / 30s Jump Seek:</strong> Quick interval skipping shortcuts for podcasts and long sets.</div>
+          </li>
+        </ul>
+      </article>
+
+    </div>
+  </div>
+
+  <!-- Semantic Footer with Crawlable Sitelink Navigation -->
+  <footer class="footer">
+    <div class="footer-container">
+      <nav class="footer-nav" aria-label="Footer Navigation">
+        <a href="download.html">Download</a>
+        <a href="changelog.html" class="active">Changelog</a>
+        <a href="support.html">Support</a>
+        <a href="privacy.html">Privacy</a>
+        <a href="terms.html">Terms</a>
+        <a href="https://github.com/shirkeharsh/mooziac" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </nav>
+      <span class="footer-copy">&copy; 2026 Mooziac · Built by ThreeTen · Released under the MIT License</span>
+    </div>
+  </footer>
+
+  <!-- Cookie Consent & Live Chat Widget -->
+  <link rel="stylesheet" href="css/cookie-banner.css?v=4.5">
+  <link rel="stylesheet" href="css/mooziac-chat.css?v=4.5">
+  <script src="js/cookie-banner.js?v=4.5"></script>
+  <script src="js/mooziac-chat.js?v=5.0"></script>
+
+</body>
+</html>

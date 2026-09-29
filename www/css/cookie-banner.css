@@ -1,0 +1,140 @@
+/* =========================================================
+   MOOZIAC — LIQUID GLASS PRIVACY & COOKIE CONSENT BANNER
+   ========================================================= */
+
+.mzc-cookie-banner {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  max-width: 440px;
+  width: calc(100vw - 48px);
+  z-index: 999990;
+  background: rgba(18, 18, 22, 0.88);
+  backdrop-filter: blur(32px) saturate(190%);
+  -webkit-backdrop-filter: blur(32px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 16px 20px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transform: translateY(120%);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
+}
+
+.mzc-cookie-banner.mzc-cookie-visible {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.mzc-cookie-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.mzc-cookie-icon {
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.mzc-cookie-text {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: rgba(244, 244, 246, 0.82);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif;
+}
+
+.mzc-cookie-text strong {
+  color: #fff;
+  font-weight: 600;
+}
+
+.mzc-cookie-link {
+  color: #ff7a96;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.15s ease;
+}
+
+.mzc-cookie-link:hover {
+  color: #fa4059;
+}
+
+.mzc-cookie-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.mzc-cookie-btn {
+  padding: 7px 16px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border: none;
+  font-family: inherit;
+}
+
+.mzc-cookie-accept {
+  background: #fa4059;
+  color: #fff;
+}
+
+.mzc-cookie-accept:hover {
+  background: #ff526d;
+  transform: scale(1.02);
+}
+
+.mzc-cookie-dismiss {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(244, 244, 246, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mzc-cookie-dismiss:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  .mzc-cookie-banner {
+    bottom: max(14px, env(safe-area-inset-bottom));
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: none;
+    padding: 12px 14px;
+    border-radius: 16px;
+    gap: 10px;
+    z-index: 999990;
+  }
+
+  .mzc-cookie-icon {
+    font-size: 18px;
+  }
+
+  .mzc-cookie-text {
+    font-size: 11.5px;
+    line-height: 1.4;
+  }
+
+  .mzc-cookie-actions {
+    gap: 8px;
+  }
+
+  .mzc-cookie-btn {
+    padding: 6px 12px;
+    font-size: 11.5px;
+    border-radius: 8px;
+  }
+}

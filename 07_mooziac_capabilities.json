@@ -1,0 +1,290 @@
+{
+  "app_metadata": {
+    "name": "Mooziac",
+    "description": "Native macOS music player uniting YouTube Music and high-fidelity local audio with trackpad gestures and notch lyrics.",
+    "bundle_id": "site.threeten.mooziac",
+    "minimum_os": "macOS 13.0 Ventura",
+    "supported_os": [
+      "macOS 13 Ventura",
+      "macOS 14 Sonoma",
+      "macOS 15 Sequoia"
+    ],
+    "architectures": [
+      "arm64 (Apple Silicon: M1/M2/M3/M4)",
+      "x86_64 (Intel Core)"
+    ],
+    "binary_type": "Universal 2 macOS App Bundle",
+    "license": "MIT License",
+    "repository": "https://github.com/shirkeharsh/mooziac",
+    "website": "https://mooziac.threeten.site",
+    "frameworks_used": [
+      "AppKit",
+      "AVFoundation",
+      "WebKit",
+      "CoreAudio",
+      "MultitouchSupport (private dynamic link)",
+      "MediaPlayer (MPNowPlayingInfoCenter)"
+    ]
+  },
+  "audio_engine": {
+    "supported_local_formats": [
+      {
+        "format": "FLAC",
+        "extension": ".flac",
+        "lossless": true,
+        "mime": "audio/flac"
+      },
+      {
+        "format": "MP3",
+        "extension": ".mp3",
+        "lossless": false,
+        "mime": "audio/mpeg"
+      },
+      {
+        "format": "WAV",
+        "extension": ".wav",
+        "lossless": true,
+        "mime": "audio/wav"
+      },
+      {
+        "format": "AAC",
+        "extension": ".aac",
+        "lossless": false,
+        "mime": "audio/aac"
+      },
+      {
+        "format": "M4A",
+        "extension": ".m4a",
+        "lossless": false,
+        "mime": "audio/mp4"
+      },
+      {
+        "format": "AIFF",
+        "extension": ".aiff",
+        "lossless": true,
+        "mime": "audio/aiff"
+      },
+      {
+        "format": "AIF",
+        "extension": ".aif",
+        "lossless": true,
+        "mime": "audio/aiff"
+      },
+      {
+        "format": "OGG",
+        "extension": ".ogg",
+        "lossless": false,
+        "mime": "audio/ogg"
+      },
+      {
+        "format": "OPUS",
+        "extension": ".opus",
+        "lossless": false,
+        "mime": "audio/opus"
+      }
+    ],
+    "bit_perfect_playback": true,
+    "sample_rates_supported": "Up to 192kHz (hardware DAC dependent)",
+    "loudness_normalization": {
+      "enabled_by_default": true,
+      "target": "-14 LUFS",
+      "transition": "250ms cosine volume easing",
+      "attenuation_formula": "pow(10, clampedDb / 20.0)"
+    },
+    "audio_route_monitoring": {
+      "feature": "Safety Auto-Pause on Disconnect",
+      "trigger": "CoreAudio kAudioHardwarePropertyDefaultOutputDevice change",
+      "action": "Pauses playback when headphones or AirPods disconnect"
+    },
+    "volume_modes": {
+      "system_sound": "Controls macOS CoreAudio Master Device Output",
+      "focus_audio": "Controls WebKit / AVPlayer internal gain independently without changing macOS master volume"
+    }
+  },
+  "gestures_and_input": {
+    "edge_volume_gesture": {
+      "supported_hardware": [
+        "Built-in MacBook trackpad",
+        "Apple Magic Trackpad"
+      ],
+      "horizontal_boundary": "Rightmost 2.5mm (normalized x >= 0.982)",
+      "vertical_trigger_zone": "Top 30% of trackpad (normalized y >= 0.70)",
+      "activation_deadzone": "3.0mm vertical movement required before engaging",
+      "travel_distance": "160mm travel maps to 0% - 100% volume scale",
+      "requires_accessibility_permissions": false
+    },
+    "corner_tap_gestures": {
+      "detection_zone": "Corners within 2.5mm or normalized x <= 0.005 / x >= 0.995, y <= 0.15",
+      "default_actions": {
+        "bottom_right_double_tap": "Next Track",
+        "bottom_right_triple_tap": "Previous Track",
+        "bottom_left_double_tap": "Play/Pause",
+        "bottom_left_triple_tap": "Toggle Centered Lyrics HUD"
+      },
+      "remappable": true,
+      "available_mappings": [
+        "Play/Pause",
+        "Next Track",
+        "Previous Track",
+        "Toggle Lyrics HUD",
+        "Volume Up (5%)",
+        "Volume Down (5%)",
+        "Mute/Unmute",
+        "Toggle Queue Drawer",
+        "Seek Forward (10s)",
+        "Seek Backward (10s)",
+        "Shuffle Toggle",
+        "Repeat Toggle",
+        "Show Main Window",
+        "Hide Main Window",
+        "Toggle Theme",
+        "None"
+      ]
+    },
+    "menu_bar_volume_scrolling": {
+      "trackpad_step": "6pt continuous scroll = 2% volume step",
+      "mouse_wheel_step": "Single notch = 4% volume step",
+      "momentum_filtering": true
+    },
+    "keyboard_shortcuts": {
+      "Space": "Play / Pause",
+      "Left Arrow": "Seek Backward 5s (Shift for 15s)",
+      "Right Arrow": "Seek Forward 5s (Shift for 15s)",
+      "Cmd+L": "Open Lyrics Drawer",
+      "Cmd+Shift+L": "Toggle Centered Floating Lyrics HUD",
+      "Cmd+S": "Toggle Shuffle",
+      "Cmd+R": "Cycle Repeat Modes (Off -> All -> One)",
+      "Cmd+M": "Toggle Mute",
+      "Cmd+,": "Open Settings Panel",
+      "Cmd+O": "Add Music Folder to Library",
+      "Cmd+W": "Close Window (continues playing in menu bar)",
+      "Cmd+Q": "Quit Mooziac completely",
+      "Cmd+Opt+Space": "Global Background Play / Pause"
+    }
+  },
+  "lyrics_pipeline": {
+    "multi_tier_fallback": [
+      {
+        "tier": "0",
+        "source": "Local .lrc sidecar file in audio track directory or ~/Music/Mooziac/"
+      },
+      {
+        "tier": "0.5",
+        "source": "Local disk cache in ~/Library/Caches/Mooziac/Lyrics/ (similarity matched)"
+      },
+      {
+        "tier": "0.8",
+        "source": "YouTube Music InnerTube synchronized lyrics payload"
+      },
+      {
+        "tier": "1.0",
+        "source": "LRCLib API exact track duration match"
+      },
+      {
+        "tier": "2.0",
+        "source": "LRCLib API query search by title and artist"
+      },
+      {
+        "tier": "3.0",
+        "source": "LRCLib API fuzzy title search"
+      },
+      {
+        "tier": "4.0",
+        "source": "Plain text fallback spaced every 4.0s"
+      }
+    ],
+    "display_modalities": {
+      "centered_hud": {
+        "docking": "Centered directly below MacBook display notch or menu bar",
+        "window_style": "Floating borderless NSPanel with transparent background",
+        "highlighting": "Current line highlighted with smooth alpha fade for past lines",
+        "user_adjustments": "Timestamp offset slider (+/- 0.5s increments via Cmd+[ and Cmd+])"
+      },
+      "sidebar_drawer": {
+        "view": "Full scrollable lyrics panel within main player window"
+      }
+    }
+  },
+  "streaming_and_downloads": {
+    "youtube_music_streaming": {
+      "engine": "WebKit WKWebView with isolated data store",
+      "custom_user_agent": "Desktop Safari modern User-Agent for Google account login compatibility",
+      "features": "Ad-free experience, account sync, library browsing, liked songs, personal playlists"
+    },
+    "offline_downloads": {
+      "helper_binary": "yt-dlp standalone binary managed by internal DependencyManager",
+      "helper_path": "~/Library/Application Support/Mooziac/bin/yt-dlp",
+      "default_save_path": "~/Music/Mooziac/",
+      "customizable_path": true,
+      "metadata_embedding": "Automatic embedding of track title, artist, album, and high-res thumbnail cover art",
+      "failure_recovery": "In-app retry button with automatic yt-dlp binary update check"
+    }
+  },
+  "ui_and_themes": {
+    "themes": [
+      {
+        "id": "oled",
+        "name": "OLED Dark Mode",
+        "description": "True #000000 black background with high-contrast accents, optimized for Liquid Retina XDR and OLED displays"
+      },
+      {
+        "id": "adaptive",
+        "name": "Adaptive Ambient Glow",
+        "description": "Extracts dominant and secondary color palettes from current album artwork to render dynamic ambient backdrops"
+      },
+      {
+        "id": "crystal",
+        "name": "Pure Crystal Glass",
+        "description": "Translucent glass effect with a subtle 1.2px #B3B8B5 rim stroke border"
+      },
+      {
+        "id": "transparent",
+        "name": "Watery Pure Transparent",
+        "description": "High-transparency vibrant blur showcasing desktop wallpaper"
+      }
+    ],
+    "progress_bars": [
+      {
+        "id": "waveform",
+        "name": "Waveform",
+        "description": "32-bar reactive audio wave animation"
+      },
+      {
+        "id": "neon",
+        "name": "Neon Glow",
+        "description": "Glowing liquid capsule scrubber with dynamic color shadow"
+      },
+      {
+        "id": "cyber_dots",
+        "name": "Cyber Dots",
+        "description": "Retro pulsing LED dot matrix display"
+      },
+      {
+        "id": "minimal",
+        "name": "Minimal Line",
+        "description": "Zero-overhead 2px precision scrub line for maximum battery savings"
+      }
+    ],
+    "menu_bar_integration": {
+      "status_item": "NSStatusItem with mini playback controls and marquee track title",
+      "menu_bar_only_mode": "Allows running strictly as an accessory app without a Dock icon"
+    }
+  },
+  "integrations_and_privacy": {
+    "discord_rich_presence": {
+      "client_id": "1537169013174435870",
+      "transport": "Native Unix domain socket (/tmp/discord-ipc-0 through /tmp/discord-ipc-9)",
+      "details_shown": "Song title, artist name, album art, elapsed/remaining time",
+      "external_dependencies": "None"
+    },
+    "macos_now_playing": {
+      "center": "MPNowPlayingInfoCenter integration for Control Center and Lock Screen widgets",
+      "remote_commands": "MPRemoteCommandCenter for hardware and Bluetooth media keys"
+    },
+    "privacy": {
+      "telemetry": "Zero analytics SDKs, zero telemetry endpoints",
+      "data_storage": "100% local SQLite database at ~/Library/Application Support/Mooziac/mooziac.sqlite",
+      "preferences": "~/Library/Preferences/site.threeten.mooziac.plist"
+    }
+  }
+}
