@@ -439,20 +439,25 @@ ${contextText || "General Mooziac native macOS music player inquiry."}`;
           try {
             const rawData = body.image || (body.attachments && body.attachments[0] && body.attachments[0].data) || '';
             const base64Data = rawData.includes('base64,') ? rawData.split('base64,')[1] : rawData;
-            if (base64Data) {
+            if (base64Data && base64Data.length <= 1.5 * 1024 * 1024) {
               const bin = atob(base64Data);
               const imgBytes = new Uint8Array(bin.length);
               for (let i = 0; i < bin.length; i++) imgBytes[i] = bin.charCodeAt(i);
 
               usedModel = '@cf/meta/llama-3.2-11b-vision-instruct';
-              aiResponse = await env.AI.run(usedModel, {
+              const visionPromise = env.AI.run(usedModel, {
                 messages: messages,
-                image: [...imgBytes],
+                image: Array.from(imgBytes),
                 max_tokens: 512
               });
+              const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Vision model timeout")), 7000)
+              );
+
+              aiResponse = await Promise.race([visionPromise, timeoutPromise]);
             }
           } catch(visionErr) {
-            console.error("Vision model fallback to 1B text:", visionErr);
+            console.warn("Vision model unavailable or timed out, smoothly falling back to text model:", visionErr);
           }
         }
 
@@ -493,11 +498,14 @@ ${contextText || "General Mooziac native macOS music player inquiry."}`;
     });
 
   } catch (err) {
+    console.error("Unhandled API error in /api/chat:", err);
     return new Response(JSON.stringify({
-      error: "Internal server error",
-      details: err.message
+      reply: "I received your question and image! If you need direct assistance with Mooziac, feel free to enter your email above or check our [GitHub Issues](https://github.com/shirkeharsh/mooziac/issues).",
+      source: "error_fallback_guardrail",
+      model: "fallback_engine",
+      error: err.message
     }), {
-      status: 500,
+      status: 200,
       headers: corsHeaders
     });
   }

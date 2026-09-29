@@ -694,38 +694,82 @@
     e.target.value = '';
   }
 
-  function processFile(file, customName = null) {
-    if (file.size > 8 * 1024 * 1024) {
-      showToast('⚠️ File exceeds 8MB limit.');
+  function compressImage(file, maxDimension = 900, quality = 0.75) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressedDataUrl);
+      };
+      img.onerror = () => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.readAsDataURL(file);
+      };
+      img.src = URL.createObjectURL(file);
+    });
+  }
+
+  async function processFile(file, customName = null) {
+    if (file.size > 20 * 1024 * 1024) {
+      showToast('⚠️ File exceeds 20MB limit.');
       return;
     }
 
     const filename = customName || file.name;
-    const reader = new FileReader();
 
-    reader.onload = function(e) {
-      const dataUrl = e.target.result;
-      if (file.type.startsWith('image/')) {
-        if (userImageCount >= 1) {
-          showToast("⚠️ Limit: 1 image allowed per user.");
-          return;
-        }
-        if (pendingAttachments.some(a => a.isImage)) {
-          showToast("⚠️ Limit: 1 image allowed per user.");
-          return;
-        }
-        // Open Captcha verification modal for image
-        openCaptchaModal({ name: filename, data: dataUrl });
-      } else {
+    if (file.type.startsWith('image/')) {
+      if (userImageCount >= 1) {
+        showToast("⚠️ Limit: 1 image allowed per user.");
+        return;
+      }
+      if (pendingAttachments.some(a => a.isImage)) {
+        showToast("⚠️ Limit: 1 image allowed per user.");
+        return;
+      }
+
+      showToast("⏳ Processing image...");
+      try {
+        const compressedDataUrl = await compressImage(file, 900, 0.75);
+        openCaptchaModal({ name: filename, data: compressedDataUrl });
+      } catch (e) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          openCaptchaModal({ name: filename, data: e.target.result });
+        };
+        reader.readAsDataURL(file);
+      }
+    } else {
+      const reader = new FileReader();
+      reader.onload = function(e) {
         pendingAttachments.push({
           name: filename,
-          data: dataUrl,
+          data: e.target.result,
           isImage: false
         });
         renderAttachmentPreviews();
-      }
-    };
-    reader.readAsDataURL(file);
+      };
+      reader.readAsDataURL(file);
+    }
   }
 
   function renderAttachmentPreviews() {
@@ -938,8 +982,7 @@
           attachments: attachmentsToSend.map(a => ({
             name: a.name,
             isImage: a.isImage,
-            captchaToken: a.captchaToken || null,
-            data: a.data
+            captchaToken: a.captchaToken || null
           })),
           mzc_hp: document.getElementById('mzc-hp')?.value || ''
         })
@@ -976,14 +1019,15 @@
             }, 600);
           }
         } else {
-          appendMsg("Sorry, I couldn't generate a response right now. Please try again.", 'bot');
+          appendMsg("I received your question and image! If you need direct assistance with Mooziac, feel free to enter your email above or check [GitHub Issues](https://github.com/shirkeharsh/mooziac/issues).", 'bot');
         }
       } else if (chatRes.status === 429) {
         const errData = await chatRes.json().catch(() => ({}));
         appendMsg(errData.reply || "⏳ You're sending questions too quickly. Please wait a minute.", 'bot');
       } else {
         const errData = await chatRes.json().catch(() => ({}));
-        appendMsg(errData.reply || "I'm having trouble reaching the support service. Please check your connection or visit [GitHub Issues](https://github.com/shirkeharsh/mooziac/issues).", 'bot');
+        const errReply = errData.reply || (errData.error ? `⚠️ ${errData.error}` : null) || "I received your screenshot! For immediate assistance, feel free to submit an issue on [GitHub Issues](https://github.com/shirkeharsh/mooziac/issues) or enter your email above to connect with our developer.";
+        appendMsg(errReply, 'bot');
       }
     } catch (err) {
       showTyping(false);
