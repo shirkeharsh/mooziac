@@ -88,16 +88,10 @@
     feed.appendChild(gate);
     scrollMessages();
 
-    // Lock input bar while awaiting email connection
+    // Prompt input bar placeholder
     const input = document.getElementById('mzc-input');
-    const sendBtn = document.getElementById('mzc-send');
     if (input) {
-      input.disabled = true;
-      input.placeholder = "Please enter your email above to connect...";
-    }
-    if (sendBtn) {
-      sendBtn.style.opacity = '0.5';
-      sendBtn.style.cursor = 'not-allowed';
+      input.placeholder = "Enter your email above or type here...";
     }
 
     const form = document.getElementById('mzc-email-gate-form');
@@ -123,13 +117,19 @@
         }).catch(() => {});
 
         gate.remove();
-        appendMsg(`You're connected! Our developer (Harsh Shirke) has received your request. You can also continue chatting with Minitoonbot! 🚀`, 'bot');
+        appendMsg(userEmail, 'user');
+        showTyping(true);
+        setTimeout(() => {
+          showTyping(false);
+          appendMsg(`Thank you! Your email (**${userEmail}**) has been connected with our developer (Harsh Shirke). He has received your request and will reach out to you directly.\n\nIn the meantime, feel free to ask Minitoonbot anything about Mooziac!`, 'bot');
+        }, 350);
 
         if (input) {
           input.disabled = false;
           input.placeholder = "Ask Minitoonbot anything...";
           input.focus();
         }
+        const sendBtn = document.getElementById('mzc-send');
         if (sendBtn) {
           sendBtn.style.opacity = '1';
           sendBtn.style.cursor = 'pointer';
@@ -310,8 +310,12 @@
       showTyping(true);
       setTimeout(() => {
         showTyping(false);
-        appendMsg(topic.reply, 'bot');
-        if (!userEmail) renderEmailConnectCard();
+        if (userEmail) {
+          appendMsg(`You're already connected with email **${userEmail}**! Our developer (Harsh Shirke) has received your request.\n\nIf you want to use a different email or have an urgent question, simply enter your new email or message below:`, 'bot');
+        } else {
+          appendMsg(topic.reply, 'bot');
+        }
+        renderEmailConnectCard();
       }, 250);
       return;
     }
@@ -470,18 +474,57 @@
     }
 
     const input = document.getElementById('mzc-input');
-    const query = input.value.trim();
-
+    const query = (input?.value || '').trim();
     if (!query) return;
 
+    // Check if user is entering/updating their email address directly in chat
+    const emailMatch = query.match(/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/);
+    if (emailMatch) {
+      userEmail = emailMatch[0];
+      localStorage.setItem('mzc_user_email', userEmail);
+      appendMsg(query, 'user');
+      input.value = '';
+
+      const gate = document.getElementById('mzc-email-gate');
+      if (gate) gate.remove();
+
+      if (input) {
+        input.disabled = false;
+        input.placeholder = "Ask Minitoonbot anything...";
+      }
+
+      fetch(`${API_BASE}/api/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'CONNECT',
+          name: 'Connected Chat User',
+          email: userEmail,
+          session_id: sessionId,
+          message: `User provided email via chat input in session ${sessionId}.`
+        })
+      }).catch(() => {});
+
+      showTyping(true);
+      setTimeout(() => {
+        showTyping(false);
+        appendMsg(`Thank you! Your email (**${userEmail}**) has been connected with our developer (Harsh Shirke). He has received your request and will reach out to you directly.\n\nIn the meantime, feel free to ask Minitoonbot anything about Mooziac!`, 'bot');
+      }, 350);
+      return;
+    }
+
     // Check if user explicitly asks for human/developer
-    if (/\b(human|agent|talk to human|connect me to human|speak to human|real person|developer|support agent|harsh)\b/i.test(query) && !userEmail) {
+    if (/\b(human|agent|talk to human|connect me to human|speak to human|real person|developer|support agent|harsh)\b/i.test(query)) {
       appendMsg(query, 'user');
       input.value = '';
       showTyping(true);
       setTimeout(() => {
         showTyping(false);
-        appendMsg("I'd be glad to connect you directly with our developer (Harsh Shirke). Please enter your email below to connect:", 'bot');
+        if (userEmail) {
+          appendMsg(`You're already connected with email **${userEmail}**! Our developer (Harsh Shirke) has received your request.\n\nIf you want to use a different email or have an urgent question, simply enter your new email or message below:`, 'bot');
+        } else {
+          appendMsg("I'd be glad to connect you directly with our developer (Harsh Shirke). Please enter your email below to connect:", 'bot');
+        }
         renderEmailConnectCard();
       }, 300);
       return;
@@ -518,6 +561,13 @@
 
       if (chatRes.ok) {
         const chatData = await chatRes.json();
+
+        if (chatData.connected_email) {
+          userEmail = chatData.connected_email;
+          localStorage.setItem('mzc_user_email', userEmail);
+          const gate = document.getElementById('mzc-email-gate');
+          if (gate) gate.remove();
+        }
 
         if (chatData.requires_email) {
           if (chatData.reply) appendMsg(chatData.reply, 'bot');

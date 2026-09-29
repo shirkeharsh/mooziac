@@ -290,6 +290,21 @@ export async function onRequestPost(context) {
       });
     }
 
+    // 5b. Direct Email Submission Handler (Catch user providing their email)
+    const emailMatch = userQuery.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/);
+    if (emailMatch && userQuery.trim().length <= 80) {
+      const email = emailMatch[0];
+      return new Response(JSON.stringify({
+        reply: `Thank you! Your email (**${email}**) has been connected with our developer (Harsh Shirke). He has received your request and will reach out to you directly.\n\nIn the meantime, feel free to ask Minitoonbot anything about Mooziac!`,
+        connected_email: email,
+        source: "human_connect_success",
+        model: "edge_guardrail"
+      }), {
+        status: 200,
+        headers: corsHeaders
+      });
+    }
+
     // 6. Retrieve top facts
     const relevantItems = retrieveContext(userQuery);
     const contextText = relevantItems.map(item => item.text).join('\n\n');
