@@ -24,6 +24,10 @@
 
   // Ground-Truth Quick Topics
   const QUICK_TOPICS = {
+    human: {
+      label: "👤 Connect to Human / Agent",
+      reply: "I'd be glad to connect you directly with our developer (Harsh Shirke). Please enter your email below to connect:"
+    },
     gestures: {
       label: "🖐️ Trackpad Edge Volume & Corners",
       reply: "**Trackpad Edge Volume & Gestures:**\n• **Volume:** Slide 1 finger along the far right edge of your trackpad (top 30% area, requires 3mm movement to engage).\n• **Bottom-Right Corner:** 2 taps = Next Track; 3 taps = Previous Track.\n• **Bottom-Left Corner:** 2 taps = Play/Pause; 3 taps = Toggle Lyrics HUD.\n\n*Zero accessibility permissions needed! Works with built-in and Magic Trackpads.*"
@@ -69,11 +73,11 @@
     gate.id = 'mzc-email-gate';
     gate.innerHTML = `
       <div class="mzc-bubble" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 12px; padding: 12px; max-width: 90%;">
-        <p style="margin: 0 0 8px 0; font-size: 13px; font-weight: 600; color: #fff;">Stay Connected with Support 💌</p>
-        <p style="margin: 0 0 10px 0; font-size: 12px; color: rgba(255, 255, 255, 0.8);">Please share your email address so our developer can follow up with you and continue our conversation:</p>
+        <p style="margin: 0 0 6px 0; font-size: 13px; font-weight: 600; color: #fff;">Connect to Human Agent / Developer 👤</p>
+        <p style="margin: 0 0 10px 0; font-size: 12px; color: rgba(255, 255, 255, 0.85);">Enter your email so our developer (Harsh Shirke) can reach out to you directly and assist you:</p>
         <form id="mzc-email-gate-form" style="display: flex; gap: 6px; margin: 0;">
-          <input type="email" id="mzc-gate-email" placeholder="name@example.com" required style="flex: 1; padding: 7px 10px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.4); color: #fff; font-size: 12px; outline: none;">
-          <button type="submit" style="padding: 7px 12px; border-radius: 8px; border: none; background: #0071E3; color: #fff; font-weight: 600; font-size: 12px; cursor: pointer;">Connect</button>
+          <input type="email" id="mzc-gate-email" placeholder="your@email.com" required style="flex: 1; padding: 7px 10px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.4); color: #fff; font-size: 12px; outline: none;">
+          <button type="submit" style="padding: 7px 14px; border-radius: 8px; border: none; background: #0071E3; color: #fff; font-weight: 600; font-size: 12px; cursor: pointer;">Connect</button>
         </form>
       </div>
     `;
@@ -98,16 +102,16 @@
             name: 'Connected Chat User',
             email: userEmail,
             session_id: sessionId,
-            message: `User connected their email in chat widget (session: ${sessionId}).`
+            message: `User requested to connect with human agent / reached chat limit in session ${sessionId}.`
           })
         }).catch(() => {});
 
         gate.remove();
-        appendMsg(`Thank you! Your email (${userEmail}) is connected. You can continue asking questions! 🚀`, 'bot');
+        appendMsg(`You're connected! Our developer (Harsh Shirke) has received your request. You can also continue chatting with Monitongue! 🚀`, 'bot');
         const input = document.getElementById('mzc-input');
         if (input) {
           input.disabled = false;
-          input.placeholder = "Ask Mooziac AI anything...";
+          input.placeholder = "Ask Minitongue anything...";
           input.focus();
         }
       });
@@ -116,7 +120,7 @@
     const input = document.getElementById('mzc-input');
     if (input) {
       input.disabled = true;
-      input.placeholder = "Please share your email above to continue...";
+      input.placeholder = "Please enter your email above to connect...";
     }
   }
 
@@ -135,7 +139,7 @@
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
           </svg>
         </div>
-        <span class="mzc-launcher-label">AI Support</span>
+        <span class="mzc-launcher-label">Ask Minitongue</span>
       </div>
 
       <!-- Main Glass Window -->
@@ -148,12 +152,12 @@
         <div class="mzc-header">
           <div class="mzc-profile">
             <div class="mzc-avatar">
-              🎵
+              👅
               <span id="mzc-dot" class="mzc-online-dot"></span>
             </div>
             <div class="mzc-profile-info">
-              <span class="mzc-name">Mooziac AI Support</span>
-              <span id="mzc-status" class="mzc-status">⚡ Online 24/7 • Instant Answers</span>
+              <span class="mzc-name">Ask Minitongue</span>
+              <span id="mzc-status" class="mzc-status">Monitongue • Built for Mooziac Support</span>
             </div>
           </div>
 
@@ -168,14 +172,15 @@
         <div id="mzc-messages" class="mzc-messages">
           <div class="mzc-msg bot">
             <div class="mzc-bubble">
-              <p><strong>Welcome to Mooziac AI Support! 👋</strong></p>
-              <p>I can answer any question about gestures, downloads, lyrics, formats, or macOS issues. Ask anything or pick a topic:</p>
+              <p><strong>Hi, I'm Monitongue! 👅</strong></p>
+              <p>I was built exclusively to assist you with Mooziac. Ask anything about gestures, downloads, lyrics, formats, or macOS fixes:</p>
               <div class="mzc-options-group" id="mzc-initial-options">
                 <button class="mzc-option-pill" data-key="gestures">🖐️ Trackpad Edge Volume</button>
                 <button class="mzc-option-pill" data-key="gatekeeper">⚠️ App Is Damaged Fix</button>
                 <button class="mzc-option-pill" data-key="lyrics">🎤 Synced Lyrics & Notch HUD</button>
                 <button class="mzc-option-pill" data-key="downloads">⬇️ Downloads & Offline Music</button>
                 <button class="mzc-option-pill" data-key="formats">🎵 Supported Formats</button>
+                <button class="mzc-option-pill" data-key="human">👤 Connect to Human / Agent</button>
               </div>
             </div>
             <span class="mzc-time">Just now</span>
@@ -202,7 +207,7 @@
           <input type="file" id="mzc-file-input" accept="image/*,.txt,.log" multiple style="display: none;">
 
           <input type="text" id="mzc-hp" name="mzc_hp" style="display:none !important;" tabindex="-1" autocomplete="off">
-          <input type="text" id="mzc-input" class="mzc-input-field" placeholder="Ask Mooziac AI anything..." maxlength="500" autocomplete="off">
+          <input type="text" id="mzc-input" class="mzc-input-field" placeholder="Ask Minitongue anything..." maxlength="500" autocomplete="off">
 
           <button id="mzc-send" class="mzc-send-btn" title="Send (Enter)">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -274,6 +279,9 @@
     setTimeout(() => {
       showTyping(false);
       appendMsg(topic.reply, 'bot');
+      if (key === 'human' && !userEmail) {
+        setTimeout(renderEmailConnectCard, 200);
+      }
     }, 250);
   }
 
@@ -426,6 +434,25 @@
 
     if (!query && attachmentsToSend.length === 0) return;
 
+    // Check if user explicitly asks for human/developer
+    if (/\b(human|agent|talk to human|connect me to human|speak to human|real person|developer|support agent|harsh)\b/i.test(query) && !userEmail) {
+      appendMsg(query, 'user', attachmentsToSend);
+      input.value = '';
+      showTyping(true);
+      setTimeout(() => {
+        showTyping(false);
+        appendMsg("I'd be glad to connect you directly with our developer (Harsh Shirke). Please enter your email below to connect:", 'bot');
+        renderEmailConnectCard();
+      }, 300);
+      return;
+    }
+
+    if (userMessageCount >= 10 && !userEmail) {
+      renderEmailConnectCard();
+      showToast("👤 Connect with human agent to continue");
+      return;
+    }
+
     userMessageCount++;
     localStorage.setItem('mzc_msg_count', userMessageCount.toString());
 
@@ -449,6 +476,7 @@
           message: query,
           session_id: sessionId,
           history: conversationHistory,
+          msg_count: userMessageCount,
           email: userEmail,
           mzc_hp: document.getElementById('mzc-hp')?.value || ''
         })
@@ -459,6 +487,7 @@
       if (chatRes.ok) {
         const chatData = await chatRes.json();
         if (chatData.requires_email) {
+          if (chatData.reply) appendMsg(chatData.reply, 'bot');
           renderEmailConnectCard();
           return;
         }

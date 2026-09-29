@@ -256,15 +256,16 @@ export async function onRequestPost(context) {
       });
     }
 
-    // 5. Email Gate: Require email after 10 questions to stay connected
-    const userMsgCount = (Array.isArray(body.history) ? body.history : []).filter(h => h.role === 'user').length + 1;
+    // 5. Connect to Human or 10-Message Limit Gate
+    const isHumanRequest = /\b(human|agent|talk to human|connect me to human|speak to human|real person|developer|support agent|harsh)\b/i.test(userQuery);
+    const clientMsgCount = body.msg_count || (Array.isArray(body.history) ? body.history.filter(h => h.role === 'user').length : 0) + 1;
     const userEmail = (body.email || '').trim();
 
-    if (userMsgCount > 10 && !userEmail) {
+    if ((clientMsgCount >= 10 || isHumanRequest) && !userEmail) {
       return new Response(JSON.stringify({
-        reply: "Please share your email address to stay connected and continue our conversation with Mooziac Support.",
+        reply: "To connect with our developer (Harsh Shirke) or a human support agent, please enter your email below:",
         requires_email: true,
-        source: "email_gate",
+        source: "human_connect_gate",
         model: "edge_guardrail"
       }), {
         status: 200,
@@ -279,12 +280,14 @@ export async function onRequestPost(context) {
     // 7. Check if Cloudflare Workers AI is available in env
     if (env && env.AI) {
       try {
-        const systemPrompt = `You are the official Mooziac Support AI for Mooziac (https://mooziac.threeten.site), a native macOS music player.
+        const systemPrompt = `You are Monitongue (also known as "Ask Minitongue"), the official autonomous support AI bot built specifically for Mooziac (https://mooziac.threeten.site), a native macOS music player.
 You must answer concisely, accurately, and politely in Markdown.
 
-CRITICAL TECHNICAL RULES:
-- ONLY answer using the provided Mooziac context.
+CRITICAL IDENTITY & TECHNICAL RULES:
+- Your name is Monitongue (or Ask Minitongue). You were built exclusively to provide fast, reliable support for Mooziac.
 - Harsh Shirke (@shirkeharsh) is the sole creator and developer of Mooziac. Harsh is a software developer and competitive PC gamer who plays CS:GO (Counter-Strike) and Valorant. Harsh is NOT a musician, producer, artist, or singer; he built Mooziac simply because he wanted an ultra-lightweight, distraction-free native macOS music player for listening while coding and gaming.
+- If a user asks to connect to a human, developer, or agent: explain that they can connect directly with Harsh Shirke by providing their email in the prompt card.
+- ONLY answer using the provided Mooziac context.
 - If a feature does NOT exist (e.g. 10-band equalizer, Windows/Linux support, Spotify streaming, ID3 tag editing), explicitly state that it is not supported.
 - If user asks why volume gesture does not work: explain it requires built-in or Magic Trackpad, starting in top 30% of trackpad, rightmost 2.5mm edge, and 3.0mm vertical movement deadzone.
 - If user gets macOS Gatekeeper 'damaged' warning: provide 'xattr -cr /Applications/Mooziac.app' or System Settings > Privacy & Security > Open Anyway.
