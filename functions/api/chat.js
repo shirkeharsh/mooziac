@@ -131,6 +131,44 @@ function generateDeterministicAnswer(userQuery, topMatches) {
   }
 }
 
+// In-memory sliding window rate limiter per edge isolate
+const chatRateLimitMap = new Map();
+
+function checkChatRateLimit(ip) {
+  const now = Date.now();
+  const windowMs = 60 * 1000; // 1 minute
+  const maxPerMin = 6;
+  const longWindowMs = 10 * 60 * 1000; // 10 minutes
+  const maxPer10Min = 25;
+
+  let timestamps = chatRateLimitMap.get(ip) || [];
+  timestamps = timestamps.filter(t => now - t < longWindowMs);
+
+  const countLastMin = timestamps.filter(t => now - t < windowMs).length;
+  if (countLastMin >= maxPerMin) {
+    return { limited: true, error: "You're sending questions too quickly. Please wait a minute." };
+  }
+  if (timestamps.length >= maxPer10Min) {
+    return { limited: true, error: "Session rate limit reached. Please wait a few minutes before asking more questions." };
+  }
+
+  timestamps.push(now);
+  chatRateLimitMap.set(ip, timestamps);
+
+  if (chatRateLimitMap.size > 2000) {
+    for (const [k, v] of chatRateLimitMap.entries()) {
+      if (v.every(t => now - t > longWindowMs)) chatRateLimitMap.delete(k);
+    }
+  }
+
+  return { limited: false };
+}
+
+// Moderation Patterns: Profanity, NSFW, Harassment, Jailbreaks, Spam
+const NSFW_AND_ABUSE_REGEX = /\b(nude|nudes|porn|pornography|nsfw|hentai|erotic|sex|sexy|boobs|penis|vagina|dildo|orgasm|cum|blowjob|fuck|fucking|fucker|shit|bitch|asshole|bastard|cunt|dick|pussy|faggot|nigger|retard|kill\s+yourself|die\s+in\s+a\s+fire|casino|poker|viagra|free\s+crypto|telegram\s+channel)\b/i;
+
+const PROMPT_INJECTION_REGEX = /(ignore\s+(all\s+)?(previous|prior|above)\s+instructions|reveal\s+(your\s+)?(system\s+prompt|instructions|secret)|you\s+are\s+now\s+(DAN|unrestricted|in\s+developer\s+mode)|bypass\s+(all\s+)?(safety|filters))/i;
+
 export async function onRequestPost(context) {
   const { request, env } = context;
 
@@ -142,21 +180,87 @@ export async function onRequestPost(context) {
   };
 
   try {
+    const clientIp = request.headers.get('cf-connecting-ip') || request.headers.get('x-real-ip') || 'unknown';
+
+    // 1. Rate Limiting Check
+    const rateCheck = checkChatRateLimit(clientIp);
+    if (rateCheck.limited) {
+      return new Response(JSON.stringify({
+        reply: `⏳ ${rateCheck.error}`,
+        source: 'rate_limiter',
+        model: 'edge_guardrail'
+      }), {
+        status: 429,
+        headers: {
+          ...corsHeaders,
+          'Retry-After': '60'
+        }
+      });
+    }
+
     const body = await request.json().catch(() => ({}));
+
+    // 2. Honeypot Bot Trap: Drop automated bots instantly without wasting AI tokens
+    if (body.website || body.mzc_hp || body.url_ref) {
+      return new Response(JSON.stringify({
+        reply: "Thanks for reaching out!",
+        source: "bot_trap",
+        model: "edge_guardrail"
+      }), { status: 200, headers: corsHeaders });
+    }
+
     const userQuery = (body.message || body.query || '').trim();
 
-    if (!userQuery) {
-      return new Response(JSON.stringify({ error: "Message cannot be empty." }), {
+    // 3. Message Length & Spam Flood Validation
+    if (!userQuery || userQuery.length < 2) {
+      return new Response(JSON.stringify({ error: "Please enter a valid question." }), {
         status: 400,
         headers: corsHeaders
       });
     }
 
-    // 1. Retrieve top facts
+    if (userQuery.length > 500) {
+      return new Response(JSON.stringify({
+        reply: "Your question is too long (over 500 characters). Please summarize your question so I can assist you better.",
+        source: "guardrail_length",
+        model: "edge_guardrail"
+      }), { status: 200, headers: corsHeaders });
+    }
+
+    if (/(.)\1{12,}/i.test(userQuery)) {
+      return new Response(JSON.stringify({
+        reply: "Please ask a clear, constructive question about Mooziac.",
+        source: "guardrail_spam",
+        model: "edge_guardrail"
+      }), { status: 200, headers: corsHeaders });
+    }
+
+    const words = userQuery.toLowerCase().split(/\s+/).filter(Boolean);
+    if (words.length >= 8 && new Set(words).size <= 2) {
+      return new Response(JSON.stringify({
+        reply: "Please ask a constructive question without repeating the same words.",
+        source: "guardrail_spam",
+        model: "edge_guardrail"
+      }), { status: 200, headers: corsHeaders });
+    }
+
+    // 4. Content Moderation: Reject NSFW, Profanity, Abuse & Jailbreaks before calling AI
+    if (NSFW_AND_ABUSE_REGEX.test(userQuery) || PROMPT_INJECTION_REGEX.test(userQuery)) {
+      return new Response(JSON.stringify({
+        reply: "I am the Mooziac Support AI and can only assist with questions regarding the Mooziac macOS music player, troubleshooting, and features. Please keep messages respectful and relevant to Mooziac.",
+        source: "content_moderation_guardrail",
+        model: "edge_guardrail"
+      }), {
+        status: 200,
+        headers: corsHeaders
+      });
+    }
+
+    // 5. Retrieve top facts
     const relevantItems = retrieveContext(userQuery);
     const contextText = relevantItems.map(item => item.text).join('\n\n');
 
-    // 2. Check if Cloudflare Workers AI is available in env
+    // 6. Check if Cloudflare Workers AI is available in env
     if (env && env.AI) {
       try {
         const systemPrompt = `You are the official Mooziac Support AI for Mooziac (https://mooziac.threeten.site), a native macOS music player.

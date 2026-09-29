@@ -137,7 +137,8 @@
           </button>
           <input type="file" id="mzc-file-input" accept="image/*,.txt,.log" multiple style="display: none;">
 
-          <input type="text" id="mzc-input" class="mzc-input-field" placeholder="Ask Mooziac AI anything..." autocomplete="off">
+          <input type="text" id="mzc-hp" name="mzc_hp" style="display:none !important;" tabindex="-1" autocomplete="off">
+          <input type="text" id="mzc-input" class="mzc-input-field" placeholder="Ask Mooziac AI anything..." maxlength="500" autocomplete="off">
 
           <button id="mzc-send" class="mzc-send-btn" title="Send (Enter)">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -375,7 +376,8 @@
         body: JSON.stringify({
           message: query,
           session_id: sessionId,
-          history: conversationHistory
+          history: conversationHistory,
+          mzc_hp: document.getElementById('mzc-hp')?.value || ''
         })
       });
 
@@ -391,6 +393,9 @@
         } else {
           appendMsg("Sorry, I couldn't generate a response right now. Please try again.", 'bot');
         }
+      } else if (chatRes.status === 429) {
+        const errData = await chatRes.json().catch(() => ({}));
+        appendMsg(errData.reply || "⏳ You're sending questions too quickly. Please wait a minute.", 'bot');
       } else {
         appendMsg("I'm having trouble reaching the support service. Please check your connection or visit [GitHub Issues](https://github.com/shirkeharsh/mooziac/issues).", 'bot');
       }

@@ -4,6 +4,28 @@
  * Securely forwards submissions to your Discord staff channel via encrypted Webhook URL.
  */
 
+// Feedback rate limiter (max 3 submissions per 10 mins per IP)
+const feedbackRateMap = new Map();
+
+function checkFeedbackRateLimit(ip) {
+  const now = Date.now();
+  const windowMs = 10 * 60 * 1000; // 10 minutes
+  const maxPerWindow = 3;
+
+  let timestamps = feedbackRateMap.get(ip) || [];
+  timestamps = timestamps.filter(t => now - t < windowMs);
+
+  if (timestamps.length >= maxPerWindow) {
+    return false;
+  }
+
+  timestamps.push(now);
+  feedbackRateMap.set(ip, timestamps);
+  return true;
+}
+
+const SPAM_REGEX = /\b(casino|crypto|poker|viagra|whatsapp|telegram|giveaway|investment|lottery)\b/i;
+
 export async function onRequestPost(context) {
   const { request, env } = context;
 
@@ -15,7 +37,51 @@ export async function onRequestPost(context) {
   };
 
   try {
+    const clientIp = request.headers.get('cf-connecting-ip') || request.headers.get('x-real-ip') || 'unknown';
+
+    // 1. Rate Limiting Check
+    if (!checkFeedbackRateLimit(clientIp)) {
+      return new Response(JSON.stringify({
+        error: "Too many feedback submissions. Please wait 10 minutes."
+      }), { status: 429, headers: corsHeaders });
+    }
+
     const payload = await request.json().catch(() => ({}));
+
+    // 2. Honeypot check for bots
+    if (payload.website || payload.hp || payload.mzc_hp) {
+      return new Response(JSON.stringify({
+        success: true,
+        status: "ticket_created",
+        ticket_id: "#MZ-FEED-BOT0",
+        message: "Feedback received successfully"
+      }), { status: 200, headers: corsHeaders });
+    }
+
+    const messageContent = (payload.message || payload.issue || '').trim();
+
+    // 3. Message validation & spam filter
+    if (!messageContent || messageContent.length < 3) {
+      return new Response(JSON.stringify({ error: "Please provide a valid feedback message." }), {
+        status: 400,
+        headers: corsHeaders
+      });
+    }
+
+    if (messageContent.length > 2000) {
+      return new Response(JSON.stringify({ error: "Message exceeds 2,000 characters." }), {
+        status: 400,
+        headers: corsHeaders
+      });
+    }
+
+    if (SPAM_REGEX.test(messageContent)) {
+      return new Response(JSON.stringify({ error: "Feedback flagged by spam filter." }), {
+        status: 400,
+        headers: corsHeaders
+      });
+    }
+
     const type = (payload.type || 'feedback').toUpperCase();
     const randSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
     const ticketId = `#MZ-${type.slice(0, 4)}-${randSuffix}`;
