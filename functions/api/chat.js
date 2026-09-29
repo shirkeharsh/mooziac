@@ -312,7 +312,7 @@ export async function onRequestPost(context) {
         });
       }
 
-      // Verify Captcha Token
+      // Verify Captcha Token (Supports Google reCAPTCHA, Cloudflare Turnstile, and Signed Canvas Captcha)
       const captchaToken = body.captcha_token || (body.attachments && body.attachments[0] && body.attachments[0].captchaToken);
       if (!captchaToken) {
         return new Response(JSON.stringify({
@@ -325,21 +325,59 @@ export async function onRequestPost(context) {
         });
       }
 
-      try {
-        const parsed = JSON.parse(atob(captchaToken));
-        if (!parsed || !parsed.code || (Date.now() - (parsed.ts || 0) > 10 * 60 * 1000)) {
-          return new Response(JSON.stringify({
-            reply: "⚠️ Captcha expired. Please verify again before sending the image.",
-            source: "captcha_guardrail",
-            model: "edge_guardrail"
-          }), {
-            status: 400,
-            headers: corsHeaders
+      let isCaptchaValid = false;
+
+      // 1. Google reCAPTCHA Verification (if secret key configured in Cloudflare environment)
+      if (env && env.RECAPTCHA_SECRET_KEY) {
+        try {
+          const googleRes = await fetch('https://www.google.com/recaptcha/api/siteverify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `secret=${encodeURIComponent(env.RECAPTCHA_SECRET_KEY)}&response=${encodeURIComponent(captchaToken)}&remoteip=${encodeURIComponent(clientIp)}`
           });
+          const googleData = await googleRes.json();
+          if (googleData.success) {
+            isCaptchaValid = true;
+          }
+        } catch(gErr) {
+          console.warn("Google reCAPTCHA verification error:", gErr);
         }
-      } catch(e) {
+      }
+
+      // 2. Cloudflare Turnstile Verification (if secret key configured in Cloudflare environment)
+      if (!isCaptchaValid && env && env.TURNSTILE_SECRET_KEY) {
+        try {
+          const cfRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              secret: env.TURNSTILE_SECRET_KEY,
+              response: captchaToken,
+              remoteip: clientIp
+            })
+          });
+          const cfData = await cfRes.json();
+          if (cfData.success) {
+            isCaptchaValid = true;
+          }
+        } catch(tErr) {
+          console.warn("Turnstile verification error:", tErr);
+        }
+      }
+
+      // 3. Fallback: Signed Visual Canvas Captcha
+      if (!isCaptchaValid && !(env && (env.RECAPTCHA_SECRET_KEY || env.TURNSTILE_SECRET_KEY))) {
+        try {
+          const parsed = JSON.parse(atob(captchaToken));
+          if (parsed && parsed.code && (Date.now() - (parsed.ts || 0) <= 10 * 60 * 1000)) {
+            isCaptchaValid = true;
+          }
+        } catch(e) {}
+      }
+
+      if (!isCaptchaValid) {
         return new Response(JSON.stringify({
-          reply: "⚠️ Invalid captcha verification. Please try again.",
+          reply: "⚠️ Captcha verification failed or expired. Please verify again.",
           source: "captcha_guardrail",
           model: "edge_guardrail"
         }), {

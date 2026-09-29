@@ -28,6 +28,27 @@
   let pendingImageForCaptcha = null;
   let currentCaptchaCode = '';
 
+  // Google reCAPTCHA & Cloudflare Turnstile Integration
+  const GOOGLE_RECAPTCHA_SITE_KEY = window.MOOZIAC_RECAPTCHA_SITE_KEY || '';
+  const TURNSTILE_SITE_KEY = window.MOOZIAC_TURNSTILE_SITE_KEY || '';
+  let googleWidgetId = null;
+  let turnstileWidgetId = null;
+
+  function loadExternalCaptchaScript(src) {
+    if (document.querySelector(`script[src="${src}"]`)) return;
+    const s = document.createElement('script');
+    s.src = src;
+    s.async = true;
+    s.defer = true;
+    document.head.appendChild(s);
+  }
+
+  if (GOOGLE_RECAPTCHA_SITE_KEY) {
+    loadExternalCaptchaScript('https://www.google.com/recaptcha/api.js?render=explicit');
+  } else if (TURNSTILE_SITE_KEY) {
+    loadExternalCaptchaScript('https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit');
+  }
+
   // Ground-Truth Quick Topics
   const QUICK_TOPICS = {
     human: {
@@ -141,18 +162,79 @@
   function openCaptchaModal(fileData) {
     pendingImageForCaptcha = fileData;
     const card = document.getElementById('mzc-captcha-card');
+    const desc = document.getElementById('mzc-captcha-desc');
+    const cloudBox = document.getElementById('mzc-cloud-captcha-box');
+    const canvasSection = document.getElementById('mzc-canvas-captcha-section');
     const input = document.getElementById('mzc-captcha-input');
     const err = document.getElementById('mzc-captcha-err');
     if (!card) return;
 
-    currentCaptchaCode = generateCaptchaCode();
     card.style.display = 'flex';
     if (err) err.style.display = 'none';
+
+    // 1. Google reCAPTCHA if site key configured
+    if (GOOGLE_RECAPTCHA_SITE_KEY && window.grecaptcha && window.grecaptcha.render) {
+      if (desc) desc.textContent = "Please check the box below to verify your upload:";
+      if (canvasSection) canvasSection.style.display = 'none';
+      if (cloudBox) {
+        cloudBox.style.display = 'flex';
+        cloudBox.innerHTML = '';
+        try {
+          googleWidgetId = window.grecaptcha.render(cloudBox, {
+            sitekey: GOOGLE_RECAPTCHA_SITE_KEY,
+            callback: (token) => onCaptchaVerified(token)
+          });
+        } catch(e) {
+          if (googleWidgetId !== null && window.grecaptcha.reset) window.grecaptcha.reset(googleWidgetId);
+        }
+      }
+      return;
+    }
+
+    // 2. Cloudflare Turnstile if site key configured
+    if (TURNSTILE_SITE_KEY && window.turnstile && window.turnstile.render) {
+      if (desc) desc.textContent = "Verifying security challenge with Cloudflare Turnstile...";
+      if (canvasSection) canvasSection.style.display = 'none';
+      if (cloudBox) {
+        cloudBox.style.display = 'flex';
+        cloudBox.innerHTML = '';
+        try {
+          turnstileWidgetId = window.turnstile.render(cloudBox, {
+            sitekey: TURNSTILE_SITE_KEY,
+            callback: (token) => onCaptchaVerified(token)
+          });
+        } catch(e) {
+          if (turnstileWidgetId !== null && window.turnstile.reset) window.turnstile.reset(turnstileWidgetId);
+        }
+      }
+      return;
+    }
+
+    // 3. Fallback: Built-in Distortion Canvas Captcha
+    if (desc) desc.textContent = "Please enter the 4 characters shown below to attach your screenshot:";
+    if (cloudBox) cloudBox.style.display = 'none';
+    if (canvasSection) canvasSection.style.display = 'block';
+
+    currentCaptchaCode = generateCaptchaCode();
     if (input) {
       input.value = '';
       setTimeout(() => input.focus(), 100);
     }
     drawCaptcha(currentCaptchaCode);
+  }
+
+  function onCaptchaVerified(token) {
+    if (pendingImageForCaptcha) {
+      pendingAttachments.push({
+        name: pendingImageForCaptcha.name,
+        data: pendingImageForCaptcha.data,
+        isImage: true,
+        captchaToken: token
+      });
+      renderAttachmentPreviews();
+      showToast("✅ Screenshot verified & attached");
+    }
+    closeCaptchaModal();
   }
 
   function closeCaptchaModal() {
@@ -161,6 +243,9 @@
     pendingImageForCaptcha = null;
     const fileInput = document.getElementById('mzc-file-input');
     if (fileInput) fileInput.value = '';
+    if (googleWidgetId !== null && window.grecaptcha && window.grecaptcha.reset) {
+      window.grecaptcha.reset(googleWidgetId);
+    }
   }
 
   function handleCaptchaSubmit(e) {
@@ -198,18 +283,7 @@
       rand: Math.random().toString(36).substring(2)
     }));
 
-    if (pendingImageForCaptcha) {
-      pendingAttachments.push({
-        name: pendingImageForCaptcha.name,
-        data: pendingImageForCaptcha.data,
-        isImage: true,
-        captchaToken: token
-      });
-      renderAttachmentPreviews();
-      showToast("✅ Screenshot verified & attached");
-    }
-
-    closeCaptchaModal();
+    onCaptchaVerified(token);
   }
 
   function updateAttachButtonState() {
@@ -378,17 +452,24 @@
             <span>🔒 Verify Image Upload</span>
             <button type="button" id="mzc-captcha-close" class="mzc-captcha-close" title="Cancel">×</button>
           </div>
-          <div class="mzc-captcha-desc">
+          <div id="mzc-captcha-desc" class="mzc-captcha-desc">
             Please enter the 4 characters shown below to attach your screenshot:
           </div>
-          <div class="mzc-captcha-box">
-            <canvas id="mzc-captcha-canvas" class="mzc-captcha-canvas" width="120" height="38"></canvas>
-            <button type="button" id="mzc-captcha-refresh" class="mzc-captcha-refresh" title="Get new code">🔄</button>
+
+          <!-- Google reCAPTCHA / Cloudflare Turnstile Container -->
+          <div id="mzc-cloud-captcha-box" style="display: none; margin: 4px 0; min-height: 78px; justify-content: center; align-items: center;"></div>
+
+          <!-- Built-in Distortion Canvas Captcha Section -->
+          <div id="mzc-canvas-captcha-section">
+            <div class="mzc-captcha-box">
+              <canvas id="mzc-captcha-canvas" class="mzc-captcha-canvas" width="120" height="38"></canvas>
+              <button type="button" id="mzc-captcha-refresh" class="mzc-captcha-refresh" title="Get new code">🔄</button>
+            </div>
+            <form id="mzc-captcha-form" class="mzc-captcha-row" style="margin-top: 8px;">
+              <input type="text" id="mzc-captcha-input" class="mzc-captcha-input" maxlength="6" placeholder="CODE" autocomplete="off" autocorrect="off" autocapitalize="characters">
+              <button type="submit" id="mzc-captcha-submit" class="mzc-captcha-btn">Verify</button>
+            </form>
           </div>
-          <form id="mzc-captcha-form" class="mzc-captcha-row">
-            <input type="text" id="mzc-captcha-input" class="mzc-captcha-input" maxlength="4" placeholder="CODE" autocomplete="off" autocorrect="off" autocapitalize="characters">
-            <button type="submit" id="mzc-captcha-submit" class="mzc-captcha-btn">Verify</button>
-          </form>
           <div id="mzc-captcha-err" class="mzc-captcha-err" style="display: none;"></div>
         </div>
 
