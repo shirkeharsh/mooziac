@@ -46,15 +46,79 @@
     }
   };
 
-  // Visitor Session
+  // Visitor Session & Email Gate
   let sessionId = localStorage.getItem('mzc_session_id');
   if (!sessionId) {
     sessionId = `sess_${Math.floor(1000 + Math.random() * 9000)}`;
     localStorage.setItem('mzc_session_id', sessionId);
   }
 
+  let userEmail = localStorage.getItem('mzc_user_email') || '';
+  let userMessageCount = parseInt(localStorage.getItem('mzc_msg_count') || '0', 10);
+
   // Conversation history for context
   let conversationHistory = [];
+
+  function renderEmailConnectCard() {
+    if (document.getElementById('mzc-email-gate')) return;
+    const feed = document.getElementById('mzc-messages');
+    if (!feed) return;
+
+    const gate = document.createElement('div');
+    gate.className = 'mzc-msg bot';
+    gate.id = 'mzc-email-gate';
+    gate.innerHTML = `
+      <div class="mzc-bubble" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 12px; padding: 12px; max-width: 90%;">
+        <p style="margin: 0 0 8px 0; font-size: 13px; font-weight: 600; color: #fff;">Stay Connected with Support 💌</p>
+        <p style="margin: 0 0 10px 0; font-size: 12px; color: rgba(255, 255, 255, 0.8);">Please share your email address so our developer can follow up with you and continue our conversation:</p>
+        <form id="mzc-email-gate-form" style="display: flex; gap: 6px; margin: 0;">
+          <input type="email" id="mzc-gate-email" placeholder="name@example.com" required style="flex: 1; padding: 7px 10px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.4); color: #fff; font-size: 12px; outline: none;">
+          <button type="submit" style="padding: 7px 12px; border-radius: 8px; border: none; background: #0071E3; color: #fff; font-weight: 600; font-size: 12px; cursor: pointer;">Connect</button>
+        </form>
+      </div>
+    `;
+    feed.appendChild(gate);
+    scrollMessages();
+
+    const form = document.getElementById('mzc-email-gate-form');
+    if (form) {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const val = document.getElementById('mzc-gate-email')?.value.trim();
+        if (!val || !val.includes('@')) return;
+        userEmail = val;
+        localStorage.setItem('mzc_user_email', userEmail);
+
+        // Forward lead to Discord Webhook via /api/feedback
+        fetch(`${API_BASE}/api/feedback`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'CONNECT',
+            name: 'Connected Chat User',
+            email: userEmail,
+            session_id: sessionId,
+            message: `User connected their email in chat widget (session: ${sessionId}).`
+          })
+        }).catch(() => {});
+
+        gate.remove();
+        appendMsg(`Thank you! Your email (${userEmail}) is connected. You can continue asking questions! 🚀`, 'bot');
+        const input = document.getElementById('mzc-input');
+        if (input) {
+          input.disabled = false;
+          input.placeholder = "Ask Mooziac AI anything...";
+          input.focus();
+        }
+      });
+    }
+
+    const input = document.getElementById('mzc-input');
+    if (input) {
+      input.disabled = true;
+      input.placeholder = "Please share your email above to continue...";
+    }
+  }
 
   // Mount Clean Liquid Glass UI
   function mountWidget() {
@@ -351,11 +415,19 @@
       return;
     }
 
+    if (userMessageCount >= 10 && !userEmail) {
+      renderEmailConnectCard();
+      return;
+    }
+
     const input = document.getElementById('mzc-input');
     const query = input.value.trim();
     const attachmentsToSend = [...pendingAttachments];
 
     if (!query && attachmentsToSend.length === 0) return;
+
+    userMessageCount++;
+    localStorage.setItem('mzc_msg_count', userMessageCount.toString());
 
     // Start 2s cooldown
     startCooldownTimer();
@@ -377,6 +449,7 @@
           message: query,
           session_id: sessionId,
           history: conversationHistory,
+          email: userEmail,
           mzc_hp: document.getElementById('mzc-hp')?.value || ''
         })
       });
@@ -385,11 +458,22 @@
 
       if (chatRes.ok) {
         const chatData = await chatRes.json();
+        if (chatData.requires_email) {
+          renderEmailConnectCard();
+          return;
+        }
         if (chatData && chatData.reply) {
           appendMsg(chatData.reply, 'bot');
           // Add to context history
           conversationHistory.push({ role: 'user', content: query });
           conversationHistory.push({ role: 'assistant', content: chatData.reply });
+
+          // Prompt email after 10th message if not yet connected
+          if (userMessageCount >= 10 && !userEmail) {
+            setTimeout(() => {
+              renderEmailConnectCard();
+            }, 600);
+          }
         } else {
           appendMsg("Sorry, I couldn't generate a response right now. Please try again.", 'bot');
         }

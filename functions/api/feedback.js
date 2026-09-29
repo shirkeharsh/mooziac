@@ -37,18 +37,10 @@ export async function onRequestPost(context) {
   };
 
   try {
+    const payload = await request.json().catch(() => ({}));
     const clientIp = request.headers.get('cf-connecting-ip') || request.headers.get('x-real-ip') || 'unknown';
 
-    // 1. Rate Limiting Check
-    if (!checkFeedbackRateLimit(clientIp)) {
-      return new Response(JSON.stringify({
-        error: "Too many feedback submissions. Please wait 10 minutes."
-      }), { status: 429, headers: corsHeaders });
-    }
-
-    const payload = await request.json().catch(() => ({}));
-
-    // 2. Honeypot check for bots
+    // 1. Honeypot check for bots
     if (payload.website || payload.hp || payload.mzc_hp) {
       return new Response(JSON.stringify({
         success: true,
@@ -56,6 +48,15 @@ export async function onRequestPost(context) {
         ticket_id: "#MZ-FEED-BOT0",
         message: "Feedback received successfully"
       }), { status: 200, headers: corsHeaders });
+    }
+
+    const type = (payload.type || 'feedback').toUpperCase();
+
+    // 2. Rate Limiting Check (CONNECT bypasses feedback limit)
+    if (type !== 'CONNECT' && !checkFeedbackRateLimit(clientIp)) {
+      return new Response(JSON.stringify({
+        error: "Too many feedback submissions. Please wait 10 minutes."
+      }), { status: 429, headers: corsHeaders });
     }
 
     const messageContent = (payload.message || payload.issue || '').trim();
@@ -92,14 +93,18 @@ export async function onRequestPost(context) {
         'BUG': 0xFF3B30,     // Red
         'IDEA': 0x8B7BFF,    // Purple
         'TALK': 0x0071E3,    // Blue
-        'FEEDBACK': 0xFFB800 // Gold
+        'FEEDBACK': 0xFFB800,// Gold
+        'CONNECT': 0x0071E3  // Blue
       };
 
       const stars = payload.stars || payload.rating || 0;
       const starsDisplay = stars > 0 ? "★".repeat(stars) + "☆".repeat(5 - stars) : "Not rated";
+      const title = type === 'CONNECT'
+        ? `💌 User Connected Email: ${payload.email}`
+        : `📬 New Support Submission (${ticketId})`;
 
       const embed = {
-        title: `📬 New Support Submission (${ticketId})`,
+        title: title,
         color: typeColors[type] || 0x34C759,
         fields: [
           { name: "Type", value: type, inline: true },

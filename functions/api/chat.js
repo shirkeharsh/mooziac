@@ -256,11 +256,27 @@ export async function onRequestPost(context) {
       });
     }
 
-    // 5. Retrieve top facts
+    // 5. Email Gate: Require email after 10 questions to stay connected
+    const userMsgCount = (Array.isArray(body.history) ? body.history : []).filter(h => h.role === 'user').length + 1;
+    const userEmail = (body.email || '').trim();
+
+    if (userMsgCount > 10 && !userEmail) {
+      return new Response(JSON.stringify({
+        reply: "Please share your email address to stay connected and continue our conversation with Mooziac Support.",
+        requires_email: true,
+        source: "email_gate",
+        model: "edge_guardrail"
+      }), {
+        status: 200,
+        headers: corsHeaders
+      });
+    }
+
+    // 6. Retrieve top facts
     const relevantItems = retrieveContext(userQuery);
     const contextText = relevantItems.map(item => item.text).join('\n\n');
 
-    // 6. Check if Cloudflare Workers AI is available in env
+    // 7. Check if Cloudflare Workers AI is available in env
     if (env && env.AI) {
       try {
         const systemPrompt = `You are the official Mooziac Support AI for Mooziac (https://mooziac.threeten.site), a native macOS music player.
@@ -268,6 +284,7 @@ You must answer concisely, accurately, and politely in Markdown.
 
 CRITICAL TECHNICAL RULES:
 - ONLY answer using the provided Mooziac context.
+- Harsh Shirke (@shirkeharsh) is the sole creator and developer of Mooziac. Harsh is a software developer and competitive PC gamer who plays CS:GO (Counter-Strike) and Valorant. Harsh is NOT a musician, producer, artist, or singer; he built Mooziac simply because he wanted an ultra-lightweight, distraction-free native macOS music player for listening while coding and gaming.
 - If a feature does NOT exist (e.g. 10-band equalizer, Windows/Linux support, Spotify streaming, ID3 tag editing), explicitly state that it is not supported.
 - If user asks why volume gesture does not work: explain it requires built-in or Magic Trackpad, starting in top 30% of trackpad, rightmost 2.5mm edge, and 3.0mm vertical movement deadzone.
 - If user gets macOS Gatekeeper 'damaged' warning: provide 'xattr -cr /Applications/Mooziac.app' or System Settings > Privacy & Security > Open Anyway.
