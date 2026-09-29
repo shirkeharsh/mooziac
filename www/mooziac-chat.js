@@ -72,12 +72,12 @@
     gate.className = 'mzc-msg bot';
     gate.id = 'mzc-email-gate';
     gate.innerHTML = `
-      <div class="mzc-bubble" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 12px; padding: 12px; max-width: 90%;">
-        <p style="margin: 0 0 6px 0; font-size: 13px; font-weight: 600; color: #fff;">Connect to Human Agent / Developer 👤</p>
-        <p style="margin: 0 0 10px 0; font-size: 12px; color: rgba(255, 255, 255, 0.85);">Enter your email so our developer (Harsh Shirke) can reach out to you directly and assist you:</p>
-        <form id="mzc-email-gate-form" style="display: flex; gap: 6px; margin: 0;">
-          <input type="email" id="mzc-gate-email" placeholder="your@email.com" required style="flex: 1; padding: 7px 10px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.4); color: #fff; font-size: 12px; outline: none;">
-          <button type="submit" style="padding: 7px 14px; border-radius: 8px; border: none; background: #0071E3; color: #fff; font-weight: 600; font-size: 12px; cursor: pointer;">Connect</button>
+      <div class="mzc-bubble mzc-connect-bubble">
+        <p class="mzc-connect-title">Connect to Human Agent / Developer 👤</p>
+        <p class="mzc-connect-desc">Enter your email so our developer (Harsh Shirke) can reach out to you directly and assist you:</p>
+        <form id="mzc-email-gate-form" class="mzc-connect-form">
+          <input type="email" id="mzc-gate-email" class="mzc-connect-input" placeholder="your@email.com" required autocomplete="email">
+          <button type="submit" class="mzc-connect-btn">Connect</button>
         </form>
       </div>
     `;
@@ -107,11 +107,11 @@
         }).catch(() => {});
 
         gate.remove();
-        appendMsg(`You're connected! Our developer (Harsh Shirke) has received your request. You can also continue chatting with Monitongue! 🚀`, 'bot');
+        appendMsg(`You're connected! Our developer (Harsh Shirke) has received your request. You can also continue chatting with Minitoonbot! 🚀`, 'bot');
         const input = document.getElementById('mzc-input');
         if (input) {
           input.disabled = false;
-          input.placeholder = "Ask Minitongue anything...";
+          input.placeholder = "Ask Minitoonbot anything...";
           input.focus();
         }
       });
@@ -139,7 +139,7 @@
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
           </svg>
         </div>
-        <span class="mzc-launcher-label">Ask Minitongue</span>
+        <span class="mzc-launcher-label">Ask Minitoonbot</span>
       </div>
 
       <!-- Main Glass Window -->
@@ -152,12 +152,12 @@
         <div class="mzc-header">
           <div class="mzc-profile">
             <div class="mzc-avatar">
-              👅
+              🤖
               <span id="mzc-dot" class="mzc-online-dot"></span>
             </div>
             <div class="mzc-profile-info">
-              <span class="mzc-name">Ask Minitongue</span>
-              <span id="mzc-status" class="mzc-status">Monitongue • Built for Mooziac Support</span>
+              <span class="mzc-name">Ask Minitoonbot</span>
+              <span id="mzc-status" class="mzc-status">Minitoonbot • Built for Mooziac Support</span>
             </div>
           </div>
 
@@ -172,7 +172,7 @@
         <div id="mzc-messages" class="mzc-messages">
           <div class="mzc-msg bot">
             <div class="mzc-bubble">
-              <p><strong>Hi, I'm Monitongue! 👅</strong></p>
+              <p><strong>Hi, I'm Minitoonbot! 🤖</strong></p>
               <p>I was built exclusively to assist you with Mooziac. Ask anything about gestures, downloads, lyrics, formats, or macOS fixes:</p>
               <div class="mzc-options-group" id="mzc-initial-options">
                 <button class="mzc-option-pill" data-key="gestures">🖐️ Trackpad Edge Volume</button>
@@ -207,7 +207,7 @@
           <input type="file" id="mzc-file-input" accept="image/*,.txt,.log" multiple style="display: none;">
 
           <input type="text" id="mzc-hp" name="mzc_hp" style="display:none !important;" tabindex="-1" autocomplete="off">
-          <input type="text" id="mzc-input" class="mzc-input-field" placeholder="Ask Minitongue anything..." maxlength="500" autocomplete="off">
+          <input type="text" id="mzc-input" class="mzc-input-field" placeholder="Ask Minitoonbot anything..." maxlength="500" autocomplete="off">
 
           <button id="mzc-send" class="mzc-send-btn" title="Send (Enter)">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -245,6 +245,15 @@
 
       // Handle Command+V / Ctrl+V screenshot pasting
       input.addEventListener('paste', handlePaste);
+
+      input.addEventListener('focus', () => {
+        if (window.innerWidth <= 640) {
+          setTimeout(() => {
+            updateMobileViewport();
+            scrollMessages();
+          }, 250);
+        }
+      });
     }
 
     if (sendBtn) sendBtn.addEventListener('click', handleSend);
@@ -253,6 +262,21 @@
       attachBtn.addEventListener('click', () => fileInput.click());
       fileInput.addEventListener('change', handleFileSelect);
     }
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', updateMobileViewport);
+      window.visualViewport.addEventListener('scroll', updateMobileViewport);
+    }
+
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 640 && isOpen) {
+        unlockBodyScroll();
+        resetMobileViewport();
+      } else if (window.innerWidth <= 640 && isOpen) {
+        lockBodyScroll();
+        updateMobileViewport();
+      }
+    });
   }
 
   function bindOptionPills() {
@@ -368,6 +392,67 @@
     renderAttachmentPreviews();
   };
 
+  let savedScrollY = 0;
+
+  function lockBodyScroll() {
+    savedScrollY = window.scrollY || window.pageYOffset || 0;
+    document.body.classList.add('mzc-chat-locked');
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${savedScrollY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.width = '100%';
+  }
+
+  function unlockBodyScroll() {
+    document.body.classList.remove('mzc-chat-locked');
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
+    document.body.style.width = '';
+    window.scrollTo(0, savedScrollY);
+  }
+
+  function updateMobileViewport() {
+    if (!isOpen || window.innerWidth > 640) return;
+    const root = document.getElementById('mzc-widget-root');
+    const win = document.getElementById('mzc-window');
+    if (!root || !win) return;
+
+    if (window.visualViewport) {
+      const vv = window.visualViewport;
+      const height = vv.height;
+      const offsetTop = vv.offsetTop || 0;
+
+      root.style.height = `${height}px`;
+      root.style.top = `${offsetTop}px`;
+      win.style.height = `${height}px`;
+
+      // Detect if virtual keyboard is likely raised
+      const isKeyboardOpen = height < (window.screen.height * 0.75) && height < (window.innerHeight - 80);
+      if (isKeyboardOpen) {
+        root.classList.add('mzc-keyboard-open');
+      } else {
+        root.classList.remove('mzc-keyboard-open');
+      }
+    }
+    scrollMessages();
+  }
+
+  function resetMobileViewport() {
+    const root = document.getElementById('mzc-widget-root');
+    const win = document.getElementById('mzc-window');
+    if (root) {
+      root.style.height = '';
+      root.style.top = '';
+      root.classList.remove('mzc-keyboard-open');
+    }
+    if (win) {
+      win.style.height = '';
+    }
+  }
+
   function setWindowState(open) {
     isOpen = open;
     const root = document.getElementById('mzc-widget-root');
@@ -383,7 +468,8 @@
       if (launcher) launcher.style.display = 'none';
 
       if (window.innerWidth <= 640) {
-        document.body.classList.add('mzc-chat-locked');
+        lockBodyScroll();
+        updateMobileViewport();
       } else {
         if (input) input.focus();
       }
@@ -392,7 +478,11 @@
       root.classList.remove('mzc-is-open');
       if (win) win.style.display = 'none';
       if (launcher) launcher.style.display = 'flex';
-      document.body.classList.remove('mzc-chat-locked');
+
+      if (window.innerWidth <= 640) {
+        unlockBodyScroll();
+        resetMobileViewport();
+      }
     }
   }
 

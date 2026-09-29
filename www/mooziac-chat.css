@@ -502,6 +502,78 @@
   50% { opacity: 1; transform: scale(1.15); }
 }
 
+/* Connect to Human / Agent Card */
+.mzc-msg#mzc-email-gate {
+  max-width: 90%;
+  width: 100%;
+}
+
+.mzc-connect-bubble {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-radius: 14px !important;
+  padding: 12px 14px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.mzc-connect-title {
+  margin: 0 0 6px 0 !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #fff !important;
+}
+
+.mzc-connect-desc {
+  margin: 0 0 10px 0 !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.mzc-connect-form {
+  display: flex !important;
+  gap: 8px !important;
+  margin: 0 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.mzc-connect-input {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  padding: 8px 12px !important;
+  border-radius: 10px !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  background: rgba(0, 0, 0, 0.45) !important;
+  color: #fff !important;
+  font-size: 13px !important;
+  outline: none !important;
+  font-family: inherit !important;
+}
+
+.mzc-connect-input:focus {
+  border-color: #0A84FF !important;
+}
+
+.mzc-connect-btn {
+  padding: 8px 16px !important;
+  border-radius: 10px !important;
+  border: none !important;
+  background: #0071E3 !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  transition: opacity 0.15s !important;
+}
+
+.mzc-connect-btn:hover {
+  opacity: 0.9 !important;
+}
+
 /* Attachment Preview Strip */
 .mzc-preview-bar {
   display: flex;
@@ -626,12 +698,15 @@
   body.mzc-chat-locked {
     overflow: hidden !important;
     touch-action: none !important;
+    position: fixed !important;
+    width: 100% !important;
+    height: 100% !important;
   }
 
   /* Fixed Floating Launcher Button in Bottom-Right */
   .mzc-widget-root {
     position: fixed !important;
-    bottom: max(20px, env(safe-area-inset-bottom)) !important;
+    bottom: max(16px, env(safe-area-inset-bottom)) !important;
     right: 16px !important;
     left: auto !important;
     top: auto !important;
@@ -647,32 +722,30 @@
     bottom: calc(max(14px, env(safe-area-inset-bottom)) + 125px) !important;
   }
 
-  .mzc-widget-root.mzc-is-open {
-    bottom: 0 !important;
-  }
-
   .mzc-launcher {
     pointer-events: auto !important;
     display: flex !important;
-    padding: 8px 16px 8px 12px;
-    border-radius: 30px;
-    gap: 6px;
-    background: rgba(22, 22, 28, 0.92);
-    backdrop-filter: blur(24px) saturate(180%);
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.22);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    padding: 10px 18px 10px 14px !important;
+    border-radius: 30px !important;
+    gap: 8px !important;
+    background: rgba(20, 20, 26, 0.95) !important;
+    backdrop-filter: blur(28px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: transparent !important;
   }
 
   .mzc-launcher-icon svg {
-    width: 14px;
-    height: 14px;
+    width: 16px !important;
+    height: 16px !important;
   }
 
   .mzc-launcher-label {
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: -0.2px;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.2px !important;
   }
 
   .mzc-window {
@@ -680,7 +753,7 @@
     pointer-events: none !important;
   }
 
-  /* Full Screen Mobile Window (Native iOS Messages Layout) */
+  /* Full Screen Mobile Window (Native iOS / Android Messenger Layout) */
   .mzc-widget-root.mzc-is-open {
     position: fixed !important;
     inset: 0 !important;
@@ -690,13 +763,16 @@
     bottom: 0 !important;
     width: 100vw !important;
     width: 100% !important;
-    height: 100dvh !important;
     height: 100% !important;
+    height: 100dvh !important;
     max-height: 100% !important;
-    z-index: 9999999 !important;
-    overflow: hidden;
+    z-index: 99999999 !important;
+    overflow: hidden !important;
     pointer-events: auto !important;
     transform: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+    background: #0d0d12 !important;
   }
 
   .mzc-widget-root.mzc-is-open .mzc-launcher {
@@ -705,18 +781,28 @@
 
   .mzc-widget-root.mzc-is-open .mzc-window {
     width: 100% !important;
+    max-width: 100% !important;
     height: 100% !important;
     height: 100dvh !important;
     max-height: 100% !important;
     border-radius: 0 !important;
     border: none !important;
     box-shadow: none !important;
-    background: rgba(14, 14, 18, 0.98) !important;
+    background: #0d0d12 !important;
     display: flex !important;
     flex-direction: column !important;
     pointer-events: auto !important;
     animation: none !important;
     transform: none !important;
+    overflow: hidden !important;
+    position: relative !important;
+  }
+
+  /* Toast Notification on Mobile - Positioned right below safe area header */
+  .mzc-toast {
+    top: calc(max(16px, env(safe-area-inset-top)) + 52px) !important;
+    z-index: 100 !important;
+    max-width: 90% !important;
   }
 
   /* Native Apple Style Navigation Header */
@@ -724,62 +810,109 @@
     padding-top: max(16px, env(safe-area-inset-top)) !important;
     padding-bottom: 12px !important;
     padding-left: 16px !important;
-    padding-right: 16px !important;
-    background: rgba(22, 22, 28, 0.92) !important;
+    padding-right: 14px !important;
+    background: rgba(20, 20, 26, 0.95) !important;
     backdrop-filter: blur(30px) saturate(190%) !important;
     -webkit-backdrop-filter: blur(30px) saturate(190%) !important;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
-    flex-shrink: 0;
+    flex-shrink: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    z-index: 10 !important;
+  }
+
+  .mzc-profile {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    min-width: 0 !important;
   }
 
   .mzc-avatar {
-    width: 34px !important;
-    height: 34px !important;
-    font-size: 16px !important;
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 17px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .mzc-profile-info {
+    min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 1px !important;
   }
 
   .mzc-name {
-    font-size: 14px !important;
+    font-size: 15px !important;
     font-weight: 700 !important;
-    letter-spacing: -0.2px;
+    letter-spacing: -0.2px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    color: #fff !important;
   }
 
   .mzc-status {
-    font-size: 11px !important;
-    color: rgba(255, 255, 255, 0.55) !important;
+    font-size: 11.5px !important;
+    color: rgba(255, 255, 255, 0.6) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .mzc-header-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-shrink: 0 !important;
   }
 
   .mzc-action-btn {
-    width: 32px !important;
-    height: 32px !important;
-    background: rgba(255, 255, 255, 0.1) !important;
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+    min-height: 38px !important;
+    background: rgba(255, 255, 255, 0.12) !important;
     border-radius: 50% !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: transparent !important;
+    cursor: pointer !important;
+    border: none !important;
+    color: #fff !important;
+    transition: background 0.15s, transform 0.1s !important;
+  }
+
+  .mzc-action-btn:active {
+    background: rgba(255, 255, 255, 0.25) !important;
+    transform: scale(0.94) !important;
   }
 
   .mzc-action-btn svg {
-    width: 14px !important;
-    height: 14px !important;
+    width: 16px !important;
+    height: 16px !important;
   }
 
   /* Native Messages Feed */
   .mzc-messages {
     flex: 1 1 0% !important;
+    min-height: 0 !important;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch !important;
     overscroll-behavior: contain !important;
-    padding: 16px 14px !important;
-    gap: 10px !important;
+    padding: 16px 14px 14px 14px !important;
+    gap: 12px !important;
     width: 100% !important;
     box-sizing: border-box !important;
   }
 
   .mzc-msg {
-    max-width: 85% !important;
+    max-width: 88% !important;
     width: fit-content !important;
-    min-width: 48px !important;
+    min-width: 44px !important;
     box-sizing: border-box !important;
   }
 
@@ -826,11 +959,11 @@
     color: #ffffff !important;
     border-radius: 18px 18px 4px 18px !important;
     border: none !important;
-    box-shadow: 0 2px 8px rgba(10, 132, 255, 0.3) !important;
+    box-shadow: 0 2px 10px rgba(10, 132, 255, 0.35) !important;
   }
 
   .mzc-msg.bot .mzc-bubble {
-    background: rgba(255, 255, 255, 0.12) !important;
+    background: rgba(255, 255, 255, 0.1) !important;
     color: #ffffff !important;
     border-radius: 18px 18px 18px 4px !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
@@ -852,12 +985,103 @@
     align-self: flex-end !important;
   }
 
+  /* Quick Issue Options on Mobile */
+  .mzc-options-group {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    margin-top: 12px !important;
+    width: 100% !important;
+  }
+
   .mzc-option-pill {
-    padding: 10px 13px !important;
-    font-size: 12.5px !important;
+    padding: 11px 14px !important;
+    font-size: 13px !important;
     border-radius: 12px !important;
-    background: rgba(255, 255, 255, 0.09) !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    color: #fff !important;
+    min-height: 42px !important;
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    text-align: left !important;
+    box-sizing: border-box !important;
+    -webkit-tap-highlight-color: transparent !important;
+    touch-action: manipulation !important;
+    cursor: pointer !important;
+    transition: background 0.15s, transform 0.1s !important;
+  }
+
+  .mzc-option-pill:active {
+    background: rgba(255, 255, 255, 0.18) !important;
+    transform: scale(0.98) !important;
+  }
+
+  /* Email Connect Card on Mobile */
+  .mzc-msg#mzc-email-gate {
+    max-width: 96% !important;
+    width: 100% !important;
+  }
+
+  .mzc-connect-bubble {
+    width: 100% !important;
+    padding: 14px !important;
+    border-radius: 16px !important;
+  }
+
+  .mzc-connect-title {
+    font-size: 14px !important;
+    margin-bottom: 6px !important;
+  }
+
+  .mzc-connect-desc {
+    font-size: 12.5px !important;
+    line-height: 1.45 !important;
+    margin-bottom: 12px !important;
+  }
+
+  .mzc-connect-form {
+    display: flex !important;
+    gap: 8px !important;
+    width: 100% !important;
+    flex-wrap: wrap !important;
+  }
+
+  .mzc-connect-input {
+    font-size: 16px !important; /* CRITICAL: Prevents iOS Safari auto-zoom */
+    min-height: 44px !important;
+    padding: 10px 14px !important;
+    border-radius: 12px !important;
+    flex: 1 1 180px !important;
+    width: auto !important;
+  }
+
+  .mzc-connect-btn {
+    min-height: 44px !important;
+    padding: 10px 18px !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    border-radius: 12px !important;
+    flex: 0 0 auto !important;
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
+  @media (max-width: 360px) {
+    .mzc-connect-input {
+      width: 100% !important;
+      flex: 1 1 100% !important;
+    }
+    .mzc-connect-btn {
+      width: 100% !important;
+    }
+  }
+
+  /* Attachment Previews on Mobile */
+  .mzc-preview-bar {
+    padding: 8px 12px !important;
+    background: rgba(14, 14, 18, 0.95) !important;
   }
 
   /* Native Bottom Composer Bar */
@@ -866,36 +1090,71 @@
     padding-left: 12px !important;
     padding-right: 12px !important;
     padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
-    background: rgba(22, 22, 28, 0.95) !important;
+    background: rgba(20, 20, 26, 0.96) !important;
     backdrop-filter: blur(30px) saturate(190%) !important;
     -webkit-backdrop-filter: blur(30px) saturate(190%) !important;
     border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
     gap: 8px !important;
-    flex-shrink: 0;
+    flex-shrink: 0 !important;
+    z-index: 10 !important;
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Tighten bottom bar padding when virtual keyboard is raised */
+  .mzc-widget-root.mzc-keyboard-open .mzc-input-bar {
+    padding-bottom: 8px !important;
   }
 
   .mzc-input-field {
-    font-size: 16px !important;
+    font-size: 16px !important; /* CRITICAL: Prevents iOS Safari auto-zoom */
+    min-height: 42px !important;
+    height: 42px !important;
     padding: 9px 14px !important;
     border-radius: 22px !important;
     background: rgba(255, 255, 255, 0.08) !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
     color: #ffffff !important;
+    -webkit-appearance: none !important;
+    box-sizing: border-box !important;
+  }
+
+  .mzc-input-field:focus {
+    border-color: #0A84FF !important;
+    background: rgba(255, 255, 255, 0.12) !important;
   }
 
   .mzc-attach-btn {
-    width: 36px !important;
-    height: 36px !important;
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
     border-radius: 50% !important;
     background: rgba(255, 255, 255, 0.08) !important;
     color: #0A84FF !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: transparent !important;
+    flex-shrink: 0 !important;
   }
 
   .mzc-send-btn {
-    width: 36px !important;
-    height: 36px !important;
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
     border-radius: 50% !important;
     background: #0A84FF !important;
     color: #ffffff !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: transparent !important;
+    flex-shrink: 0 !important;
   }
 }
