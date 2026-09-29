@@ -133,6 +133,10 @@ function generateDeterministicAnswer(userQuery, topMatches) {
 
 // In-memory sliding window rate limiter per edge isolate
 const chatRateLimitMap = new Map();
+const sessionMsgCountMap = new Map();
+const sessionImgCountMap = new Map();
+const ipMsgCountMap = new Map();
+const ipImgCountMap = new Map();
 
 function checkChatRateLimit(ip) {
   const now = Date.now();
@@ -257,13 +261,28 @@ export async function onRequestPost(context) {
     }
 
     // 5. Connect to Human or 10-Message Limit Gate
-    const isHumanRequest = /\b(human|agent|talk to human|connect me to human|speak to human|real person|developer|support agent|harsh)\b/i.test(userQuery);
-    const clientMsgCount = body.msg_count || (Array.isArray(body.history) ? body.history.filter(h => h.role === 'user').length : 0) + 1;
+    const sessionId = (body.session_id || clientIp).toString();
     const userEmail = (body.email || '').trim();
 
-    if ((clientMsgCount >= 10 || isHumanRequest) && !userEmail) {
+    // Server-side session & IP message counter
+    const serverSessionCount = (sessionMsgCountMap.get(sessionId) || 0) + 1;
+    sessionMsgCountMap.set(sessionId, serverSessionCount);
+
+    let ipCount = 0;
+    if (clientIp !== 'unknown' && clientIp !== '127.0.0.1' && clientIp !== '::1') {
+      ipCount = (ipMsgCountMap.get(clientIp) || 0) + 1;
+      ipMsgCountMap.set(clientIp, ipCount);
+    }
+
+    const clientMsgCount = parseInt(body.msg_count || '0', 10);
+    const historyCount = Array.isArray(body.history) ? body.history.filter(h => h.role === 'user').length + 1 : 1;
+    const effectiveMsgCount = Math.max(serverSessionCount, ipCount, clientMsgCount, historyCount);
+
+    const isHumanRequest = /\b(human|agent|talk to human|connect me to human|speak to human|real person|developer|support agent|harsh)\b/i.test(userQuery);
+
+    if ((effectiveMsgCount > 10 || isHumanRequest) && !userEmail) {
       return new Response(JSON.stringify({
-        reply: "To connect with our developer (Harsh Shirke) or a human support agent, please enter your email below:",
+        reply: "To continue chatting with Minitoonbot or connect directly with our developer (Harsh Shirke), please enter your email below:",
         requires_email: true,
         source: "human_connect_gate",
         model: "edge_guardrail"
@@ -271,6 +290,68 @@ export async function onRequestPost(context) {
         status: 200,
         headers: corsHeaders
       });
+    }
+
+    // 5b. Image Attachment Guardrail: Strictly 1 image per user & Captcha verification
+    const hasImage = Boolean(body.image || (Array.isArray(body.attachments) && body.attachments.some(a => a.isImage)));
+    if (hasImage) {
+      const serverImgCount = sessionImgCountMap.get(sessionId) || 0;
+      let ipImgCount = 0;
+      if (clientIp !== 'unknown' && clientIp !== '127.0.0.1' && clientIp !== '::1') {
+        ipImgCount = ipImgCountMap.get(clientIp) || 0;
+      }
+
+      if (serverImgCount >= 1 || ipImgCount >= 1) {
+        return new Response(JSON.stringify({
+          reply: "⚠️ Image limit reached: Only 1 screenshot/image is permitted per user to prevent abuse.",
+          source: "image_limit_guardrail",
+          model: "edge_guardrail"
+        }), {
+          status: 200,
+          headers: corsHeaders
+        });
+      }
+
+      // Verify Captcha Token
+      const captchaToken = body.captcha_token || (body.attachments && body.attachments[0] && body.attachments[0].captchaToken);
+      if (!captchaToken) {
+        return new Response(JSON.stringify({
+          reply: "⚠️ Captcha verification required to submit an image.",
+          source: "captcha_guardrail",
+          model: "edge_guardrail"
+        }), {
+          status: 400,
+          headers: corsHeaders
+        });
+      }
+
+      try {
+        const parsed = JSON.parse(atob(captchaToken));
+        if (!parsed || !parsed.code || (Date.now() - (parsed.ts || 0) > 10 * 60 * 1000)) {
+          return new Response(JSON.stringify({
+            reply: "⚠️ Captcha expired. Please verify again before sending the image.",
+            source: "captcha_guardrail",
+            model: "edge_guardrail"
+          }), {
+            status: 400,
+            headers: corsHeaders
+          });
+        }
+      } catch(e) {
+        return new Response(JSON.stringify({
+          reply: "⚠️ Invalid captcha verification. Please try again.",
+          source: "captcha_guardrail",
+          model: "edge_guardrail"
+        }), {
+          status: 400,
+          headers: corsHeaders
+        });
+      }
+
+      sessionImgCountMap.set(sessionId, serverImgCount + 1);
+      if (clientIp !== 'unknown' && clientIp !== '127.0.0.1' && clientIp !== '::1') {
+        ipImgCountMap.set(clientIp, (ipImgCountMap.get(clientIp) || 0) + 1);
+      }
     }
 
     // 6. Retrieve top facts
@@ -312,20 +393,46 @@ ${contextText || "General Mooziac native macOS music player inquiry."}`;
 
         messages.push({ role: "user", content: userQuery });
 
-        // Run Cloudflare Workers AI (Llama 3.2 1B)
-        const model = env.AI_MODEL || '@cf/meta/llama-3.2-1b-instruct';
-        const aiResponse = await env.AI.run(model, {
-          messages: messages,
-          max_tokens: 512,
-          temperature: 0.2
-        });
+        let aiResponse = null;
+        let usedModel = env.AI_MODEL || '@cf/meta/llama-3.2-1b-instruct';
+
+        // Multimodal Vision Model if image is present
+        if (hasImage) {
+          try {
+            const rawData = body.image || (body.attachments && body.attachments[0] && body.attachments[0].data) || '';
+            const base64Data = rawData.includes('base64,') ? rawData.split('base64,')[1] : rawData;
+            if (base64Data) {
+              const bin = atob(base64Data);
+              const imgBytes = new Uint8Array(bin.length);
+              for (let i = 0; i < bin.length; i++) imgBytes[i] = bin.charCodeAt(i);
+
+              usedModel = '@cf/meta/llama-3.2-11b-vision-instruct';
+              aiResponse = await env.AI.run(usedModel, {
+                messages: messages,
+                image: [...imgBytes],
+                max_tokens: 512
+              });
+            }
+          } catch(visionErr) {
+            console.error("Vision model fallback to 1B text:", visionErr);
+          }
+        }
+
+        if (!aiResponse) {
+          usedModel = env.AI_MODEL || '@cf/meta/llama-3.2-1b-instruct';
+          aiResponse = await env.AI.run(usedModel, {
+            messages: messages,
+            max_tokens: 512,
+            temperature: 0.2
+          });
+        }
 
         const reply = aiResponse.response || aiResponse.text || '';
         if (reply.trim()) {
           return new Response(JSON.stringify({
             reply: reply.trim(),
             source: 'cloudflare_workers_ai',
-            model: model
+            model: usedModel
           }), {
             status: 200,
             headers: corsHeaders

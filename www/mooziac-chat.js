@@ -2,6 +2,7 @@
  * =========================================================
  * MOOZIAC LIQUID GLASS AI SUPPORT WIDGET (mooziac-chat.js)
  * 100% Autonomous AI Support Assistant (Powered by Mooziac Knowledge Base & Llama 3.2)
+ * Brand: Ask Minitoonbot 🤖
  * =========================================================
  */
 
@@ -21,6 +22,11 @@
   const MSG_COOLDOWN_SEC = 2;
   let isCooldownActive = false;
   let cooldownRemaining = 0;
+
+  // Image Upload Gating (Strictly 1 image per user + Captcha)
+  let userImageCount = parseInt(localStorage.getItem('mzc_img_count') || '0', 10);
+  let pendingImageForCaptcha = null;
+  let currentCaptchaCode = '';
 
   // Ground-Truth Quick Topics
   const QUICK_TOPICS = {
@@ -63,6 +69,166 @@
   // Conversation history for context
   let conversationHistory = [];
 
+  // ==========================================
+  // Captcha Verification Engine
+  // ==========================================
+  function generateCaptchaCode() {
+    const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+    let res = '';
+    for (let i = 0; i < 4; i++) {
+      res += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return res;
+  }
+
+  function drawCaptcha(code) {
+    const canvas = document.getElementById('mzc-captcha-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Background gradient
+    const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    grad.addColorStop(0, '#181a24');
+    grad.addColorStop(1, '#0e0f14');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Noise lines
+    const colors = ['#60a5fa', '#34d399', '#f472b6', '#fbbf24', '#a78bfa', '#38bdf8'];
+    for (let i = 0; i < 5; i++) {
+      ctx.strokeStyle = colors[Math.floor(Math.random() * colors.length)];
+      ctx.lineWidth = 1 + Math.random();
+      ctx.globalAlpha = 0.45;
+      ctx.beginPath();
+      ctx.moveTo(Math.random() * canvas.width, Math.random() * canvas.height);
+      ctx.bezierCurveTo(
+        Math.random() * canvas.width, Math.random() * canvas.height,
+        Math.random() * canvas.width, Math.random() * canvas.height,
+        Math.random() * canvas.width, Math.random() * canvas.height
+      );
+      ctx.stroke();
+    }
+
+    // Noise dots
+    for (let i = 0; i < 25; i++) {
+      ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
+      ctx.globalAlpha = 0.35;
+      ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, 1.5, 1.5);
+    }
+
+    // Skewed / rotated characters
+    ctx.globalAlpha = 1.0;
+    const charWidth = (canvas.width - 24) / 4;
+    for (let i = 0; i < code.length; i++) {
+      ctx.save();
+      const x = 16 + i * charWidth;
+      const y = 26 + (Math.random() * 4 - 2);
+      const angle = (Math.random() * 30 - 15) * Math.PI / 180;
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+      ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = colors[i % colors.length];
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(0,0,0,0.8)';
+      ctx.shadowBlur = 4;
+      ctx.fillText(code[i], 0, 0);
+      ctx.restore();
+    }
+  }
+
+  function openCaptchaModal(fileData) {
+    pendingImageForCaptcha = fileData;
+    const card = document.getElementById('mzc-captcha-card');
+    const input = document.getElementById('mzc-captcha-input');
+    const err = document.getElementById('mzc-captcha-err');
+    if (!card) return;
+
+    currentCaptchaCode = generateCaptchaCode();
+    card.style.display = 'flex';
+    if (err) err.style.display = 'none';
+    if (input) {
+      input.value = '';
+      setTimeout(() => input.focus(), 100);
+    }
+    drawCaptcha(currentCaptchaCode);
+  }
+
+  function closeCaptchaModal() {
+    const card = document.getElementById('mzc-captcha-card');
+    if (card) card.style.display = 'none';
+    pendingImageForCaptcha = null;
+    const fileInput = document.getElementById('mzc-file-input');
+    if (fileInput) fileInput.value = '';
+  }
+
+  function handleCaptchaSubmit(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const input = document.getElementById('mzc-captcha-input');
+    const err = document.getElementById('mzc-captcha-err');
+    const val = (input?.value || '').trim().toUpperCase();
+
+    if (!val) {
+      if (err) {
+        err.textContent = 'Please enter the code above.';
+        err.style.display = 'block';
+      }
+      return;
+    }
+
+    if (val !== currentCaptchaCode) {
+      if (err) {
+        err.textContent = 'Incorrect code. Please try again.';
+        err.style.display = 'block';
+      }
+      currentCaptchaCode = generateCaptchaCode();
+      drawCaptcha(currentCaptchaCode);
+      if (input) {
+        input.value = '';
+        input.focus();
+      }
+      return;
+    }
+
+    // Verified! Create signed captcha token
+    const token = btoa(JSON.stringify({
+      code: currentCaptchaCode,
+      ts: Date.now(),
+      rand: Math.random().toString(36).substring(2)
+    }));
+
+    if (pendingImageForCaptcha) {
+      pendingAttachments.push({
+        name: pendingImageForCaptcha.name,
+        data: pendingImageForCaptcha.data,
+        isImage: true,
+        captchaToken: token
+      });
+      renderAttachmentPreviews();
+      showToast("✅ Screenshot verified & attached");
+    }
+
+    closeCaptchaModal();
+  }
+
+  function updateAttachButtonState() {
+    const attachBtn = document.getElementById('mzc-attach-btn');
+    if (!attachBtn) return;
+    if (userImageCount >= 1) {
+      attachBtn.classList.add('disabled');
+      attachBtn.setAttribute('disabled', 'true');
+      attachBtn.title = 'Image limit reached (1 image per user)';
+    } else {
+      attachBtn.classList.remove('disabled');
+      attachBtn.removeAttribute('disabled');
+      attachBtn.title = 'Attach screenshot (⌘V)';
+    }
+  }
+
+  // ==========================================
+  // Email Connect Card (Human Lead Gate)
+  // ==========================================
   function renderEmailConnectCard() {
     if (document.getElementById('mzc-email-gate')) return;
     const feed = document.getElementById('mzc-messages');
@@ -83,6 +249,18 @@
     `;
     feed.appendChild(gate);
     scrollMessages();
+
+    // Lock input bar while awaiting email connection
+    const input = document.getElementById('mzc-input');
+    const sendBtn = document.getElementById('mzc-send');
+    if (input) {
+      input.disabled = true;
+      input.placeholder = "Please enter your email above to connect...";
+    }
+    if (sendBtn) {
+      sendBtn.style.opacity = '0.5';
+      sendBtn.style.cursor = 'not-allowed';
+    }
 
     const form = document.getElementById('mzc-email-gate-form');
     if (form) {
@@ -108,23 +286,23 @@
 
         gate.remove();
         appendMsg(`You're connected! Our developer (Harsh Shirke) has received your request. You can also continue chatting with Minitoonbot! 🚀`, 'bot');
-        const input = document.getElementById('mzc-input');
+
         if (input) {
           input.disabled = false;
           input.placeholder = "Ask Minitoonbot anything...";
           input.focus();
         }
+        if (sendBtn) {
+          sendBtn.style.opacity = '1';
+          sendBtn.style.cursor = 'pointer';
+        }
       });
-    }
-
-    const input = document.getElementById('mzc-input');
-    if (input) {
-      input.disabled = true;
-      input.placeholder = "Please enter your email above to connect...";
     }
   }
 
+  // ==========================================
   // Mount Clean Liquid Glass UI
+  // ==========================================
   function mountWidget() {
     if (document.getElementById('mzc-widget-root')) return;
 
@@ -194,6 +372,26 @@
           <div class="mzc-typing-dot"></div>
         </div>
 
+        <!-- Captcha Modal Card (Strictly 1 image verification) -->
+        <div id="mzc-captcha-card" class="mzc-captcha-card" style="display: none;">
+          <div class="mzc-captcha-header">
+            <span>🔒 Verify Image Upload</span>
+            <button type="button" id="mzc-captcha-close" class="mzc-captcha-close" title="Cancel">×</button>
+          </div>
+          <div class="mzc-captcha-desc">
+            Please enter the 4 characters shown below to attach your screenshot:
+          </div>
+          <div class="mzc-captcha-box">
+            <canvas id="mzc-captcha-canvas" class="mzc-captcha-canvas" width="120" height="38"></canvas>
+            <button type="button" id="mzc-captcha-refresh" class="mzc-captcha-refresh" title="Get new code">🔄</button>
+          </div>
+          <form id="mzc-captcha-form" class="mzc-captcha-row">
+            <input type="text" id="mzc-captcha-input" class="mzc-captcha-input" maxlength="4" placeholder="CODE" autocomplete="off" autocorrect="off" autocapitalize="characters">
+            <button type="submit" id="mzc-captcha-submit" class="mzc-captcha-btn">Verify</button>
+          </form>
+          <div id="mzc-captcha-err" class="mzc-captcha-err" style="display: none;"></div>
+        </div>
+
         <!-- Attachment Preview Strip -->
         <div id="mzc-preview-bar" class="mzc-preview-bar" style="display: none;"></div>
 
@@ -204,7 +402,7 @@
               <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
             </svg>
           </button>
-          <input type="file" id="mzc-file-input" accept="image/*,.txt,.log" multiple style="display: none;">
+          <input type="file" id="mzc-file-input" accept="image/*,.txt,.log" style="display: none;">
 
           <input type="text" id="mzc-hp" name="mzc_hp" style="display:none !important;" tabindex="-1" autocomplete="off">
           <input type="text" id="mzc-input" class="mzc-input-field" placeholder="Ask Minitoonbot anything..." maxlength="500" autocomplete="off">
@@ -222,6 +420,22 @@
     document.body.appendChild(root);
     setupEvents();
     bindOptionPills();
+    updateAttachButtonState();
+
+    // Enforce 10-message gate on initial load / reload
+    if (userMessageCount >= 10 && !userEmail) {
+      setTimeout(renderEmailConnectCard, 300);
+      const input = document.getElementById('mzc-input');
+      const sendBtn = document.getElementById('mzc-send');
+      if (input) {
+        input.disabled = true;
+        input.placeholder = "Please enter your email above to connect...";
+      }
+      if (sendBtn) {
+        sendBtn.style.opacity = '0.5';
+        sendBtn.style.cursor = 'not-allowed';
+      }
+    }
   }
 
   function setupEvents() {
@@ -231,6 +445,11 @@
     const sendBtn = document.getElementById('mzc-send');
     const attachBtn = document.getElementById('mzc-attach-btn');
     const fileInput = document.getElementById('mzc-file-input');
+
+    // Captcha elements
+    const captchaClose = document.getElementById('mzc-captcha-close');
+    const captchaRefresh = document.getElementById('mzc-captcha-refresh');
+    const captchaForm = document.getElementById('mzc-captcha-form');
 
     if (launcher) launcher.addEventListener('click', toggleWindow);
     if (closeBtn) closeBtn.addEventListener('click', closeWindow);
@@ -259,9 +478,34 @@
     if (sendBtn) sendBtn.addEventListener('click', handleSend);
 
     if (attachBtn && fileInput) {
-      attachBtn.addEventListener('click', () => fileInput.click());
+      attachBtn.addEventListener('click', () => {
+        if (userImageCount >= 1) {
+          showToast("⚠️ Limit: 1 image allowed per user.");
+          return;
+        }
+        if (pendingAttachments.some(a => a.isImage)) {
+          showToast("⚠️ Limit: 1 image allowed per user.");
+          return;
+        }
+        fileInput.click();
+      });
       fileInput.addEventListener('change', handleFileSelect);
     }
+
+    // Captcha modal listeners
+    if (captchaClose) captchaClose.addEventListener('click', closeCaptchaModal);
+    if (captchaRefresh) {
+      captchaRefresh.addEventListener('click', () => {
+        currentCaptchaCode = generateCaptchaCode();
+        drawCaptcha(currentCaptchaCode);
+        const ci = document.getElementById('mzc-captcha-input');
+        if (ci) {
+          ci.value = '';
+          ci.focus();
+        }
+      });
+    }
+    if (captchaForm) captchaForm.addEventListener('submit', handleCaptchaSubmit);
 
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', updateMobileViewport);
@@ -295,6 +539,27 @@
     const topic = QUICK_TOPICS[key];
     if (!topic) return;
 
+    if (key === 'human') {
+      appendMsg(topic.label, 'user');
+      showTyping(true);
+      setTimeout(() => {
+        showTyping(false);
+        appendMsg(topic.reply, 'bot');
+        if (!userEmail) renderEmailConnectCard();
+      }, 250);
+      return;
+    }
+
+    // Enforce 10-message gate strictly on quick topics
+    if (userMessageCount >= 10 && !userEmail) {
+      showToast("👤 Connect with human agent to continue");
+      renderEmailConnectCard();
+      return;
+    }
+
+    userMessageCount++;
+    localStorage.setItem('mzc_msg_count', userMessageCount.toString());
+
     // 1. Post user selection
     appendMsg(topic.label, 'user');
 
@@ -303,8 +568,10 @@
     setTimeout(() => {
       showTyping(false);
       appendMsg(topic.reply, 'bot');
-      if (key === 'human' && !userEmail) {
-        setTimeout(renderEmailConnectCard, 200);
+
+      // Check if this reached the 10th message
+      if (userMessageCount >= 10 && !userEmail) {
+        setTimeout(renderEmailConnectCard, 400);
       }
     }, 250);
   }
@@ -319,6 +586,14 @@
     for (let i = 0; i < items.length; i++) {
       if (items[i].type.indexOf('image') !== -1) {
         e.preventDefault();
+        if (userImageCount >= 1) {
+          showToast("⚠️ Limit: 1 image allowed per user.");
+          return;
+        }
+        if (pendingAttachments.some(a => a.isImage)) {
+          showToast("⚠️ Limit: 1 image allowed per user.");
+          return;
+        }
         const file = items[i].getAsFile();
         if (file) {
           processFile(file, `screenshot_${Date.now()}.png`);
@@ -350,19 +625,24 @@
     reader.onload = function(e) {
       const dataUrl = e.target.result;
       if (file.type.startsWith('image/')) {
-        pendingAttachments.push({
-          name: filename,
-          data: dataUrl,
-          isImage: true
-        });
+        if (userImageCount >= 1) {
+          showToast("⚠️ Limit: 1 image allowed per user.");
+          return;
+        }
+        if (pendingAttachments.some(a => a.isImage)) {
+          showToast("⚠️ Limit: 1 image allowed per user.");
+          return;
+        }
+        // Open Captcha verification modal for image
+        openCaptchaModal({ name: filename, data: dataUrl });
       } else {
         pendingAttachments.push({
           name: filename,
           data: dataUrl,
           isImage: false
         });
+        renderAttachmentPreviews();
       }
-      renderAttachmentPreviews();
     };
     reader.readAsDataURL(file);
   }
@@ -471,7 +751,7 @@
         lockBodyScroll();
         updateMobileViewport();
       } else {
-        if (input) input.focus();
+        if (input && !input.disabled) input.focus();
       }
       scrollMessages();
     } else {
@@ -515,6 +795,7 @@
 
     if (userMessageCount >= 10 && !userEmail) {
       renderEmailConnectCard();
+      showToast("👤 Connect with human agent to continue");
       return;
     }
 
@@ -524,22 +805,24 @@
 
     if (!query && attachmentsToSend.length === 0) return;
 
+    const hasImg = attachmentsToSend.some(a => a.isImage);
+    if (hasImg && userImageCount >= 1) {
+      showToast("⚠️ Limit: 1 image allowed per user.");
+      return;
+    }
+
     // Check if user explicitly asks for human/developer
     if (/\b(human|agent|talk to human|connect me to human|speak to human|real person|developer|support agent|harsh)\b/i.test(query) && !userEmail) {
       appendMsg(query, 'user', attachmentsToSend);
       input.value = '';
+      pendingAttachments = [];
+      renderAttachmentPreviews();
       showTyping(true);
       setTimeout(() => {
         showTyping(false);
         appendMsg("I'd be glad to connect you directly with our developer (Harsh Shirke). Please enter your email below to connect:", 'bot');
         renderEmailConnectCard();
       }, 300);
-      return;
-    }
-
-    if (userMessageCount >= 10 && !userEmail) {
-      renderEmailConnectCard();
-      showToast("👤 Connect with human agent to continue");
       return;
     }
 
@@ -559,6 +842,7 @@
     showTyping(true);
 
     try {
+      const imgAtt = attachmentsToSend.find(a => a.isImage);
       const chatRes = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -568,6 +852,14 @@
           history: conversationHistory,
           msg_count: userMessageCount,
           email: userEmail,
+          image: imgAtt ? imgAtt.data : null,
+          captcha_token: imgAtt ? imgAtt.captchaToken : null,
+          attachments: attachmentsToSend.map(a => ({
+            name: a.name,
+            isImage: a.isImage,
+            captchaToken: a.captchaToken || null,
+            data: a.data
+          })),
           mzc_hp: document.getElementById('mzc-hp')?.value || ''
         })
       });
@@ -576,18 +868,27 @@
 
       if (chatRes.ok) {
         const chatData = await chatRes.json();
+
+        // Mark 1 image cap fulfilled once sent successfully
+        if (hasImg) {
+          userImageCount = 1;
+          localStorage.setItem('mzc_img_count', '1');
+          updateAttachButtonState();
+        }
+
         if (chatData.requires_email) {
           if (chatData.reply) appendMsg(chatData.reply, 'bot');
           renderEmailConnectCard();
           return;
         }
+
         if (chatData && chatData.reply) {
           appendMsg(chatData.reply, 'bot');
           // Add to context history
           conversationHistory.push({ role: 'user', content: query });
           conversationHistory.push({ role: 'assistant', content: chatData.reply });
 
-          // Prompt email after 10th message if not yet connected
+          // Gate after 10th message if not yet connected
           if (userMessageCount >= 10 && !userEmail) {
             setTimeout(() => {
               renderEmailConnectCard();
@@ -600,7 +901,8 @@
         const errData = await chatRes.json().catch(() => ({}));
         appendMsg(errData.reply || "⏳ You're sending questions too quickly. Please wait a minute.", 'bot');
       } else {
-        appendMsg("I'm having trouble reaching the support service. Please check your connection or visit [GitHub Issues](https://github.com/shirkeharsh/mooziac/issues).", 'bot');
+        const errData = await chatRes.json().catch(() => ({}));
+        appendMsg(errData.reply || "I'm having trouble reaching the support service. Please check your connection or visit [GitHub Issues](https://github.com/shirkeharsh/mooziac/issues).", 'bot');
       }
     } catch (err) {
       showTyping(false);
