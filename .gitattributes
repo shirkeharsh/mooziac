@@ -1,4 +1,50 @@
-# Exclude build scripts and embedded offline assets from language statistics
-build_app.sh linguist-vendored linguist-detectable=false
-Resources/trackpad.html linguist-documentation linguist-detectable=false
-Resources/Terminal/** linguist-vendored linguist-detectable=false
+# ==============================================================================
+# Mooziac Git Configuration (.gitattributes)
+# 1. 100% Swift Language Statistics on GitHub (Linguist overrides)
+# 2. Clean ZIP Archive Export (Excludes website, web functions & internal tools)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. GitHub Linguist: Ensure 100% Swift Language Bar on GitHub
+# ------------------------------------------------------------------------------
+# Treat all website, serverless functions, and web assets as vendored/undetectable
+www/** linguist-detectable=false linguist-vendored
+functions/** linguist-detectable=false linguist-vendored
+Resources/** linguist-detectable=false linguist-vendored
+docs/** linguist-documentation linguist-detectable=false
+build_app.sh linguist-detectable=false linguist-vendored
+dev_server.js linguist-detectable=false linguist-vendored
+
+# Override specific file types to guarantee only Swift code is indexed
+*.js linguist-detectable=false linguist-vendored
+*.html linguist-detectable=false linguist-documentation
+*.css linguist-detectable=false linguist-vendored
+*.sh linguist-detectable=false linguist-vendored
+*.json linguist-detectable=false linguist-vendored
+*.jsonl linguist-detectable=false linguist-vendored
+*.svg linguist-detectable=false linguist-vendored
+*.xml linguist-detectable=false linguist-vendored
+*.txt linguist-detectable=false linguist-documentation
+*.md linguist-documentation
+*.entitlements linguist-detectable=false linguist-vendored
+
+# Ensure Swift files are the sole detectable code
+*.swift linguist-detectable=true
+
+# ------------------------------------------------------------------------------
+# 2. Git Archive / ZIP Export Ignore (GitHub "Download ZIP" & git archive)
+# Completely excludes website, web backend, CI/CD, and internal dev servers
+# from the source code ZIP archive downloaded by players/developers.
+# ------------------------------------------------------------------------------
+www export-ignore
+www/** export-ignore
+functions export-ignore
+functions/** export-ignore
+.github export-ignore
+.github/** export-ignore
+docs export-ignore
+docs/** export-ignore
+dev_server.js export-ignore
+README.old.md export-ignore
+.gitattributes export-ignore
+.gitignore export-ignore
