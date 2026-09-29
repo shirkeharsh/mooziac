@@ -93,27 +93,75 @@ export async function onRequestPost(context) {
         'IDEA': 0x8B7BFF,    // Purple
         'TALK': 0x0071E3,    // Blue
         'FEEDBACK': 0xFFB800,// Gold
-        'CONNECT': 0x0071E3  // Blue
+        'CONNECT': 0x34C759  // Emerald Green
       };
+
+      // Extract rich Cloudflare edge metadata
+      const country = request.headers.get('cf-ipcountry') || '';
+      const city = request.headers.get('cf-ipcity') || '';
+      const region = request.headers.get('cf-region') || '';
+      const timezone = request.headers.get('cf-timezone') || '';
+      const ua = request.headers.get('user-agent') || '';
+      const referer = request.headers.get('referer') || 'Direct';
+      const rayId = request.headers.get('cf-ray') || 'N/A';
+
+      // Flag emoji generator
+      let flag = '🌐';
+      if (country && country.length === 2 && country !== 'XX') {
+        const codePoints = country.toUpperCase().split('').map(c => 127397 + c.charCodeAt(0));
+        flag = String.fromCodePoint(...codePoints);
+      }
+
+      // Location string
+      const locationParts = [city, region, country ? `${flag} ${country}` : ''].filter(Boolean);
+      const locationStr = locationParts.length > 0 ? locationParts.join(', ') : 'Unknown';
+
+      // Parse macOS architecture / browser
+      let clientDevice = 'macOS';
+      if (/Macintosh/i.test(ua)) {
+        const arch = /Intel/i.test(ua) ? 'Intel / Rosetta' : 'Apple Silicon';
+        const match = ua.match(/Mac OS X ([0-9_]+)/);
+        const ver = match ? `macOS ${match[1].replace(/_/g, '.')}` : 'macOS';
+        clientDevice = `${ver} (${arch})`;
+      } else if (/iPhone|iPad/i.test(ua)) {
+        clientDevice = 'iOS Mobile';
+      } else if (/Windows/i.test(ua)) {
+        clientDevice = 'Windows';
+      }
+
+      let browser = 'Browser';
+      if (/Chrome/i.test(ua)) browser = 'Chrome';
+      else if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) browser = 'Safari';
+      else if (/Firefox/i.test(ua)) browser = 'Firefox';
+      else if (/Edg/i.test(ua)) browser = 'Edge';
 
       const stars = payload.stars || payload.rating || 0;
       const starsDisplay = stars > 0 ? "★".repeat(stars) + "☆".repeat(5 - stars) : "Not rated";
-      const title = type === 'CONNECT'
-        ? `💌 User Connected Email: ${payload.email}`
-        : `📬 New Support Submission (${ticketId})`;
+      
+      let title = `📬 New Support Submission (${ticketId})`;
+      if (type === 'CONNECT') title = `💌 User Connected Email (${payload.email})`;
+      else if (type === 'FEEDBACK') title = `⭐ New Rating Feedback: ${starsDisplay} (${ticketId})`;
+      else if (type === 'BUG') title = `🐛 New Bug Report (${ticketId})`;
+      else if (type === 'IDEA') title = `💡 New Feature Idea (${ticketId})`;
+
+      const fields = [
+        { name: "Ticket ID", value: ticketId, inline: true },
+        { name: "Category", value: type, inline: true },
+        { name: "Rating", value: starsDisplay, inline: true },
+        { name: "Name", value: payload.name || "Anonymous", inline: true },
+        { name: "Email", value: payload.email || "No email provided", inline: true },
+        { name: "🌍 Location", value: `${locationStr}${timezone ? ` (${timezone})` : ''}`, inline: true },
+        { name: "💻 Device / OS", value: `${payload.macos || clientDevice} • ${browser}`, inline: true },
+        { name: "🌐 Referrer", value: referer, inline: true },
+        { name: "🔒 IP & Ray ID", value: `${clientIp} (${rayId})`, inline: true },
+        { name: "📝 Message / Details", value: payload.message || payload.issue || "No message content", inline: false }
+      ];
 
       const embed = {
         title: title,
         color: typeColors[type] || 0x34C759,
-        fields: [
-          { name: "Type", value: type, inline: true },
-          { name: "Rating", value: starsDisplay, inline: true },
-          { name: "Name", value: payload.name || "Anonymous", inline: true },
-          { name: "Email", value: payload.email || "No email provided", inline: true },
-          { name: "macOS System", value: payload.macos || "macOS 13+", inline: true },
-          { name: "Message", value: payload.message || payload.issue || "No message content", inline: false }
-        ],
-        footer: { text: "Mooziac Support Portal" },
+        fields: fields,
+        footer: { text: "Mooziac Support Portal • Cloudflare Edge" },
         timestamp: new Date().toISOString()
       };
 
