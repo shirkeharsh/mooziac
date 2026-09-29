@@ -2,6 +2,8 @@
 .build/
 dist/
 .swiftpm/
+.wrangler/
+dev_server.js
 
 # OS cruft
 .DS_Store
