@@ -83,7 +83,6 @@ export async function onRequestPost(context) {
       });
     }
 
-    const type = (payload.type || 'feedback').toUpperCase();
     const randSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
     const ticketId = `#MZ-${type.slice(0, 4)}-${randSuffix}`;
 
