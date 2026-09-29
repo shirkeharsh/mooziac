@@ -391,22 +391,6 @@
   align-self: flex-end;
 }
 
-/* Embedded Media / Screenshots */
-.mzc-bubble-img {
-  display: block;
-  max-width: 100%;
-  max-height: 190px;
-  border-radius: 10px;
-  margin-top: 6px;
-  object-fit: cover;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  cursor: pointer;
-  transition: opacity 0.2s;
-}
-
-.mzc-bubble-img:hover {
-  opacity: 0.9;
-}
 
 /* Offline Ticket Card (Minimalist Glass) */
 .mzc-offline-card {
@@ -574,186 +558,6 @@
   opacity: 0.9 !important;
 }
 
-/* Disabled Attach Button when 1 image limit reached */
-.mzc-attach-btn.disabled,
-.mzc-attach-btn[disabled] {
-  opacity: 0.35 !important;
-  cursor: not-allowed !important;
-  pointer-events: none !important;
-}
-
-/* Captcha Verification Modal Card */
-.mzc-captcha-card {
-  position: absolute;
-  bottom: 60px;
-  left: 12px;
-  right: 12px;
-  background: rgba(18, 18, 24, 0.96);
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 16px;
-  padding: 14px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.15);
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  animation: mzc-pop-in 0.2s ease-out;
-}
-
-.mzc-captcha-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 13px;
-  font-weight: 600;
-  color: #fff;
-}
-
-.mzc-captcha-close {
-  background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 20px;
-  cursor: pointer;
-  line-height: 1;
-  padding: 0 4px;
-}
-
-.mzc-captcha-close:hover {
-  color: #fff;
-}
-
-.mzc-captcha-desc {
-  font-size: 11.5px;
-  line-height: 1.4;
-  color: rgba(255, 255, 255, 0.75);
-}
-
-.mzc-captcha-box {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(0, 0, 0, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  padding: 6px 10px;
-  width: fit-content;
-}
-
-.mzc-captcha-canvas {
-  border-radius: 6px;
-  display: block;
-}
-
-.mzc-captcha-refresh {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 8px;
-  color: #fff;
-  cursor: pointer;
-  padding: 6px 8px;
-  font-size: 13px;
-  transition: all 0.15s;
-}
-
-.mzc-captcha-refresh:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.mzc-captcha-row {
-  display: flex;
-  gap: 8px;
-  width: 100%;
-}
-
-.mzc-captcha-input {
-  flex: 1;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 10px;
-  padding: 8px 12px;
-  color: #fff;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  outline: none;
-}
-
-.mzc-captcha-input:focus {
-  border-color: #0A84FF;
-}
-
-.mzc-captcha-btn {
-  background: #0A84FF;
-  border: none;
-  border-radius: 10px;
-  color: #fff;
-  font-size: 12.5px;
-  font-weight: 600;
-  padding: 8px 16px;
-  cursor: pointer;
-  transition: opacity 0.15s;
-  flex-shrink: 0;
-}
-
-.mzc-captcha-btn:hover {
-  opacity: 0.9;
-}
-
-.mzc-captcha-err {
-  font-size: 11.5px;
-  color: #ef4444;
-  font-weight: 500;
-}
-
-/* Attachment Preview Strip */
-.mzc-preview-bar {
-  display: flex;
-  gap: 8px;
-  padding: 8px 14px;
-  background: rgba(0, 0, 0, 0.4);
-  border-top: 1px solid var(--mzc-border);
-  overflow-x: auto;
-}
-
-.mzc-preview-chip {
-  position: relative;
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
-  border: 1px solid var(--mzc-border-light);
-  overflow: hidden;
-  flex-shrink: 0;
-  background: #000;
-}
-
-.mzc-preview-chip img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.mzc-preview-remove {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.8);
-  color: #fff;
-  border: none;
-  font-size: 10px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
 /* Minimal Input Bar */
 .mzc-input-bar {
   padding: 10px 14px;
@@ -762,26 +566,6 @@
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.mzc-attach-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--mzc-border);
-  color: var(--mzc-txt-mut);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all 0.15s;
-}
-
-.mzc-attach-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
 }
 
 .mzc-input-field {
@@ -1213,11 +997,6 @@
     }
   }
 
-  /* Attachment Previews on Mobile */
-  .mzc-preview-bar {
-    padding: 8px 12px !important;
-    background: rgba(14, 14, 18, 0.95) !important;
-  }
 
   /* Native Bottom Composer Bar */
   .mzc-input-bar {
@@ -1261,22 +1040,6 @@
     background: rgba(255, 255, 255, 0.12) !important;
   }
 
-  .mzc-attach-btn {
-    width: 40px !important;
-    height: 40px !important;
-    min-width: 40px !important;
-    min-height: 40px !important;
-    border-radius: 50% !important;
-    background: rgba(255, 255, 255, 0.08) !important;
-    color: #0A84FF !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    touch-action: manipulation !important;
-    -webkit-tap-highlight-color: transparent !important;
-    flex-shrink: 0 !important;
-  }
-
   .mzc-send-btn {
     width: 40px !important;
     height: 40px !important;
@@ -1291,25 +1054,5 @@
     touch-action: manipulation !important;
     -webkit-tap-highlight-color: transparent !important;
     flex-shrink: 0 !important;
-  }
-
-  /* Mobile Captcha Adjustments */
-  .mzc-captcha-card {
-    bottom: 74px !important;
-    left: 10px !important;
-    right: 10px !important;
-    padding: 16px !important;
-    z-index: 100 !important;
-  }
-
-  .mzc-captcha-input {
-    font-size: 16px !important;
-    min-height: 42px !important;
-  }
-
-  .mzc-captcha-btn {
-    min-height: 42px !important;
-    padding: 10px 18px !important;
-    font-size: 14px !important;
   }
 }

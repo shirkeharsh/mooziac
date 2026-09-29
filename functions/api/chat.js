@@ -134,9 +134,7 @@ function generateDeterministicAnswer(userQuery, topMatches) {
 // In-memory sliding window rate limiter per edge isolate
 const chatRateLimitMap = new Map();
 const sessionMsgCountMap = new Map();
-const sessionImgCountMap = new Map();
 const ipMsgCountMap = new Map();
-const ipImgCountMap = new Map();
 
 function checkChatRateLimit(ip) {
   const now = Date.now();
@@ -292,106 +290,6 @@ export async function onRequestPost(context) {
       });
     }
 
-    // 5b. Image Attachment Guardrail: Strictly 1 image per user & Captcha verification
-    const hasImage = Boolean(body.image || (Array.isArray(body.attachments) && body.attachments.some(a => a.isImage)));
-    if (hasImage) {
-      const serverImgCount = sessionImgCountMap.get(sessionId) || 0;
-      let ipImgCount = 0;
-      if (clientIp !== 'unknown' && clientIp !== '127.0.0.1' && clientIp !== '::1') {
-        ipImgCount = ipImgCountMap.get(clientIp) || 0;
-      }
-
-      if (serverImgCount >= 1 || ipImgCount >= 1) {
-        return new Response(JSON.stringify({
-          reply: "⚠️ Image limit reached: Only 1 screenshot/image is permitted per user to prevent abuse.",
-          source: "image_limit_guardrail",
-          model: "edge_guardrail"
-        }), {
-          status: 200,
-          headers: corsHeaders
-        });
-      }
-
-      // Verify Captcha Token (Supports Google reCAPTCHA, Cloudflare Turnstile, and Signed Canvas Captcha)
-      const captchaToken = body.captcha_token || (body.attachments && body.attachments[0] && body.attachments[0].captchaToken);
-      if (!captchaToken) {
-        return new Response(JSON.stringify({
-          reply: "⚠️ Captcha verification required to submit an image.",
-          source: "captcha_guardrail",
-          model: "edge_guardrail"
-        }), {
-          status: 400,
-          headers: corsHeaders
-        });
-      }
-
-      let isCaptchaValid = false;
-
-      // 1. Google reCAPTCHA Verification (if secret key configured in Cloudflare environment)
-      if (env && env.RECAPTCHA_SECRET_KEY) {
-        try {
-          const googleRes = await fetch('https://www.google.com/recaptcha/api/siteverify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `secret=${encodeURIComponent(env.RECAPTCHA_SECRET_KEY)}&response=${encodeURIComponent(captchaToken)}&remoteip=${encodeURIComponent(clientIp)}`
-          });
-          const googleData = await googleRes.json();
-          if (googleData.success) {
-            isCaptchaValid = true;
-          }
-        } catch(gErr) {
-          console.warn("Google reCAPTCHA verification error:", gErr);
-        }
-      }
-
-      // 2. Cloudflare Turnstile Verification (if secret key configured in Cloudflare environment)
-      if (!isCaptchaValid && env && env.TURNSTILE_SECRET_KEY) {
-        try {
-          const cfRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              secret: env.TURNSTILE_SECRET_KEY,
-              response: captchaToken,
-              remoteip: clientIp
-            })
-          });
-          const cfData = await cfRes.json();
-          if (cfData.success) {
-            isCaptchaValid = true;
-          }
-        } catch(tErr) {
-          console.warn("Turnstile verification error:", tErr);
-        }
-      }
-
-      // 3. Fallback: Signed Visual Canvas Captcha
-      if (!isCaptchaValid && !(env && (env.RECAPTCHA_SECRET_KEY || env.TURNSTILE_SECRET_KEY))) {
-        try {
-          const parsed = JSON.parse(atob(captchaToken));
-          if (parsed && parsed.code && (Date.now() - (parsed.ts || 0) <= 10 * 60 * 1000)) {
-            isCaptchaValid = true;
-          }
-        } catch(e) {}
-      }
-
-      if (!isCaptchaValid) {
-        return new Response(JSON.stringify({
-          reply: "⚠️ Captcha verification failed or expired. Please verify again.",
-          source: "captcha_guardrail",
-          model: "edge_guardrail"
-        }), {
-          status: 400,
-          headers: corsHeaders
-        });
-      }
-
-      sessionImgCountMap.set(sessionId, serverImgCount + 1);
-      if (clientIp !== 'unknown' && clientIp !== '127.0.0.1' && clientIp !== '::1') {
-        ipImgCountMap.set(clientIp, (ipImgCountMap.get(clientIp) || 0) + 1);
-      }
-    }
-
     // 6. Retrieve top facts
     const relevantItems = retrieveContext(userQuery);
     const contextText = relevantItems.map(item => item.text).join('\n\n');
@@ -431,44 +329,12 @@ ${contextText || "General Mooziac native macOS music player inquiry."}`;
 
         messages.push({ role: "user", content: userQuery });
 
-        let aiResponse = null;
-        let usedModel = env.AI_MODEL || '@cf/meta/llama-3.2-1b-instruct';
-
-        // Multimodal Vision Model if image is present
-        if (hasImage) {
-          try {
-            const rawData = body.image || (body.attachments && body.attachments[0] && body.attachments[0].data) || '';
-            const base64Data = rawData.includes('base64,') ? rawData.split('base64,')[1] : rawData;
-            if (base64Data && base64Data.length <= 1.5 * 1024 * 1024) {
-              const bin = atob(base64Data);
-              const imgBytes = new Uint8Array(bin.length);
-              for (let i = 0; i < bin.length; i++) imgBytes[i] = bin.charCodeAt(i);
-
-              usedModel = '@cf/meta/llama-3.2-11b-vision-instruct';
-              const visionPromise = env.AI.run(usedModel, {
-                messages: messages,
-                image: Array.from(imgBytes),
-                max_tokens: 512
-              });
-              const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("Vision model timeout")), 7000)
-              );
-
-              aiResponse = await Promise.race([visionPromise, timeoutPromise]);
-            }
-          } catch(visionErr) {
-            console.warn("Vision model unavailable or timed out, smoothly falling back to text model:", visionErr);
-          }
-        }
-
-        if (!aiResponse) {
-          usedModel = env.AI_MODEL || '@cf/meta/llama-3.2-1b-instruct';
-          aiResponse = await env.AI.run(usedModel, {
-            messages: messages,
-            max_tokens: 512,
-            temperature: 0.2
-          });
-        }
+        const usedModel = env.AI_MODEL || '@cf/meta/llama-3.2-1b-instruct';
+        const aiResponse = await env.AI.run(usedModel, {
+          messages: messages,
+          max_tokens: 512,
+          temperature: 0.2
+        });
 
         const reply = aiResponse.response || aiResponse.text || '';
         if (reply.trim()) {
@@ -500,7 +366,7 @@ ${contextText || "General Mooziac native macOS music player inquiry."}`;
   } catch (err) {
     console.error("Unhandled API error in /api/chat:", err);
     return new Response(JSON.stringify({
-      reply: "I received your question and image! If you need direct assistance with Mooziac, feel free to enter your email above or check our [GitHub Issues](https://github.com/shirkeharsh/mooziac/issues).",
+      reply: "I'm having trouble retrieving an answer right now. If you need direct assistance with Mooziac, feel free to enter your email above or check our [GitHub Issues](https://github.com/shirkeharsh/mooziac/issues).",
       source: "error_fallback_guardrail",
       model: "fallback_engine",
       error: err.message

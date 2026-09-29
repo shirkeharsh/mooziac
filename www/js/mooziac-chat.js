@@ -3,6 +3,7 @@
  * MOOZIAC LIQUID GLASS AI SUPPORT WIDGET (mooziac-chat.js)
  * 100% Autonomous AI Support Assistant (Powered by Mooziac Knowledge Base & Llama 3.2)
  * Brand: Ask Minitoonbot 🤖
+ * Pure Text Support - Clean, Fast & Minimalist
  * =========================================================
  */
 
@@ -16,38 +17,11 @@
   // State
   let isOpen = false;
   let toastTimer = null;
-  let pendingAttachments = [];
 
   // Rate Limiting
   const MSG_COOLDOWN_SEC = 2;
   let isCooldownActive = false;
   let cooldownRemaining = 0;
-
-  // Image Upload Gating (Strictly 1 image per user + Captcha)
-  let userImageCount = parseInt(localStorage.getItem('mzc_img_count') || '0', 10);
-  let pendingImageForCaptcha = null;
-  let currentCaptchaCode = '';
-
-  // Google reCAPTCHA & Cloudflare Turnstile Integration
-  const GOOGLE_RECAPTCHA_SITE_KEY = window.MOOZIAC_RECAPTCHA_SITE_KEY || '';
-  const TURNSTILE_SITE_KEY = window.MOOZIAC_TURNSTILE_SITE_KEY || '';
-  let googleWidgetId = null;
-  let turnstileWidgetId = null;
-
-  function loadExternalCaptchaScript(src) {
-    if (document.querySelector(`script[src="${src}"]`)) return;
-    const s = document.createElement('script');
-    s.src = src;
-    s.async = true;
-    s.defer = true;
-    document.head.appendChild(s);
-  }
-
-  if (GOOGLE_RECAPTCHA_SITE_KEY) {
-    loadExternalCaptchaScript('https://www.google.com/recaptcha/api.js?render=explicit');
-  } else if (TURNSTILE_SITE_KEY) {
-    loadExternalCaptchaScript('https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit');
-  }
 
   // Ground-Truth Quick Topics
   const QUICK_TOPICS = {
@@ -89,216 +63,6 @@
 
   // Conversation history for context
   let conversationHistory = [];
-
-  // ==========================================
-  // Captcha Verification Engine
-  // ==========================================
-  function generateCaptchaCode() {
-    const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-    let res = '';
-    for (let i = 0; i < 4; i++) {
-      res += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return res;
-  }
-
-  function drawCaptcha(code) {
-    const canvas = document.getElementById('mzc-captcha-canvas');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Background gradient
-    const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-    grad.addColorStop(0, '#181a24');
-    grad.addColorStop(1, '#0e0f14');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Noise lines
-    const colors = ['#60a5fa', '#34d399', '#f472b6', '#fbbf24', '#a78bfa', '#38bdf8'];
-    for (let i = 0; i < 5; i++) {
-      ctx.strokeStyle = colors[Math.floor(Math.random() * colors.length)];
-      ctx.lineWidth = 1 + Math.random();
-      ctx.globalAlpha = 0.45;
-      ctx.beginPath();
-      ctx.moveTo(Math.random() * canvas.width, Math.random() * canvas.height);
-      ctx.bezierCurveTo(
-        Math.random() * canvas.width, Math.random() * canvas.height,
-        Math.random() * canvas.width, Math.random() * canvas.height,
-        Math.random() * canvas.width, Math.random() * canvas.height
-      );
-      ctx.stroke();
-    }
-
-    // Noise dots
-    for (let i = 0; i < 25; i++) {
-      ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
-      ctx.globalAlpha = 0.35;
-      ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, 1.5, 1.5);
-    }
-
-    // Skewed / rotated characters
-    ctx.globalAlpha = 1.0;
-    const charWidth = (canvas.width - 24) / 4;
-    for (let i = 0; i < code.length; i++) {
-      ctx.save();
-      const x = 16 + i * charWidth;
-      const y = 26 + (Math.random() * 4 - 2);
-      const angle = (Math.random() * 30 - 15) * Math.PI / 180;
-      ctx.translate(x, y);
-      ctx.rotate(angle);
-      ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
-      ctx.fillStyle = colors[i % colors.length];
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.shadowColor = 'rgba(0,0,0,0.8)';
-      ctx.shadowBlur = 4;
-      ctx.fillText(code[i], 0, 0);
-      ctx.restore();
-    }
-  }
-
-  function openCaptchaModal(fileData) {
-    pendingImageForCaptcha = fileData;
-    const card = document.getElementById('mzc-captcha-card');
-    const desc = document.getElementById('mzc-captcha-desc');
-    const cloudBox = document.getElementById('mzc-cloud-captcha-box');
-    const canvasSection = document.getElementById('mzc-canvas-captcha-section');
-    const input = document.getElementById('mzc-captcha-input');
-    const err = document.getElementById('mzc-captcha-err');
-    if (!card) return;
-
-    card.style.display = 'flex';
-    if (err) err.style.display = 'none';
-
-    // 1. Google reCAPTCHA if site key configured
-    if (GOOGLE_RECAPTCHA_SITE_KEY && window.grecaptcha && window.grecaptcha.render) {
-      if (desc) desc.textContent = "Please check the box below to verify your upload:";
-      if (canvasSection) canvasSection.style.display = 'none';
-      if (cloudBox) {
-        cloudBox.style.display = 'flex';
-        cloudBox.innerHTML = '';
-        try {
-          googleWidgetId = window.grecaptcha.render(cloudBox, {
-            sitekey: GOOGLE_RECAPTCHA_SITE_KEY,
-            callback: (token) => onCaptchaVerified(token)
-          });
-        } catch(e) {
-          if (googleWidgetId !== null && window.grecaptcha.reset) window.grecaptcha.reset(googleWidgetId);
-        }
-      }
-      return;
-    }
-
-    // 2. Cloudflare Turnstile if site key configured
-    if (TURNSTILE_SITE_KEY && window.turnstile && window.turnstile.render) {
-      if (desc) desc.textContent = "Verifying security challenge with Cloudflare Turnstile...";
-      if (canvasSection) canvasSection.style.display = 'none';
-      if (cloudBox) {
-        cloudBox.style.display = 'flex';
-        cloudBox.innerHTML = '';
-        try {
-          turnstileWidgetId = window.turnstile.render(cloudBox, {
-            sitekey: TURNSTILE_SITE_KEY,
-            callback: (token) => onCaptchaVerified(token)
-          });
-        } catch(e) {
-          if (turnstileWidgetId !== null && window.turnstile.reset) window.turnstile.reset(turnstileWidgetId);
-        }
-      }
-      return;
-    }
-
-    // 3. Fallback: Built-in Distortion Canvas Captcha
-    if (desc) desc.textContent = "Please enter the 4 characters shown below to attach your screenshot:";
-    if (cloudBox) cloudBox.style.display = 'none';
-    if (canvasSection) canvasSection.style.display = 'block';
-
-    currentCaptchaCode = generateCaptchaCode();
-    if (input) {
-      input.value = '';
-      setTimeout(() => input.focus(), 100);
-    }
-    drawCaptcha(currentCaptchaCode);
-  }
-
-  function onCaptchaVerified(token) {
-    if (pendingImageForCaptcha) {
-      pendingAttachments.push({
-        name: pendingImageForCaptcha.name,
-        data: pendingImageForCaptcha.data,
-        isImage: true,
-        captchaToken: token
-      });
-      renderAttachmentPreviews();
-      showToast("✅ Screenshot verified & attached");
-    }
-    closeCaptchaModal();
-  }
-
-  function closeCaptchaModal() {
-    const card = document.getElementById('mzc-captcha-card');
-    if (card) card.style.display = 'none';
-    pendingImageForCaptcha = null;
-    const fileInput = document.getElementById('mzc-file-input');
-    if (fileInput) fileInput.value = '';
-    if (googleWidgetId !== null && window.grecaptcha && window.grecaptcha.reset) {
-      window.grecaptcha.reset(googleWidgetId);
-    }
-  }
-
-  function handleCaptchaSubmit(e) {
-    if (e && e.preventDefault) e.preventDefault();
-    const input = document.getElementById('mzc-captcha-input');
-    const err = document.getElementById('mzc-captcha-err');
-    const val = (input?.value || '').trim().toUpperCase();
-
-    if (!val) {
-      if (err) {
-        err.textContent = 'Please enter the code above.';
-        err.style.display = 'block';
-      }
-      return;
-    }
-
-    if (val !== currentCaptchaCode) {
-      if (err) {
-        err.textContent = 'Incorrect code. Please try again.';
-        err.style.display = 'block';
-      }
-      currentCaptchaCode = generateCaptchaCode();
-      drawCaptcha(currentCaptchaCode);
-      if (input) {
-        input.value = '';
-        input.focus();
-      }
-      return;
-    }
-
-    // Verified! Create signed captcha token
-    const token = btoa(JSON.stringify({
-      code: currentCaptchaCode,
-      ts: Date.now(),
-      rand: Math.random().toString(36).substring(2)
-    }));
-
-    onCaptchaVerified(token);
-  }
-
-  function updateAttachButtonState() {
-    const attachBtn = document.getElementById('mzc-attach-btn');
-    if (!attachBtn) return;
-    if (userImageCount >= 1) {
-      attachBtn.classList.add('disabled');
-      attachBtn.setAttribute('disabled', 'true');
-      attachBtn.title = 'Image limit reached (1 image per user)';
-    } else {
-      attachBtn.classList.remove('disabled');
-      attachBtn.removeAttribute('disabled');
-      attachBtn.title = 'Attach screenshot (⌘V)';
-    }
-  }
 
   // ==========================================
   // Email Connect Card (Human Lead Gate)
@@ -446,48 +210,10 @@
           <div class="mzc-typing-dot"></div>
         </div>
 
-        <!-- Captcha Modal Card (Strictly 1 image verification) -->
-        <div id="mzc-captcha-card" class="mzc-captcha-card" style="display: none;">
-          <div class="mzc-captcha-header">
-            <span>🔒 Verify Image Upload</span>
-            <button type="button" id="mzc-captcha-close" class="mzc-captcha-close" title="Cancel">×</button>
-          </div>
-          <div id="mzc-captcha-desc" class="mzc-captcha-desc">
-            Please enter the 4 characters shown below to attach your screenshot:
-          </div>
-
-          <!-- Google reCAPTCHA / Cloudflare Turnstile Container -->
-          <div id="mzc-cloud-captcha-box" style="display: none; margin: 4px 0; min-height: 78px; justify-content: center; align-items: center;"></div>
-
-          <!-- Built-in Distortion Canvas Captcha Section -->
-          <div id="mzc-canvas-captcha-section">
-            <div class="mzc-captcha-box">
-              <canvas id="mzc-captcha-canvas" class="mzc-captcha-canvas" width="120" height="38"></canvas>
-              <button type="button" id="mzc-captcha-refresh" class="mzc-captcha-refresh" title="Get new code">🔄</button>
-            </div>
-            <form id="mzc-captcha-form" class="mzc-captcha-row" style="margin-top: 8px;">
-              <input type="text" id="mzc-captcha-input" class="mzc-captcha-input" maxlength="6" placeholder="CODE" autocomplete="off" autocorrect="off" autocapitalize="characters">
-              <button type="submit" id="mzc-captcha-submit" class="mzc-captcha-btn">Verify</button>
-            </form>
-          </div>
-          <div id="mzc-captcha-err" class="mzc-captcha-err" style="display: none;"></div>
-        </div>
-
-        <!-- Attachment Preview Strip -->
-        <div id="mzc-preview-bar" class="mzc-preview-bar" style="display: none;"></div>
-
-        <!-- Input Bar -->
+        <!-- Input Bar (Pure Text Only) -->
         <div class="mzc-input-bar">
-          <button id="mzc-attach-btn" class="mzc-attach-btn" title="Attach screenshot (⌘V)">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
-            </svg>
-          </button>
-          <input type="file" id="mzc-file-input" accept="image/*,.txt,.log" style="display: none;">
-
           <input type="text" id="mzc-hp" name="mzc_hp" style="display:none !important;" tabindex="-1" autocomplete="off">
           <input type="text" id="mzc-input" class="mzc-input-field" placeholder="Ask Minitoonbot anything..." maxlength="500" autocomplete="off">
-
           <button id="mzc-send" class="mzc-send-btn" title="Send (Enter)">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -501,7 +227,6 @@
     document.body.appendChild(root);
     setupEvents();
     bindOptionPills();
-    updateAttachButtonState();
 
     // Enforce 10-message gate on initial load / reload
     if (userMessageCount >= 10 && !userEmail) {
@@ -524,13 +249,6 @@
     const closeBtn = document.getElementById('mzc-close-btn');
     const input = document.getElementById('mzc-input');
     const sendBtn = document.getElementById('mzc-send');
-    const attachBtn = document.getElementById('mzc-attach-btn');
-    const fileInput = document.getElementById('mzc-file-input');
-
-    // Captcha elements
-    const captchaClose = document.getElementById('mzc-captcha-close');
-    const captchaRefresh = document.getElementById('mzc-captcha-refresh');
-    const captchaForm = document.getElementById('mzc-captcha-form');
 
     if (launcher) launcher.addEventListener('click', toggleWindow);
     if (closeBtn) closeBtn.addEventListener('click', closeWindow);
@@ -543,9 +261,6 @@
         }
       });
 
-      // Handle Command+V / Ctrl+V screenshot pasting
-      input.addEventListener('paste', handlePaste);
-
       input.addEventListener('focus', () => {
         if (window.innerWidth <= 640) {
           setTimeout(() => {
@@ -557,36 +272,6 @@
     }
 
     if (sendBtn) sendBtn.addEventListener('click', handleSend);
-
-    if (attachBtn && fileInput) {
-      attachBtn.addEventListener('click', () => {
-        if (userImageCount >= 1) {
-          showToast("⚠️ Limit: 1 image allowed per user.");
-          return;
-        }
-        if (pendingAttachments.some(a => a.isImage)) {
-          showToast("⚠️ Limit: 1 image allowed per user.");
-          return;
-        }
-        fileInput.click();
-      });
-      fileInput.addEventListener('change', handleFileSelect);
-    }
-
-    // Captcha modal listeners
-    if (captchaClose) captchaClose.addEventListener('click', closeCaptchaModal);
-    if (captchaRefresh) {
-      captchaRefresh.addEventListener('click', () => {
-        currentCaptchaCode = generateCaptchaCode();
-        drawCaptcha(currentCaptchaCode);
-        const ci = document.getElementById('mzc-captcha-input');
-        if (ci) {
-          ci.value = '';
-          ci.focus();
-        }
-      });
-    }
-    if (captchaForm) captchaForm.addEventListener('submit', handleCaptchaSubmit);
 
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', updateMobileViewport);
@@ -656,146 +341,6 @@
       }
     }, 250);
   }
-
-  function handlePaste(e) {
-    const clipboardData = e.clipboardData || window.clipboardData;
-    if (!clipboardData) return;
-
-    const items = clipboardData.items;
-    if (!items) return;
-
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf('image') !== -1) {
-        e.preventDefault();
-        if (userImageCount >= 1) {
-          showToast("⚠️ Limit: 1 image allowed per user.");
-          return;
-        }
-        if (pendingAttachments.some(a => a.isImage)) {
-          showToast("⚠️ Limit: 1 image allowed per user.");
-          return;
-        }
-        const file = items[i].getAsFile();
-        if (file) {
-          processFile(file, `screenshot_${Date.now()}.png`);
-        }
-        break;
-      }
-    }
-  }
-
-  function handleFileSelect(e) {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    for (let i = 0; i < files.length; i++) {
-      processFile(files[i]);
-    }
-    e.target.value = '';
-  }
-
-  function compressImage(file, maxDimension = 900, quality = 0.75) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        let width = img.width;
-        let height = img.height;
-
-        if (width > maxDimension || height > maxDimension) {
-          if (width > height) {
-            height = Math.round((height * maxDimension) / width);
-            width = maxDimension;
-          } else {
-            width = Math.round((width * maxDimension) / height);
-            height = maxDimension;
-          }
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-
-        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
-        resolve(compressedDataUrl);
-      };
-      img.onerror = () => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target.result);
-        reader.readAsDataURL(file);
-      };
-      img.src = URL.createObjectURL(file);
-    });
-  }
-
-  async function processFile(file, customName = null) {
-    if (file.size > 20 * 1024 * 1024) {
-      showToast('⚠️ File exceeds 20MB limit.');
-      return;
-    }
-
-    const filename = customName || file.name;
-
-    if (file.type.startsWith('image/')) {
-      if (userImageCount >= 1) {
-        showToast("⚠️ Limit: 1 image allowed per user.");
-        return;
-      }
-      if (pendingAttachments.some(a => a.isImage)) {
-        showToast("⚠️ Limit: 1 image allowed per user.");
-        return;
-      }
-
-      showToast("⏳ Processing image...");
-      try {
-        const compressedDataUrl = await compressImage(file, 900, 0.75);
-        openCaptchaModal({ name: filename, data: compressedDataUrl });
-      } catch (e) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          openCaptchaModal({ name: filename, data: e.target.result });
-        };
-        reader.readAsDataURL(file);
-      }
-    } else {
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        pendingAttachments.push({
-          name: filename,
-          data: e.target.result,
-          isImage: false
-        });
-        renderAttachmentPreviews();
-      };
-      reader.readAsDataURL(file);
-    }
-  }
-
-  function renderAttachmentPreviews() {
-    const bar = document.getElementById('mzc-preview-bar');
-    if (!bar) return;
-
-    if (pendingAttachments.length === 0) {
-      bar.style.display = 'none';
-      bar.innerHTML = '';
-      return;
-    }
-
-    bar.style.display = 'flex';
-    bar.innerHTML = pendingAttachments.map((att, index) => `
-      <div class="mzc-preview-chip">
-        ${att.isImage ? `<img src="${att.data}" class="mzc-chip-thumb" alt="thumb">` : `<span class="mzc-chip-icon">📄</span>`}
-        <span class="mzc-chip-name">${escapeHtml(att.name)}</span>
-        <button class="mzc-chip-remove" onclick="window.__mzc_remove_att(${index})">×</button>
-      </div>
-    `).join('');
-  }
-
-  window.__mzc_remove_att = function(index) {
-    pendingAttachments.splice(index, 1);
-    renderAttachmentPreviews();
-  };
 
   let savedScrollY = 0;
 
@@ -926,22 +471,13 @@
 
     const input = document.getElementById('mzc-input');
     const query = input.value.trim();
-    const attachmentsToSend = [...pendingAttachments];
 
-    if (!query && attachmentsToSend.length === 0) return;
-
-    const hasImg = attachmentsToSend.some(a => a.isImage);
-    if (hasImg && userImageCount >= 1) {
-      showToast("⚠️ Limit: 1 image allowed per user.");
-      return;
-    }
+    if (!query) return;
 
     // Check if user explicitly asks for human/developer
     if (/\b(human|agent|talk to human|connect me to human|speak to human|real person|developer|support agent|harsh)\b/i.test(query) && !userEmail) {
-      appendMsg(query, 'user', attachmentsToSend);
+      appendMsg(query, 'user');
       input.value = '';
-      pendingAttachments = [];
-      renderAttachmentPreviews();
       showTyping(true);
       setTimeout(() => {
         showTyping(false);
@@ -958,16 +494,13 @@
     startCooldownTimer();
 
     // Append to UI immediately
-    appendMsg(query, 'user', attachmentsToSend);
+    appendMsg(query, 'user');
     input.value = '';
-    pendingAttachments = [];
-    renderAttachmentPreviews();
 
     // Show AI typing indicator
     showTyping(true);
 
     try {
-      const imgAtt = attachmentsToSend.find(a => a.isImage);
       const chatRes = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -977,13 +510,6 @@
           history: conversationHistory,
           msg_count: userMessageCount,
           email: userEmail,
-          image: imgAtt ? imgAtt.data : null,
-          captcha_token: imgAtt ? imgAtt.captchaToken : null,
-          attachments: attachmentsToSend.map(a => ({
-            name: a.name,
-            isImage: a.isImage,
-            captchaToken: a.captchaToken || null
-          })),
           mzc_hp: document.getElementById('mzc-hp')?.value || ''
         })
       });
@@ -992,13 +518,6 @@
 
       if (chatRes.ok) {
         const chatData = await chatRes.json();
-
-        // Mark 1 image cap fulfilled once sent successfully
-        if (hasImg) {
-          userImageCount = 1;
-          localStorage.setItem('mzc_img_count', '1');
-          updateAttachButtonState();
-        }
 
         if (chatData.requires_email) {
           if (chatData.reply) appendMsg(chatData.reply, 'bot');
@@ -1019,14 +538,14 @@
             }, 600);
           }
         } else {
-          appendMsg("I received your question and image! If you need direct assistance with Mooziac, feel free to enter your email above or check [GitHub Issues](https://github.com/shirkeharsh/mooziac/issues).", 'bot');
+          appendMsg("If you need direct assistance with Mooziac, feel free to enter your email above or check [GitHub Issues](https://github.com/shirkeharsh/mooziac/issues).", 'bot');
         }
       } else if (chatRes.status === 429) {
         const errData = await chatRes.json().catch(() => ({}));
         appendMsg(errData.reply || "⏳ You're sending questions too quickly. Please wait a minute.", 'bot');
       } else {
         const errData = await chatRes.json().catch(() => ({}));
-        const errReply = errData.reply || (errData.error ? `⚠️ ${errData.error}` : null) || "I received your screenshot! For immediate assistance, feel free to submit an issue on [GitHub Issues](https://github.com/shirkeharsh/mooziac/issues) or enter your email above to connect with our developer.";
+        const errReply = errData.reply || (errData.error ? `⚠️ ${errData.error}` : null) || "For immediate assistance, feel free to submit an issue on [GitHub Issues](https://github.com/shirkeharsh/mooziac/issues) or enter your email above to connect with our developer.";
         appendMsg(errReply, 'bot');
       }
     } catch (err) {
@@ -1060,27 +579,15 @@
     }, 1000);
   }
 
-  function appendMsg(text, sender, attachments = []) {
+  function appendMsg(text, sender) {
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const container = document.getElementById('mzc-messages');
     const msg = document.createElement('div');
     msg.className = `mzc-msg ${sender}`;
 
-    let imgHtml = '';
-    if (attachments && attachments.length > 0) {
-      attachments.forEach(att => {
-        if (att.isImage) {
-          imgHtml += `<img src="${att.data}" class="mzc-bubble-img" alt="${escapeHtml(att.name)}" onclick="window.open('${att.data}', '_blank')">`;
-        } else {
-          imgHtml += `<div style="font-size: 11px; padding: 4px; background: rgba(0,0,0,0.25); border-radius: 4px; margin-top: 4px;">📎 ${escapeHtml(att.name)}</div>`;
-        }
-      });
-    }
-
     msg.innerHTML = `
       <div class="mzc-bubble">
         ${text ? formatMarkdown(text) : ''}
-        ${imgHtml}
       </div>
       <span class="mzc-time">${time}</span>
     `;
