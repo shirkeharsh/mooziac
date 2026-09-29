@@ -280,7 +280,7 @@ export async function onRequestPost(context) {
 
     if ((effectiveMsgCount > 10 || isHumanRequest) && !userEmail) {
       return new Response(JSON.stringify({
-        reply: "To continue chatting with Minimoo or connect directly with our developer (Harsh Shirke), please enter your email below:",
+        reply: "To continue chatting with MiniMoo or connect directly with our developer (Harsh Shirke), please enter your email below:",
         requires_email: true,
         source: "human_connect_gate",
         model: "edge_guardrail"
@@ -295,7 +295,7 @@ export async function onRequestPost(context) {
     if (emailMatch && userQuery.trim().length <= 80) {
       const email = emailMatch[0];
       return new Response(JSON.stringify({
-        reply: `Thank you! Your email (**${email}**) has been connected with our developer (Harsh Shirke). He has received your request and will reach out to you directly.\n\nIn the meantime, feel free to ask Minimoo anything about Mooziac!`,
+        reply: `Thank you! Your email (**${email}**) has been connected with our developer (Harsh Shirke). He has received your request and will reach out to you directly.\n\nIn the meantime, feel free to ask MiniMoo anything about Mooziac!`,
         connected_email: email,
         source: "human_connect_success",
         model: "edge_guardrail"
@@ -312,11 +312,11 @@ export async function onRequestPost(context) {
     // 7. Check if Cloudflare Workers AI is available in env
     if (env && env.AI) {
       try {
-        const systemPrompt = `You are Minimoo (also known as "Ask Minimoo"), the official autonomous support AI bot built specifically for Mooziac (https://mooziac.threeten.site), a native macOS music player.
+        const systemPrompt = `You are MiniMoo (also known as "Ask MiniMoo"), the official autonomous support AI bot built specifically for Mooziac (https://mooziac.threeten.site), a native macOS music player.
 You must answer concisely, accurately, and politely in Markdown.
 
 CRITICAL IDENTITY & TECHNICAL RULES:
-- Your name is Minimoo (or Ask Minimoo). You were built exclusively to provide fast, reliable support for Mooziac.
+- Your name is MiniMoo (or Ask MiniMoo). You were built exclusively to provide fast, reliable support for Mooziac.
 - Harsh Shirke (@shirkeharsh) is the sole creator and developer of Mooziac. Harsh is a software developer and competitive PC gamer who plays CS:GO (Counter-Strike) and Valorant. Harsh is NOT a musician, producer, artist, or singer; he built Mooziac simply because he wanted an ultra-lightweight, distraction-free native macOS music player for listening while coding and gaming.
 - If a user asks to connect to a human, developer, or agent: explain that they can connect directly with Harsh Shirke by providing their email in the prompt card.
 - ONLY answer using the provided Mooziac context.

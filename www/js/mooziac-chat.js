@@ -2,7 +2,7 @@
  * =========================================================
  * MOOZIAC LIQUID GLASS AI SUPPORT WIDGET (mooziac-chat.js)
  * 100% Autonomous AI Support Assistant (Powered by Mooziac Knowledge Base & Llama 3.2)
- * Brand: Ask Minimoo 🤖
+ * Brand: Ask MiniMoo 🤖
  * Pure Text Support - Clean, Fast & Minimalist
  * =========================================================
  */
@@ -121,12 +121,12 @@
         showTyping(true);
         setTimeout(() => {
           showTyping(false);
-          appendMsg(`Thank you! Your email (**${userEmail}**) has been connected with our developer (Harsh Shirke). He has received your request and will reach out to you directly.\n\nIn the meantime, feel free to ask Minimoo anything about Mooziac!`, 'bot');
+          appendMsg(`Thank you! Your email (**${userEmail}**) has been connected with our developer (Harsh Shirke). He has received your request and will reach out to you directly.\n\nIn the meantime, feel free to ask MiniMoo anything about Mooziac!`, 'bot');
         }, 350);
 
         if (input) {
           input.disabled = false;
-          input.placeholder = "Ask Minimoo anything...";
+          input.placeholder = "Ask MiniMoo anything...";
           input.focus();
         }
         const sendBtn = document.getElementById('mzc-send');
@@ -155,7 +155,7 @@
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
           </svg>
         </div>
-        <span class="mzc-launcher-label">Ask Minimoo</span>
+        <span class="mzc-launcher-label">Ask MiniMoo</span>
       </div>
 
       <!-- Main Glass Window -->
@@ -172,8 +172,8 @@
               <span id="mzc-dot" class="mzc-online-dot"></span>
             </div>
             <div class="mzc-profile-info">
-              <span class="mzc-name">Ask Minimoo</span>
-              <span id="mzc-status" class="mzc-status">Minimoo • Built for Mooziac Support</span>
+              <span class="mzc-name">Ask MiniMoo</span>
+              <span id="mzc-status" class="mzc-status">MiniMoo • Built for Mooziac Support</span>
             </div>
           </div>
 
@@ -188,7 +188,7 @@
         <div id="mzc-messages" class="mzc-messages">
           <div class="mzc-msg bot">
             <div class="mzc-bubble">
-              <p><strong>Hi, I'm Minimoo! 🤖</strong></p>
+              <p><strong>Hi, I'm MiniMoo! 🤖</strong></p>
               <p>I was built exclusively to assist you with Mooziac. Ask anything about gestures, downloads, lyrics, formats, or macOS fixes:</p>
               <div class="mzc-options-group" id="mzc-initial-options">
                 <button class="mzc-option-pill" data-key="gestures">🖐️ Trackpad Edge Volume</button>
@@ -213,7 +213,7 @@
         <!-- Input Bar (Pure Text Only) -->
         <div class="mzc-input-bar">
           <input type="text" id="mzc-hp" name="mzc_hp" style="display:none !important;" tabindex="-1" autocomplete="off">
-          <input type="text" id="mzc-input" class="mzc-input-field" placeholder="Ask Minimoo anything..." maxlength="500" autocomplete="off">
+          <input type="text" id="mzc-input" class="mzc-input-field" placeholder="Ask MiniMoo anything..." maxlength="500" autocomplete="off">
           <button id="mzc-send" class="mzc-send-btn" title="Send (Enter)">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -490,7 +490,7 @@
 
       if (input) {
         input.disabled = false;
-        input.placeholder = "Ask Minimoo anything...";
+        input.placeholder = "Ask MiniMoo anything...";
       }
 
       fetch(`${API_BASE}/api/feedback`, {
@@ -508,7 +508,7 @@
       showTyping(true);
       setTimeout(() => {
         showTyping(false);
-        appendMsg(`Thank you! Your email (**${userEmail}**) has been connected with our developer (Harsh Shirke). He has received your request and will reach out to you directly.\n\nIn the meantime, feel free to ask Minimoo anything about Mooziac!`, 'bot');
+        appendMsg(`Thank you! Your email (**${userEmail}**) has been connected with our developer (Harsh Shirke). He has received your request and will reach out to you directly.\n\nIn the meantime, feel free to ask MiniMoo anything about Mooziac!`, 'bot');
       }, 350);
       return;
     }
