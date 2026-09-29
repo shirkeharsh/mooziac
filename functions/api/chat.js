@@ -68,8 +68,11 @@ function retrieveContext(userQuery) {
 
   // Score FAQs
   for (const f of KB.faqs) {
-    // Check direct variation match
-    const directVar = f.variations.some(v => lowerQuery.includes(v.toLowerCase()) || v.toLowerCase().includes(lowerQuery));
+    // Check direct variation match (avoid short word false positives)
+    const directVar = f.variations.some(v => {
+      const lv = v.toLowerCase();
+      return lowerQuery.includes(lv) || (lowerQuery.length >= 8 && lv.includes(lowerQuery));
+    });
     let baseScore = directVar ? 30 : 0;
     
     const s = scoreMatch(words, f.q + ' ' + f.variations.join(' ') + ' ' + f.a, f.topics);
@@ -258,6 +261,54 @@ export async function onRequestPost(context) {
       });
     }
 
+    // 4b. Conversational Intent Handling (Natural greetings, thanks, confirmations, farewells)
+    const normText = userQuery.trim().toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+
+    // Gratitude (thx, thanks, thnks, thank you, ty, appreciate it, etc.)
+    if (/^(thanks|thx|thnks|thank you|thank u|ty|tysm|cheers|appreciate it|much appreciated|thank you so much)$/i.test(normText)) {
+      return new Response(JSON.stringify({
+        reply: "You're very welcome! 😊 Glad I could help. Enjoy listening with Mooziac, and feel free to reach out anytime if you have any questions!",
+        source: "conversational_guardrail",
+        model: "conversational_engine"
+      }), { status: 200, headers: corsHeaders });
+    }
+
+    // Success / Confirmation (done, it worked, works, fixed, resolved, etc.)
+    if (/^(done|it worked|works now|working now|fixed|resolved|got it|all good|cool|great|awesome|perfect|nice|sounds good|understood|works|all done)$/i.test(normText)) {
+      return new Response(JSON.stringify({
+        reply: "Awesome, glad that worked out! 🚀 Enjoy your music. Let me know if you run into anything else or have questions about gestures, lyrics, or features!",
+        source: "conversational_guardrail",
+        model: "conversational_engine"
+      }), { status: 200, headers: corsHeaders });
+    }
+
+    // Greetings (hi, hello, hey, yo, etc.)
+    if (/^(hi|hello|hey|hey there|hi there|yo|sup|good morning|good afternoon|good evening)$/i.test(normText)) {
+      return new Response(JSON.stringify({
+        reply: "Hey there! 👋 I'm MiniMoo. What can I help you with in Mooziac today?",
+        source: "conversational_guardrail",
+        model: "conversational_engine"
+      }), { status: 200, headers: corsHeaders });
+    }
+
+    // Farewells (bye, goodbye, etc.)
+    if (/^(bye|goodbye|cya|see ya|see you|take care|have a good day|night|goodnight)$/i.test(normText)) {
+      return new Response(JSON.stringify({
+        reply: "Have a great one and happy listening! 🎵 Drop by anytime if you ever need help with Mooziac.",
+        source: "conversational_guardrail",
+        model: "conversational_engine"
+      }), { status: 200, headers: corsHeaders });
+    }
+
+    // Affirmative / OK (ok, okay, alright, sure, etc.)
+    if (/^(ok|okay|k|alright|sure|yep|yes|yeah)$/i.test(normText)) {
+      return new Response(JSON.stringify({
+        reply: "Sounds good! Let me know if there's anything else you need.",
+        source: "conversational_guardrail",
+        model: "conversational_engine"
+      }), { status: 200, headers: corsHeaders });
+    }
+
     // 5. Connect to Human or 10-Message Limit Gate
     const sessionId = (body.session_id || clientIp).toString();
     const userEmail = (body.email || '').trim();
@@ -312,13 +363,17 @@ export async function onRequestPost(context) {
     // 7. Check if Cloudflare Workers AI is available in env
     if (env && env.AI) {
       try {
-        const systemPrompt = `You are MiniMoo (also known as "Ask MiniMoo"), the official autonomous support AI bot built specifically for Mooziac (https://mooziac.threeten.site), a native macOS music player.
-You must answer concisely, accurately, and politely in Markdown.
+        const systemPrompt = `You are MiniMoo (also known as "Ask MiniMoo"), the official autonomous support AI bot for Mooziac (https://mooziac.threeten.site), a native macOS music player.
+You must answer naturally, concisely, accurately, and politely in Markdown.
 
-CRITICAL IDENTITY & TECHNICAL RULES:
-- Your name is MiniMoo (or Ask MiniMoo). You were built exclusively to provide fast, reliable support for Mooziac.
+CONVERSATIONAL PERSONALITY & TONE:
+- Speak naturally, warmly, and helpfully like a knowledgeable Mac engineer and audio enthusiast.
+- NEVER repeat or paraphrase the user's intent in a robotic third-person statement (NEVER say "You're looking for...", "You're looking to connect...", or "You are asking about..."). Speak directly to the user in a friendly tone.
+- If the user says thanks or confirms something worked, reply warmly and politely.
+- Only bring up developer Harsh Shirke if the user explicitly asks to connect with a developer, human, or agent. Do not bring up Harsh Shirke unprompted.
+
+TECHNICAL RULES (Mooziac macOS Music Player):
 - Harsh Shirke (@shirkeharsh) is the sole creator and developer of Mooziac. Harsh is a software developer and competitive PC gamer who plays CS:GO (Counter-Strike) and Valorant. Harsh is NOT a musician, producer, artist, or singer; he built Mooziac simply because he wanted an ultra-lightweight, distraction-free native macOS music player for listening while coding and gaming.
-- If a user asks to connect to a human, developer, or agent: explain that they can connect directly with Harsh Shirke by providing their email in the prompt card.
 - ONLY answer using the provided Mooziac context.
 - If a feature does NOT exist (e.g. 10-band equalizer, Windows/Linux support, Spotify streaming, ID3 tag editing), explicitly state that it is not supported.
 - If user asks why volume gesture does not work: explain it requires built-in or Magic Trackpad, starting in top 30% of trackpad, rightmost 2.5mm edge, and 3.0mm vertical movement deadzone.
@@ -347,8 +402,8 @@ ${contextText || "General Mooziac native macOS music player inquiry."}`;
         const usedModel = env.AI_MODEL || '@cf/meta/llama-3.2-1b-instruct';
         const aiResponse = await env.AI.run(usedModel, {
           messages: messages,
-          max_tokens: 512,
-          temperature: 0.2
+          max_tokens: 384,
+          temperature: 0.5
         });
 
         const reply = aiResponse.response || aiResponse.text || '';
