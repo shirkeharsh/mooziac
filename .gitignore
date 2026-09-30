@@ -5,6 +5,10 @@ dist/
 .wrangler/
 dev_server.js
 
+# Website & Edge Functions (Maintained in private repo shirkeharsh/mooziac-site)
+www/
+functions/
+
 # OS cruft
 .DS_Store
 *.DS_Store
