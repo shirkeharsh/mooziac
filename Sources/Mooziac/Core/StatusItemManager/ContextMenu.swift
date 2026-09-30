@@ -308,7 +308,7 @@ extension StatusItemManager {
     }
 
     @objc private func openSupportFromMenu() {
-        if let url = URL(string: "https://mooziac.threeten.site/support.html") {
+        if let url = URL(string: "https://mooziac.pages.dev/support.html") {
             NSWorkspace.shared.open(url)
         }
     }
