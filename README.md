@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://mooziac.threeten.site">
+  <a href="https://mooziac.pages.dev">
     <img src="Resources/banner.svg" alt="Mooziac macOS Music Player" width="100%">
   </a>
 </p>
