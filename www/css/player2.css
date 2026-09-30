@@ -209,6 +209,7 @@
     transform 0.18s cubic-bezier(0.2, 0.8, 0.4, 1);
   isolation: isolate;
   overflow: hidden;
+  text-align: left;
 }
 
 /* Ambient Radial Dynamic Glow */
@@ -279,6 +280,7 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
+  text-align: left;
 }
 
 .title {
@@ -290,6 +292,7 @@
   text-overflow: ellipsis;
   line-height: 1.25;
   letter-spacing: -0.01em;
+  text-align: left;
 }
 
 .artist {
@@ -301,6 +304,7 @@
   text-overflow: ellipsis;
   margin-top: 2px;
   line-height: 1.2;
+  text-align: left;
 }
 
 .top-actions {
@@ -726,6 +730,7 @@
 .settings-panel {
   display: none;
   width: 100%;
+  text-align: left;
   animation: drawerSlideDown 0.24s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
 }
 
@@ -745,12 +750,14 @@
   color: var(--text-tertiary);
   text-transform: uppercase;
   margin-bottom: 4px;
+  text-align: left;
 }
 
 .feature-rows-stack {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  text-align: left;
 }
 
 .feature-row {
@@ -761,6 +768,7 @@
   border-radius: 8px;
   background: transparent;
   transition: background-color 0.12s ease;
+  text-align: left;
 }
 
 .feature-row:hover {
@@ -788,6 +796,7 @@
   margin-left: 8px;
   display: flex;
   flex-direction: column;
+  text-align: left;
 }
 
 .feature-title {
@@ -795,6 +804,7 @@
   font-weight: 600;
   color: var(--text-primary);
   line-height: 1.2;
+  text-align: left;
 }
 
 .feature-desc {
@@ -806,6 +816,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.2;
+  text-align: left;
 }
 
 /* 4-Step Capsule Switch for Theme & Progress Style */
@@ -917,6 +928,7 @@
 .playlist-drawer {
   display: none;
   width: 100%;
+  text-align: left;
   animation: drawerSlideDown 0.24s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
 }
 
@@ -1092,6 +1104,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
+  text-align: left;
 }
 
 .lib-item-title {
@@ -1101,6 +1114,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-align: left;
 }
 
 .lib-item-sub {
@@ -1109,6 +1123,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-align: left;
 }
 
 .lib-item-badge {

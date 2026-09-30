@@ -445,6 +445,10 @@ h1.hero-title {
   margin: 0 auto;
   width: 100%;
 }
+.player-stage .stage,
+.player-stage .mooziac-player {
+  text-align: left;
+}
 .player-stage::before {
   content: "";
   position: absolute;
@@ -1286,6 +1290,7 @@ h1.hero-title {
   }
   .player-stage .mooziac-player {
     box-shadow: 0 16px 36px rgba(0, 0, 0, 0.7) !important;
+    text-align: left !important;
   }
 
   .site-nav {
@@ -1486,6 +1491,7 @@ h1.hero-title {
     border-radius: 18px;
     margin: 0 auto;
     box-sizing: border-box;
+    text-align: left !important;
   }
   .player-stage .controls-row {
     gap: 4px;
@@ -1729,6 +1735,7 @@ h1.hero-title {
     padding: 10px 10px;
     border-radius: 14px;
     margin: 0 auto;
+    text-align: left !important;
   }
   .player-stage .artwork {
     width: 38px;
