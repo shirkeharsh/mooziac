@@ -2,7 +2,7 @@
 
 *Last Updated: August 2026*
 
-Welcome to **Mooziac**. By downloading, installing, accessing, or using the Mooziac application (the "App") or visiting our website ([mooziac.threeten.site](https://mooziac.threeten.site)), you agree to be bound by these Terms of Service.
+Welcome to **Mooziac**. By downloading, installing, accessing, or using the Mooziac application (the "App") or visiting our website ([mooziac.pages.dev](https://mooziac.pages.dev)), you agree to be bound by these Terms of Service.
 
 ---
 

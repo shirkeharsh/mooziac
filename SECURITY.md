@@ -8,10 +8,11 @@ The Mooziac development team takes the security and privacy of our users very se
 
 We actively provide security patches and updates for the following versions:
 
-| Version | Supported          | Status             |
-| ------- | ------------------ | ------------------ |
-| 1.0.x   | :white_check_mark: | Currently Supported |
-| < 1.0.0 | :x:                | Unsupported        |
+| Version | Supported          | Status                   |
+| ------- | ------------------ | ------------------------ |
+| 1.1.x   | :white_check_mark: | Currently Supported      |
+| 1.0.x   | :white_check_mark: | Critical Security Fixes  |
+| < 1.0.0 | :x:                | Unsupported              |
 
 We strongly encourage all users to stay updated with the latest release available on [GitHub Releases](https://github.com/shirkeharsh/mooziac/releases).
 

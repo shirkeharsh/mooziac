@@ -636,13 +636,14 @@ class StatusItemManager: NSObject {
     @objc func resetLoginFromMenu() {
         let dataStore = WKWebsiteDataStore.default()
         let dataTypes = WKWebsiteDataStore.allWebsiteDataTypes()
-        dataStore.fetchDataRecords(ofTypes: dataTypes) { records in
-            dataStore.removeData(ofTypes: dataTypes, for: records) {
+        dataStore.fetchDataRecords(ofTypes: dataTypes) { [weak self] records in
+            dataStore.removeData(ofTypes: dataTypes, for: records) { [weak self] in
                 DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
                     UserDefaults.standard.set(false, forKey: "YTM_hasLoggedInOnce")
                     NowPlayingManager.shared.flushSessionState(keepCookies: false)
-                    self?.mainViewController.setBrowserVisible(false)
-                    self?.mainViewController.webViewContainer.loadMusicHome(autoPlayRandom: true)
+                    self.mainViewController.setBrowserVisible(false)
+                    self.mainViewController.webViewContainer.loadMusicHome(autoPlayRandom: true)
                     CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "✓ Reset Login & Started Fresh")
                 }
             }

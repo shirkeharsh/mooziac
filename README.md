@@ -22,7 +22,7 @@
     <img src="https://img.shields.io/badge/Download-Mooziac.zip-8B7BFF?style=for-the-badge&logo=zip&logoColor=white" alt="Download ZIP">
   </a>
   &nbsp;&nbsp;
-  <a href="https://mooziac.threeten.site">
+  <a href="https://mooziac.pages.dev">
     <img src="https://img.shields.io/badge/Explore-Official%20Site-34C759?style=for-the-badge&logo=safari&logoColor=white" alt="Official Website">
   </a>
 </p>
@@ -283,7 +283,7 @@ If you find Mooziac useful, please consider **starring the repository** — it h
 
 - 🐛 **Found a bug?** [Open an issue](https://github.com/shirkeharsh/mooziac/issues)
 - 💡 **Have a feature idea?** [Submit a feature request](https://github.com/shirkeharsh/mooziac/issues/new)
-- 🌐 **Official Website:** [mooziac.threeten.site](https://mooziac.threeten.site)
+- 🌐 **Official Website:** [mooziac.pages.dev](https://mooziac.pages.dev)
 
 ---
 
