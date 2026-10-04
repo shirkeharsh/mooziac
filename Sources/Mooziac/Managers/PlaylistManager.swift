@@ -160,6 +160,32 @@ public final class PlaylistManager: NSObject {
         return LocalDatabaseManager.shared.fetchPlaylistItems(playlistID: playlistID)
     }
 
+    /// Imports a playlist file as a new playlist without copying or moving its audio files.
+    @discardableResult
+    public func importPlaylistFile(_ document: PlaylistFileCodec.Document) -> String? {
+        let name = document.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, !document.tracks.isEmpty,
+              let playlistID = createPlaylist(name: name) else { return nil }
+
+        let items = document.tracks.enumerated().map { index, track in
+            PlaylistItemRecord(
+                playlistID: playlistID,
+                sortOrder: index,
+                refType: "local",
+                refID: track.path,
+                title: track.title.isEmpty ? URL(fileURLWithPath: track.path).deletingPathExtension().lastPathComponent : track.title,
+                artist: track.artist
+            )
+        }
+        LocalDatabaseManager.shared.replacePlaylistItems(playlistID: playlistID, items: items)
+        invalidateSummary(for: playlistID)
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: NSNotification.Name("Mooziac_PlaylistsUpdated"), object: nil)
+            NotificationCenter.default.post(name: NSNotification.Name("Mooziac_LibraryUpdated"), object: nil)
+        }
+        return playlistID
+    }
+
     public func appendPlaylistItem(_ item: PlaylistItemRecord, to playlistID: String) {
         LocalDatabaseManager.shared.appendPlaylistItem(item)
         markSyncedDirtyIfNeeded(playlistID: playlistID)

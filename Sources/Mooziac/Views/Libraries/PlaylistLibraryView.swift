@@ -724,7 +724,8 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
 
             searchField.placeholderString = "Search playlists..."
             saveQueueButton.isHidden = false
-            importHeaderButton.isHidden = true
+            importHeaderButton.isHidden = false
+            importHeaderButton.toolTip = "Import Playlist File…"
             openFolderHeaderButton.isHidden = true
             downloadCurrentHeaderButton.isHidden = true
             addCurrentTrackButton.isHidden = true
@@ -740,7 +741,7 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
 
             emptyStateIcon.image = NSImage(systemSymbolName: "music.note.list", accessibilityDescription: "Empty")
             emptyStateLabel.stringValue = "No playlists yet"
-            emptyStateSubLabel.stringValue = "Click '＋ New Playlist' below to create your first playlist"
+            emptyStateSubLabel.stringValue = "Create a playlist below or import an M3U8 or JSON playlist file"
             emptyStateView.isHidden = !filteredPlaylists.isEmpty
 
         case .detail(let playlist):
@@ -840,6 +841,7 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
             searchField.placeholderString = "Search downloaded tracks..."
             saveQueueButton.isHidden = true
             importHeaderButton.isHidden = false
+            importHeaderButton.toolTip = "Import Audio Files…"
             openFolderHeaderButton.isHidden = false
             downloadCurrentHeaderButton.isHidden = false
             addCurrentTrackButton.isHidden = true
@@ -949,6 +951,11 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
     }
 
     @objc private func handleImportTapped() {
+        if case .list = mode {
+            handleImportPlaylistTapped()
+            return
+        }
+
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
@@ -963,6 +970,56 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
                 }
             }
         }
+    }
+
+    private func handleImportPlaylistTapped() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [
+            UTType(filenameExtension: "m3u8") ?? .plainText,
+            UTType(filenameExtension: "m3u") ?? .plainText,
+            .json
+        ]
+        panel.prompt = "Import Playlist"
+
+        panel.begin { [weak self] response in
+            guard response == .OK, let fileURL = panel.url else { return }
+            do {
+                let data = try Data(contentsOf: fileURL)
+                let result = try PlaylistFileCodec.decode(data, from: fileURL)
+                guard !result.document.tracks.isEmpty else {
+                    self?.showPlaylistFileError("No local track entries were found in this playlist.")
+                    return
+                }
+                guard let playlistID = PlaylistManager.shared.importPlaylistFile(result.document) else {
+                    self?.showPlaylistFileError("Mooziac couldn't create this playlist.")
+                    return
+                }
+                self?.reload()
+                let skippedMessage = result.skippedEntryCount > 0
+                    ? " (\(result.skippedEntryCount) online or unsupported entr\(result.skippedEntryCount == 1 ? "y was" : "ies were") skipped)"
+                    : ""
+                CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(
+                    text: "✓ Imported \(result.document.tracks.count) track(s) as \(result.document.name)\(skippedMessage)"
+                )
+                if let playlist = PlaylistManager.shared.fetchPlaylists().first(where: { $0.id == playlistID }) {
+                    self?.mode = .detail(playlist)
+                }
+            } catch {
+                self?.showPlaylistFileError(error.localizedDescription)
+            }
+        }
+    }
+
+    private func showPlaylistFileError(_ message: String) {
+        let alert = NSAlert()
+        alert.messageText = "Couldn't Import Playlist"
+        alert.informativeText = message
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 
     @objc private func handleOpenFolderTapped() {
