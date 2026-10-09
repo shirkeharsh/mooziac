@@ -1,4 +1,5 @@
 import AppKit
+import UniformTypeIdentifiers
 
 extension PlaylistLibraryView {
     // MARK: - Context Menu
@@ -26,6 +27,20 @@ extension PlaylistLibraryView {
             addCurrentItem.target = self
             addCurrentItem.representedObject = playlist
             menu.addItem(addCurrentItem)
+
+            menu.addItem(NSMenuItem.separator())
+
+            let exportItem = NSMenuItem(title: "Export Playlist", action: nil, keyEquivalent: "")
+            let exportMenu = NSMenu(title: "Export Playlist")
+            for format in PlaylistFileCodec.Format.allCases {
+                let title = format == .m3u8 ? "M3U8…" : "JSON…"
+                let item = NSMenuItem(title: title, action: #selector(handleExportPlaylist(_:)), keyEquivalent: "")
+                item.target = self
+                item.representedObject = ["playlist": playlist, "format": format.rawValue]
+                exportMenu.addItem(item)
+            }
+            exportItem.submenu = exportMenu
+            menu.addItem(exportItem)
 
             menu.addItem(NSMenuItem.separator())
 
@@ -309,6 +324,57 @@ extension PlaylistLibraryView {
         }
 
         return menu
+    }
+
+    @objc private func handleExportPlaylist(_ sender: NSMenuItem) {
+        guard let payload = sender.representedObject as? [String: Any],
+              let playlist = payload["playlist"] as? PlaylistRecord,
+              let rawFormat = payload["format"] as? String,
+              let format = PlaylistFileCodec.Format(rawValue: rawFormat) else { return }
+
+        let items = PlaylistManager.shared.fetchPlaylistItems(playlistID: playlist.id)
+        let localItems = items.filter { $0.refType == "local" && !$0.refID.isEmpty }
+        guard !localItems.isEmpty else {
+            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "⚠️ This playlist has no local tracks to export")
+            return
+        }
+
+        let document = PlaylistFileCodec.Document(
+            name: playlist.name,
+            tracks: localItems.map { PlaylistFileCodec.Track(path: $0.refID, title: $0.title, artist: $0.artist) }
+        )
+        do {
+            let data = try PlaylistFileCodec.encode(document, as: format)
+            let panel = NSSavePanel()
+            panel.allowedContentTypes = [UTType(filenameExtension: format.fileExtension) ?? .data]
+            panel.nameFieldStringValue = "\(playlist.name).\(format.fileExtension)"
+            panel.canCreateDirectories = true
+            panel.prompt = "Export"
+            panel.begin { response in
+                guard response == .OK, let url = panel.url else { return }
+                do {
+                    try data.write(to: url, options: .atomic)
+                    let skippedCount = items.count - localItems.count
+                    let skipped = skippedCount > 0 ? " (\(skippedCount) online entr\(skippedCount == 1 ? "y" : "ies") omitted)" : ""
+                    CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(
+                        text: "✓ Exported \(localItems.count) track(s)\(skipped)"
+                    )
+                } catch {
+                    self.showPlaylistFileError(error.localizedDescription)
+                }
+            }
+        } catch {
+            showPlaylistFileError(error.localizedDescription)
+        }
+    }
+
+    private func showPlaylistFileError(_ message: String) {
+        let alert = NSAlert()
+        alert.messageText = "Couldn't Export Playlist"
+        alert.informativeText = message
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 
     @objc func handleContextOpenPlaylist(_ sender: NSMenuItem) {

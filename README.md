@@ -232,6 +232,24 @@ Mooziac/
 
 ---
 
+## 🎵 Playlist File Import & Export
+
+In the Playlists view, use the **＋** button to import an M3U/M3U8 or JSON playlist file. Right-click a playlist and choose **Export Playlist** to save it as M3U8 or JSON. Import creates a new playlist and references the local file paths in the playlist; it does not copy or move audio files. Relative paths are resolved from the playlist file's folder. Missing local files remain as references and can resolve when they become available. Online entries in imported playlists and non-local entries during export are skipped.
+
+Mooziac's JSON playlist format is versioned and uses UTF-8:
+
+```json
+{
+  "version": 1,
+  "name": "Road Trip",
+  "tracks": [
+    { "path": "/Users/me/Music/song.m4a", "title": "Song", "artist": "Artist" }
+  ]
+}
+```
+
+---
+
 ## ❓ Frequently Asked Questions (FAQ)
 
 <details>
