@@ -61,6 +61,19 @@ extension NSColor {
 
     public static let darkThemeSelector = NSColor(hex: "D9DDE3")
     public static let lightThemeSelector = NSColor(hex: "434343")
+
+    public var hexString: String {
+        guard let rgbColor = usingColorSpace(.sRGB) else {
+            return String(format: "#%02X%02X%02X",
+                          Int(round(redComponent * 255)),
+                          Int(round(greenComponent * 255)),
+                          Int(round(blueComponent * 255)))
+        }
+        let r = Int(round(rgbColor.redComponent * 255))
+        let g = Int(round(rgbColor.greenComponent * 255))
+        let b = Int(round(rgbColor.blueComponent * 255))
+        return String(format: "#%02X%02X%02X", r, g, b)
+    }
 }
 
 // MARK: - System Appearance & macOS 27 Contrast-Safe Engine
