@@ -450,12 +450,8 @@ extension DynamicIslandPlayerView {
             btn.refresh(tone: tone, isGlass: isGlass, cyan: cyan)
         }
         playlistDetailCreateButton.contentTintColor = isPlaylistCreateOpen ? cyan : tone.iconColor
-
-        if let footerBtn = playlistCreateFooterButton {
-            footerBtn.contentTintColor = cyan
-            footerBtn.layer?.borderColor = cyan.withAlphaComponent(0.35).cgColor
-            footerBtn.layer?.backgroundColor = cyan.withAlphaComponent(isGlass ? 0.08 : 0.12).cgColor
-        }
+        playlistImportButton.contentTintColor = tone.iconColor
+        playlistDetailExportButton.contentTintColor = cyan
 
         downloadsPlayAllButton.contentTintColor = cyan
         downloadsShuffleButton.contentTintColor = cyan

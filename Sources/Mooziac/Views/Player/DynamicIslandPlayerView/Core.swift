@@ -111,6 +111,8 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     let playlistDetailShuffleButton = ReactiveIconButton()
     let playlistDetailDownloadAllButton = ReactiveIconButton()
     let playlistDetailCreateButton = ReactiveIconButton()
+    let playlistImportButton = ReactiveIconButton()
+    let playlistDetailExportButton = ReactiveIconButton()
     let playlistDetailRenameButton = ReactiveIconButton()
     let playlistDetailDeleteButton = ReactiveIconButton()
     let playlistDetailAddButton = ReactiveIconButton()

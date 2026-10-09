@@ -84,11 +84,12 @@ public enum PlaylistFileCodec {
     }
 
     public static func decode(_ data: Data, from fileURL: URL) throws -> DecodedDocument {
+        let defaultName = fileURL.deletingPathExtension().lastPathComponent
         switch fileURL.pathExtension.lowercased() {
         case "json":
             return try decodeJSON(data, relativeTo: fileURL.deletingLastPathComponent())
         case "m3u", "m3u8":
-            return try decodeM3U(data, relativeTo: fileURL.deletingLastPathComponent())
+            return try decodeM3U(data, relativeTo: fileURL.deletingLastPathComponent(), defaultName: defaultName)
         default:
             throw CodecError.unsupportedFormat
         }
@@ -117,7 +118,7 @@ public enum PlaylistFileCodec {
         return DecodedDocument(document: Document(name: decoded.name, tracks: tracks), skippedEntryCount: skipped)
     }
 
-    private static func decodeM3U(_ data: Data, relativeTo directory: URL) throws -> DecodedDocument {
+    private static func decodeM3U(_ data: Data, relativeTo directory: URL, defaultName: String = "") throws -> DecodedDocument {
         guard var text = String(data: data, encoding: .utf8) else {
             throw CodecError.invalidPlaylist("M3U playlists must be UTF-8 text.")
         }
@@ -154,7 +155,9 @@ public enum PlaylistFileCodec {
             pendingTitle = ""
         }
 
-        if name.isEmpty { name = directory.lastPathComponent }
+        if name.isEmpty {
+            name = defaultName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? directory.lastPathComponent : defaultName
+        }
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw CodecError.invalidPlaylist("The playlist name is missing.")
         }

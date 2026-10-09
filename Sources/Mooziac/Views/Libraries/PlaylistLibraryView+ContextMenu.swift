@@ -350,6 +350,7 @@ extension PlaylistLibraryView {
             panel.nameFieldStringValue = "\(playlist.name).\(format.fileExtension)"
             panel.canCreateDirectories = true
             panel.prompt = "Export"
+            NSApp.activate(ignoringOtherApps: true)
             panel.begin { response in
                 guard response == .OK, let url = panel.url else { return }
                 do {

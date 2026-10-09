@@ -984,6 +984,7 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
         ]
         panel.prompt = "Import Playlist"
 
+        NSApp.activate(ignoringOtherApps: true)
         panel.begin { [weak self] response in
             guard response == .OK, let fileURL = panel.url else { return }
             do {

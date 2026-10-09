@@ -1,4 +1,5 @@
 import AppKit
+import UniformTypeIdentifiers
 
 extension DynamicIslandPlayerView {
     // MARK: - Drawer Context Menus
@@ -855,23 +856,40 @@ extension DynamicIslandPlayerView {
     func updatePlaylistCreateButtonIcon(isCreating: Bool) {
         let config = NSImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
         playlistDetailCreateButton.image = NSImage(systemSymbolName: "plus", accessibilityDescription: "Create New Playlist")?.withSymbolConfiguration(config)
-        playlistDetailCreateButton.toolTip = isCreating ? "Cancel" : "Create New Playlist"
+        playlistDetailCreateButton.toolTip = "Create New Playlist"
     }
 
     @objc func handleCreateNewPlaylistFromHeader() {
-        if isPlaylistCreateOpen {
-            handleInlineCreateCancel()
-            return
+        let alert = NSAlert()
+        alert.window.level = .statusBar + 1
+        alert.messageText = "Create New Playlist"
+        alert.informativeText = "Enter a name for the new playlist:"
+        alert.alertStyle = .informational
+
+        let textField = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+        textField.placeholderString = "Playlist Name"
+        alert.accessoryView = textField
+        alert.addButton(withTitle: "Create")
+        alert.addButton(withTitle: "Cancel")
+        alert.window.initialFirstResponder = textField
+        DispatchQueue.main.async {
+            textField.selectText(nil)
         }
-        isPlaylistCreateOpen = true
-        playlistSearchField?.stringValue = ""
-        inlineCreateTextField.stringValue = ""
-        updatePlaylistCreateButtonIcon(isCreating: true)
-        resetPlaylistSectionChrome()
-        refreshPlaylistsSection()
-        updateSettingsThemeHighlight()
-        applySearchCreateFieldState(animated: true)
-        window?.makeFirstResponder(inlineCreateTextField)
+
+        if alert.runModal() == .alertFirstButtonReturn {
+            let name = textField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty else { return }
+            if let newID = PlaylistManager.shared.createPlaylist(name: name) {
+                showToastBanner(message: "✓ Created \"\(name)\"")
+                refreshPlaylistsSection()
+                if let pl = PlaylistManager.shared.fetchPlaylists().first(where: { $0.id == newID }) {
+                    self.playlistDetailMode = pl
+                    self.playlistSectionLabel.stringValue = pl.name.uppercased()
+                    self.resetPlaylistSectionChrome()
+                    self.refreshPlaylistsSection()
+                }
+            }
+        }
     }
 
     @objc func handleInlineCreateConfirm() {
@@ -1024,4 +1042,117 @@ extension DynamicIslandPlayerView {
         updateSettingsThemeHighlight()
     }
 
+    // MARK: - Playlist File Import & Export
+
+    @objc func handleImportPlaylistTapped() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [
+            UTType(filenameExtension: "m3u8") ?? .plainText,
+            UTType(filenameExtension: "m3u") ?? .plainText,
+            .json
+        ]
+        panel.prompt = "Import Playlist"
+
+        NSApp.activate(ignoringOtherApps: true)
+        panel.begin { [weak self] response in
+            guard response == .OK, let fileURL = panel.url else { return }
+            do {
+                let data = try Data(contentsOf: fileURL)
+                let result = try PlaylistFileCodec.decode(data, from: fileURL)
+                guard !result.document.tracks.isEmpty else {
+                    self?.showToastBanner(message: "⚠️ No local tracks found in playlist", isWarning: true)
+                    return
+                }
+                guard let playlistID = PlaylistManager.shared.importPlaylistFile(result.document) else {
+                    self?.showToastBanner(message: "✕ Couldn't create playlist", isWarning: true)
+                    return
+                }
+                self?.refreshPlaylistsSection()
+                let skippedNote = result.skippedEntryCount > 0 ? " (\(result.skippedEntryCount) skipped)" : ""
+                self?.showToastBanner(message: "✓ Imported \"\(result.document.name)\" (\(result.document.tracks.count) tracks)\(skippedNote)")
+                if let playlist = PlaylistManager.shared.fetchPlaylists().first(where: { $0.id == playlistID }) {
+                    self?.playlistDetailMode = playlist
+                    self?.playlistSectionLabel.stringValue = playlist.name.uppercased()
+                    self?.resetPlaylistSectionChrome()
+                    self?.refreshPlaylistsSection()
+                }
+            } catch {
+                self?.showToastBanner(message: "✕ \(error.localizedDescription)", isWarning: true)
+            }
+        }
+    }
+
+    @objc func handleExportPlaylistFromDetail() {
+        guard playlistDetailMode != nil else { return }
+        let menu = NSMenu(title: "Export Format")
+        let m3u8Item = NSMenuItem(title: "Export as M3U8…", action: #selector(handleDetailExportM3U8), keyEquivalent: "")
+        m3u8Item.target = self
+        menu.addItem(m3u8Item)
+
+        let jsonItem = NSMenuItem(title: "Export as JSON…", action: #selector(handleDetailExportJSON), keyEquivalent: "")
+        jsonItem.target = self
+        menu.addItem(jsonItem)
+
+        let event = NSApp.currentEvent ?? NSEvent()
+        NSMenu.popUpContextMenu(menu, with: event, for: playlistDetailExportButton)
+    }
+
+    @objc func handleDetailExportM3U8() {
+        guard let playlist = playlistDetailMode else { return }
+        exportPlaylist(playlist, format: .m3u8)
+    }
+
+    @objc func handleDetailExportJSON() {
+        guard let playlist = playlistDetailMode else { return }
+        exportPlaylist(playlist, format: .json)
+    }
+
+    @objc func handlePlaylistContextExportM3U8(_ sender: NSMenuItem) {
+        guard let playlistID = sender.representedObject as? String,
+              let playlist = PlaylistManager.shared.fetchPlaylists().first(where: { $0.id == playlistID }) else { return }
+        exportPlaylist(playlist, format: .m3u8)
+    }
+
+    @objc func handlePlaylistContextExportJSON(_ sender: NSMenuItem) {
+        guard let playlistID = sender.representedObject as? String,
+              let playlist = PlaylistManager.shared.fetchPlaylists().first(where: { $0.id == playlistID }) else { return }
+        exportPlaylist(playlist, format: .json)
+    }
+
+    private func exportPlaylist(_ playlist: PlaylistRecord, format: PlaylistFileCodec.Format) {
+        let items = PlaylistManager.shared.fetchPlaylistItems(playlistID: playlist.id)
+        let tracks = items.compactMap { item -> PlaylistFileCodec.Track? in
+            guard item.refType == "local" else { return nil }
+            return PlaylistFileCodec.Track(path: item.refID, title: item.title, artist: item.artist)
+        }
+
+        guard !tracks.isEmpty else {
+            showToastBanner(message: "⚠️ No local tracks in this playlist to export", isWarning: true)
+            return
+        }
+
+        let doc = PlaylistFileCodec.Document(name: playlist.name, tracks: tracks)
+
+        let panel = NSSavePanel()
+        panel.title = "Export Playlist"
+        panel.nameFieldStringValue = "\(playlist.name).\(format.fileExtension)"
+        panel.allowedContentTypes = [UTType(filenameExtension: format.fileExtension) ?? .plainText]
+        panel.canCreateDirectories = true
+        panel.prompt = "Export"
+
+        NSApp.activate(ignoringOtherApps: true)
+        panel.begin { [weak self] resp in
+            guard resp == .OK, let saveURL = panel.url else { return }
+            do {
+                let data = try PlaylistFileCodec.encode(doc, as: format)
+                try data.write(to: saveURL, options: .atomic)
+                self?.showToastBanner(message: "✓ Exported \"\(playlist.name)\"")
+            } catch {
+                self?.showToastBanner(message: "✕ Failed to export: \(error.localizedDescription)", isWarning: true)
+            }
+        }
+    }
 }

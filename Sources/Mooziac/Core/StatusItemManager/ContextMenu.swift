@@ -1,4 +1,5 @@
 import AppKit
+import UniformTypeIdentifiers
 
 extension StatusItemManager {
     private func makeCapsuleToggleMenuItem(title: String, isOn: Bool, onToggle: @escaping (Bool) -> Void) -> (menuItem: NSMenuItem, toggleView: NativeCapsuleToggleView) {
@@ -157,6 +158,9 @@ extension StatusItemManager {
         let importAudioItem = NSMenuItem(title: "Import Audio Files to Location…", action: #selector(importAudioFilesFromMenu), keyEquivalent: "")
         importAudioItem.target = self
         settingsMenu.addItem(importAudioItem)
+        let importPlaylistFileItem = NSMenuItem(title: "Import Playlist File… (.m3u8, .json)", action: #selector(importPlaylistFileFromMenu), keyEquivalent: "")
+        importPlaylistFileItem.target = self
+        settingsMenu.addItem(importPlaylistFileItem)
         let importPlaylistMenuItem = NSMenuItem(title: "Import Playlist from Link…", action: #selector(importPlaylistFromMenu), keyEquivalent: "i")
         importPlaylistMenuItem.target = self
         settingsMenu.addItem(importPlaylistMenuItem)
@@ -310,6 +314,43 @@ extension StatusItemManager {
     @objc private func openSupportFromMenu() {
         if let url = URL(string: "https://mooziac.pages.dev/support.html") {
             NSWorkspace.shared.open(url)
+        }
+    }
+
+    @objc private func importPlaylistFileFromMenu() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [
+            UTType(filenameExtension: "m3u8") ?? .plainText,
+            UTType(filenameExtension: "m3u") ?? .plainText,
+            .json
+        ]
+        panel.prompt = "Import Playlist"
+
+        NSApp.activate(ignoringOtherApps: true)
+        panel.begin { [weak self] response in
+            guard response == .OK, let fileURL = panel.url else { return }
+            do {
+                let data = try Data(contentsOf: fileURL)
+                let result = try PlaylistFileCodec.decode(data, from: fileURL)
+                guard !result.document.tracks.isEmpty else {
+                    CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "⚠️ No local tracks found in playlist")
+                    return
+                }
+                guard let _ = PlaylistManager.shared.importPlaylistFile(result.document) else {
+                    CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "✕ Couldn't create playlist")
+                    return
+                }
+                let skippedNote = result.skippedEntryCount > 0 ? " (\(result.skippedEntryCount) skipped)" : ""
+                CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "✓ Imported \"\(result.document.name)\" (\(result.document.tracks.count) tracks)\(skippedNote)")
+                if self?.panel.isVisible == true {
+                    self?.mainViewController.dynamicIslandPlayer.refreshPlaylistsSection()
+                }
+            } catch {
+                CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "✕ \(error.localizedDescription)")
+            }
         }
     }
 

@@ -33,6 +33,8 @@ extension DynamicIslandPlayerView {
             libraryNavContainer.isHidden = true
             playlistDetailBackButton.isHidden = false
             playlistDetailCreateButton.isHidden = true
+            playlistImportButton.isHidden = true
+            playlistDetailExportButton.isHidden = false
             playlistSearchToggleButton.isHidden = true
             playlistBulkDeleteButton.isHidden = true
             playlistSelectionDoneButton.isHidden = true
@@ -48,6 +50,7 @@ extension DynamicIslandPlayerView {
                 playlistDetailDeleteButton.isHidden = true
                 playlistDetailAddButton.isHidden = true
                 playlistDetailRenameButton.isHidden = true
+                playlistDetailExportButton.isHidden = true
                 playlistDetailPlayAllButton.isHidden = true
                 playlistDetailShuffleButton.isHidden = true
                 playlistDetailDownloadAllButton.isHidden = true
@@ -59,6 +62,7 @@ extension DynamicIslandPlayerView {
                 playlistDetailDeleteButton.isHidden = false
                 playlistDetailAddButton.isHidden = false
                 playlistDetailRenameButton.isHidden = false
+                playlistDetailExportButton.isHidden = false
                 playlistDetailPlayAllButton.isHidden = false
                 playlistDetailShuffleButton.isHidden = false
                 playlistDetailDownloadAllButton.isHidden = false
@@ -83,10 +87,13 @@ extension DynamicIslandPlayerView {
             playlistDetailRenameButton.isHidden = true
             playlistDetailDeleteButton.isHidden = true
             playlistDetailAddButton.isHidden = true
+            playlistDetailExportButton.isHidden = true
             playlistActionRowStack?.isHidden = false
 
             switch activeLibraryTab {
             case .playlists:
+                playlistDetailCreateButton.isHidden = false
+                playlistImportButton.isHidden = false
                 playlistSearchToggleButton.isHidden = false
                 playlistBulkDeleteButton.isHidden = !isPlaylistSelectionMode
                 playlistSelectionDoneButton.isHidden = !isPlaylistSelectionMode
@@ -102,6 +109,7 @@ extension DynamicIslandPlayerView {
 
             case .likedSongs:
                 playlistDetailCreateButton.isHidden = true
+                playlistImportButton.isHidden = true
                 playlistSearchToggleButton.isHidden = false
                 playlistBulkDeleteButton.isHidden = true
                 playlistSelectionDoneButton.isHidden = true
@@ -117,6 +125,7 @@ extension DynamicIslandPlayerView {
 
             case .downloads:
                 playlistDetailCreateButton.isHidden = true
+                playlistImportButton.isHidden = true
                 playlistSearchToggleButton.isHidden = false
                 playlistBulkDeleteButton.isHidden = true
                 playlistSelectionDoneButton.isHidden = true
@@ -132,6 +141,7 @@ extension DynamicIslandPlayerView {
 
             case .history:
                 playlistDetailCreateButton.isHidden = true
+                playlistImportButton.isHidden = true
                 playlistSearchToggleButton.isHidden = false
                 playlistBulkDeleteButton.isHidden = true
                 playlistSelectionDoneButton.isHidden = true
@@ -150,31 +160,13 @@ extension DynamicIslandPlayerView {
             detailStackView.isHidden = true
             playlistScrollView?.isHidden = false
         }
-        playlistCreateFooterButton?.isHidden = (playlistDetailMode != nil) || (activeLibraryTab != .playlists) || isPlaylistSelectionMode || isPlaylistCreateOpen
         updatePlaylistSearchToggleIcon()
         updatePlaylistCreateButtonIcon(isCreating: isPlaylistCreateOpen)
     }
 
     func applySearchCreateFieldState(animated: Bool) {
-        var searchOpen = isPlaylistSearchActive
-        var createOpen = isPlaylistCreateOpen
-        if playlistDetailMode != nil {
-            searchOpen = true
-            createOpen = false
-        } else {
-            if createOpen { searchOpen = false }
-            if searchOpen { createOpen = false }
-        }
-        if searchOpen {
-            expandSearchField(animated: animated)
-            collapseCreateField(animated: animated)
-        } else if createOpen {
-            collapseSearchField(animated: animated)
-            expandCreateField(animated: animated)
-        } else {
-            collapseSearchField(animated: animated)
-            collapseCreateField(animated: animated)
-        }
+        expandSearchField(animated: animated)
+        collapseCreateField(animated: false)
     }
 
     private func expandSearchField(animated: Bool) {
@@ -786,12 +778,15 @@ extension DynamicIslandPlayerView {
         playlistActionRowStack?.isHidden = false
         playlistDetailDeleteButton.isHidden = false
         playlistDetailAddButton.isHidden = false
+        playlistImportButton.isHidden = true
+        playlistDetailExportButton.isHidden = false
         playlistSearchField?.isHidden = false
 
         if playlistAddMode {
             playlistDetailCreateButton.isHidden = true
             playlistDetailDeleteButton.isHidden = true
             playlistDetailAddButton.isHidden = true
+            playlistDetailExportButton.isHidden = true
             playlistDetailRenameButton.isHidden = true
             playlistDetailPlayAllButton.isHidden = true
             playlistDetailShuffleButton.isHidden = true
@@ -1109,6 +1104,24 @@ extension DynamicIslandPlayerView {
         renameItem.target = self
         renameItem.representedObject = playlist.id
         contextMenu.addItem(renameItem)
+
+        let exportItem = NSMenuItem(title: "Export Playlist", action: nil, keyEquivalent: "")
+        let exportSubMenu = NSMenu(title: "Export Playlist")
+        let m3u8Item = NSMenuItem(title: "M3U8…", action: #selector(handlePlaylistContextExportM3U8(_:)), keyEquivalent: "")
+        m3u8Item.target = self
+        m3u8Item.representedObject = playlist.id
+        exportSubMenu.addItem(m3u8Item)
+
+        let jsonItem = NSMenuItem(title: "JSON…", action: #selector(handlePlaylistContextExportJSON(_:)), keyEquivalent: "")
+        jsonItem.target = self
+        jsonItem.representedObject = playlist.id
+        exportSubMenu.addItem(jsonItem)
+        exportItem.submenu = exportSubMenu
+        contextMenu.addItem(exportItem)
+
+        let importItem = NSMenuItem(title: "Import Playlist…", action: #selector(handleImportPlaylistTapped), keyEquivalent: "")
+        importItem.target = self
+        contextMenu.addItem(importItem)
 
         contextMenu.addItem(NSMenuItem.separator())
 

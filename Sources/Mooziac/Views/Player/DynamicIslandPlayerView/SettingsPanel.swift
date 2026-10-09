@@ -448,6 +448,30 @@ extension DynamicIslandPlayerView {
         playlistDetailRenameButton.widthAnchor.constraint(equalToConstant: 22).isActive = true
         playlistDetailRenameButton.heightAnchor.constraint(equalToConstant: 22).isActive = true
 
+        playlistImportButton.translatesAutoresizingMaskIntoConstraints = false
+        let importConfig = NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
+        playlistImportButton.image = NSImage(systemSymbolName: "square.and.arrow.down", accessibilityDescription: "Import Playlist")?.withSymbolConfiguration(importConfig)
+        playlistImportButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
+        playlistImportButton.toolTip = "Import Playlist (.m3u8, .json)"
+        playlistImportButton.target = self
+        playlistImportButton.action = #selector(handleImportPlaylistTapped)
+        playlistImportButton.isBordered = false
+        playlistImportButton.wantsLayer = true
+        playlistImportButton.layer?.cornerRadius = 5
+        playlistImportButton.widthAnchor.constraint(equalToConstant: 24).isActive = true
+        playlistImportButton.heightAnchor.constraint(equalToConstant: 24).isActive = true
+
+        playlistDetailExportButton.translatesAutoresizingMaskIntoConstraints = false
+        let exportConfig = NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
+        playlistDetailExportButton.image = NSImage(systemSymbolName: "square.and.arrow.up", accessibilityDescription: "Export Playlist")?.withSymbolConfiguration(exportConfig)
+        playlistDetailExportButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+        playlistDetailExportButton.toolTip = "Export Playlist (.m3u8, .json)"
+        playlistDetailExportButton.target = self
+        playlistDetailExportButton.action = #selector(handleExportPlaylistFromDetail)
+        playlistDetailExportButton.isHidden = true
+        playlistDetailExportButton.widthAnchor.constraint(equalToConstant: 22).isActive = true
+        playlistDetailExportButton.heightAnchor.constraint(equalToConstant: 22).isActive = true
+
         playlistSearchToggleButton.translatesAutoresizingMaskIntoConstraints = false
         let searchToggleConfig = NSImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
         playlistSearchToggleButton.image = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: "Search Playlists")?.withSymbolConfiguration(searchToggleConfig)
@@ -505,6 +529,8 @@ extension DynamicIslandPlayerView {
         playlistHeaderStack = subHeaderStack
 
         let actionsTrailingStack = NSStackView(views: [
+            playlistDetailCreateButton,
+            playlistImportButton,
             downloadsPlayAllButton,
             downloadsShuffleButton,
             likedPlayAllButton,
@@ -517,6 +543,7 @@ extension DynamicIslandPlayerView {
             playlistDetailShuffleButton,
             playlistDetailDownloadAllButton,
             playlistDetailRenameButton,
+            playlistDetailExportButton,
             playlistDetailAddButton,
             playlistDetailDeleteButton
         ])
@@ -699,30 +726,6 @@ extension DynamicIslandPlayerView {
         subView.addSubview(topControlsStack)
         subView.addSubview(playlistScroll)
 
-        let isGlass = PlayerDesign.current == .glassMode
-        let isDark = (PlayerDesign.current == .darkMode)
-        let cyan = isGlass ? NSColor.lightThemeSelector : (isDark ? NSColor.darkThemeSelector : NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0))
-
-        let footerButton = NSButton()
-        footerButton.translatesAutoresizingMaskIntoConstraints = false
-        footerButton.title = "+  Create Playlist"
-        footerButton.font = NSFont.systemFont(ofSize: 10, weight: .semibold)
-        footerButton.isBordered = false
-        footerButton.wantsLayer = true
-        footerButton.layer?.cornerRadius = 13
-        footerButton.layer?.borderWidth = 1.0
-        footerButton.contentTintColor = cyan
-        footerButton.layer?.borderColor = cyan.withAlphaComponent(0.40).cgColor
-        footerButton.layer?.backgroundColor = cyan.withAlphaComponent(isGlass ? 0.10 : 0.15).cgColor
-        footerButton.layer?.shadowColor = NSColor.black.cgColor
-        footerButton.layer?.shadowOpacity = 0.35
-        footerButton.layer?.shadowRadius = 7
-        footerButton.layer?.shadowOffset = CGSize(width: 0, height: 3)
-        footerButton.target = self
-        footerButton.action = #selector(handleCreateNewPlaylistFromHeader)
-        playlistCreateFooterButton = footerButton
-        subView.addSubview(footerButton)
-
         NSLayoutConstraint.activate([
             topControlsStack.topAnchor.constraint(equalTo: subView.topAnchor, constant: 4),
             topControlsStack.leadingAnchor.constraint(equalTo: subView.leadingAnchor),
@@ -751,14 +754,7 @@ extension DynamicIslandPlayerView {
             playlistScroll.topAnchor.constraint(equalTo: topControlsStack.bottomAnchor, constant: 8),
             playlistScroll.leadingAnchor.constraint(equalTo: subView.leadingAnchor),
             playlistScroll.trailingAnchor.constraint(equalTo: subView.trailingAnchor),
-            playlistScroll.bottomAnchor.constraint(equalTo: subView.bottomAnchor, constant: -4),
-
-            footerButton.centerXAnchor.constraint(equalTo: subView.centerXAnchor),
-            footerButton.bottomAnchor.constraint(equalTo: subView.bottomAnchor, constant: -10),
-            footerButton.heightAnchor.constraint(equalToConstant: 26),
-            footerButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 120),
-            footerButton.leadingAnchor.constraint(greaterThanOrEqualTo: subView.leadingAnchor, constant: 12),
-            footerButton.trailingAnchor.constraint(lessThanOrEqualTo: subView.trailingAnchor, constant: -12)
+            playlistScroll.bottomAnchor.constraint(equalTo: subView.bottomAnchor, constant: -4)
         ])
 
         settingsContainerView.addSubview(mainStack)

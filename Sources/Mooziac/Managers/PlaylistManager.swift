@@ -167,14 +167,35 @@ public final class PlaylistManager: NSObject {
         guard !name.isEmpty, !document.tracks.isEmpty,
               let playlistID = createPlaylist(name: name) else { return nil }
 
-        let items = document.tracks.enumerated().map { index, track in
-            PlaylistItemRecord(
+        let index = libraryIndex()
+        let items = document.tracks.enumerated().map { order, track -> PlaylistItemRecord in
+            let known = index.byFilePath[track.path]
+            let resolvedTitle: String
+            if !track.title.isEmpty {
+                resolvedTitle = track.title
+            } else if let knownTitle = known?.title, !knownTitle.isEmpty {
+                resolvedTitle = knownTitle
+            } else {
+                resolvedTitle = URL(fileURLWithPath: track.path).deletingPathExtension().lastPathComponent
+            }
+
+            let resolvedArtist = !track.artist.isEmpty ? track.artist : (known?.artist ?? "")
+            let resolvedDuration = (known != nil && known!.duration > 0) ? PlaylistManager.formattedDuration(known!.duration) : ""
+            let resolvedArtwork = known?.artworkURL?.path ?? ""
+            let resolvedYtId = known?.ytVideoId
+            let isLiked = known?.isLiked ?? false
+
+            return PlaylistItemRecord(
                 playlistID: playlistID,
-                sortOrder: index,
+                sortOrder: order,
                 refType: "local",
                 refID: track.path,
-                title: track.title.isEmpty ? URL(fileURLWithPath: track.path).deletingPathExtension().lastPathComponent : track.title,
-                artist: track.artist
+                ytVideoId: resolvedYtId,
+                title: resolvedTitle,
+                artist: resolvedArtist,
+                artworkUrl: resolvedArtwork,
+                duration: resolvedDuration,
+                isLiked: isLiked
             )
         }
         LocalDatabaseManager.shared.replacePlaylistItems(playlistID: playlistID, items: items)
