@@ -10,8 +10,15 @@ struct PersistedDownloadJob: Codable {
 }
 
 enum DownloadQueuePersistence {
+    #if DEBUG
+    static var customFileURL: URL?
+    #endif
+
     private static var fileURL: URL {
-        FileManager.default
+        #if DEBUG
+        if let custom = customFileURL { return custom }
+        #endif
+        return FileManager.default
             .urls(
                 for: .applicationSupportDirectory,
                 in: .userDomainMask

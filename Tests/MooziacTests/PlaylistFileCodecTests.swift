@@ -98,4 +98,19 @@ final class PlaylistFileCodecTests: XCTestCase {
         )
         XCTAssertThrowsError(try PlaylistFileCodec.encode(document, as: .m3u8))
     }
+
+    func testM3U8FallsBackToFilenameWhenPlaylistTagMissing() throws {
+        let contents = """
+        #EXTM3U
+        #EXTINF:120,Sample Track
+        tracks/sample.mp3
+        """
+        let decoded = try PlaylistFileCodec.decode(
+            Data(contents.utf8),
+            from: URL(fileURLWithPath: "/Users/me/Lists/RoadTrip.m3u8")
+        )
+        XCTAssertEqual(decoded.document.name, "RoadTrip")
+        XCTAssertEqual(decoded.document.tracks.count, 1)
+        XCTAssertEqual(decoded.document.tracks[0].path, "/Users/me/Lists/tracks/sample.mp3")
+    }
 }

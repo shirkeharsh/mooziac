@@ -5,11 +5,15 @@ final class DownloadQueuePersistenceTests: XCTestCase {
     
     override func setUp() {
         super.setUp()
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        DownloadQueuePersistence.customFileURL = tempDir.appendingPathComponent("pending_downloads.json")
         DownloadQueuePersistence.clear()
     }
     
     override func tearDown() {
         DownloadQueuePersistence.clear()
+        DownloadQueuePersistence.customFileURL = nil
         super.tearDown()
     }
     
