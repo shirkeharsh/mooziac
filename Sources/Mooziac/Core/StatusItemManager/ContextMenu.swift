@@ -172,6 +172,13 @@ extension StatusItemManager {
         clearHistoryItem.target = self
         settingsMenu.addItem(clearHistoryItem)
         settingsMenu.addItem(NSMenuItem.separator())
+        let colorPickerItem = NSMenuItem(title: "Choose Accent Color…", action: #selector(openColorPickerFromMenu), keyEquivalent: "c")
+        colorPickerItem.target = self
+        settingsMenu.addItem(colorPickerItem)
+        let resetColorItem = NSMenuItem(title: "Reset Accent Color to Auto", action: #selector(resetColorFromMenu), keyEquivalent: "")
+        resetColorItem.target = self
+        settingsMenu.addItem(resetColorItem)
+        settingsMenu.addItem(NSMenuItem.separator())
         let settingsUpdateItem = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdatesFromMenu), keyEquivalent: "u")
         settingsUpdateItem.target = self
         settingsMenu.addItem(settingsUpdateItem)
@@ -244,6 +251,31 @@ extension StatusItemManager {
         if panel.isVisible {
             mainViewController.dynamicIslandPlayer.refreshPlaylistsSection()
         }
+    }
+
+    @objc private func openColorPickerFromMenu() {
+        NSApp.activate(ignoringOtherApps: true)
+        let panel = NSColorPanel.shared
+        if let custom = CustomAccentColorManager.customColor {
+            panel.color = custom
+        } else {
+            panel.color = settingsAccentColor(tone: mainViewController.dynamicIslandPlayer.currentSettingsTone())
+        }
+        panel.setTarget(self)
+        panel.setAction(#selector(colorPanelColorDidChange(_:)))
+        panel.isContinuous = true
+        panel.orderFront(nil)
+    }
+
+    @objc private func colorPanelColorDidChange(_ sender: NSColorPanel) {
+        let picked = sender.color
+        CustomAccentColorManager.customColor = picked
+        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Accent: \(picked.hexString.uppercased())")
+    }
+
+    @objc private func resetColorFromMenu() {
+        CustomAccentColorManager.resetToDefault()
+        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Accent: Auto Tint")
     }
 
     @objc private func importAudioFilesFromMenu() {
