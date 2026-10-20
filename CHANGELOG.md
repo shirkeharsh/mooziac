@@ -4,6 +4,20 @@ All notable changes to Mooziac are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.2.0] - 2026-10-21
+
+### Added
+- Native YouTube Video Player: Added dedicated YouTube video viewing mode with seamless switching between the menu bar music player and the standalone video window.
+- VideoToolbox Hardware Decode: VideoToolbox hardware decode preference with VP9 and H.264 optimization, reducing power draw to ~2.8W and lowering CPU cluster load.
+- Distraction-Free Playback & SponsorBlock: Embedded declarative content styling and clutter filtering rules alongside automatic SponsorBlock segment skipping.
+- Fullscreen & Playback Hotkeys: Native fullscreen toggle via F key, playback seeking via J/K/L, speed adjustment via [ / ], and timestamped URL copying via Cmd+Shift+C.
+- Unit Test Suite: Added test coverage for video quality levels, thermal defaults, video playback state calculations, shorts URL extraction, and settings notifications.
+
+### Changed
+- Thermal & Battery Optimization: Eliminated status item animation CPU spin, disabled unnecessary high-frequency mouse tracking, and defaulted playback quality to 1080p Full HD for cool running on Apple Silicon and Intel Macs.
+- Trackpad Edge Volume Continuity: Unified edge volume sliding across music and video playback with continuous CoreAudio volume tracking and physical haptic feedback.
+- Clean Text Alignment: Removed non-standard emojis and symbols across menus and documentation for uniform left alignment.
+
 ## [1.1.8] - 2026-09-29
 
 ### Added

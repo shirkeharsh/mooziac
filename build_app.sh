@@ -9,12 +9,12 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-APP_VERSION="1.1.9"
-APP_BUILD="19"
+APP_VERSION="1.2.0"
+APP_BUILD="20"
 APP_NAME="Mooziac.app"
 APP_BUNDLE_ID="app.mooziac.mac"
 APP_COPYRIGHT="Copyright © 2026 ThreeTen. All rights reserved."
-APP_DESCRIPTION="Mooziac — Modern Music Player for macOS with edge trackpad controls & YouTube Music WebKit sync."
+APP_DESCRIPTION="Mooziac — Native Music & Video Player for macOS with edge trackpad controls & YouTube WebKit sync."
 VOLUME_NAME="Mooziac"
 ZIP_NAME="Mooziac.zip"
 
@@ -66,7 +66,10 @@ fi
 
 # Clean previous build artifacts and old build cache
 echo "    Clearing old build artifacts and caches..."
-rm -rf "$SCRIPT_DIR/.build" "$DIST_DIR" "$LOCAL_APP_DEST"
+rm -rf "$SCRIPT_DIR/.build" "$DIST_DIR"
+if [ "$INSTALL_LOCALLY" = true ]; then
+    rm -rf "$LOCAL_APP_DEST"
+fi
 mkdir -p "$DIST_DIR"
 mkdir -p "$STAGING_DIR"
 
