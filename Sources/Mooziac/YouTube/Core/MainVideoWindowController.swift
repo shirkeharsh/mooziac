@@ -52,7 +52,7 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
-        window.acceptsMouseMovedEvents = true
+        window.acceptsMouseMovedEvents = false
         window.isOpaque = true
         window.backgroundColor = NSColor(red: 0.06, green: 0.06, blue: 0.08, alpha: 1.0)
         window.minSize = NSSize(width: 520, height: 340)

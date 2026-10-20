@@ -15,7 +15,7 @@ public final class YouTubeQualityManager {
                let q = VideoQuality(rawValue: saved) {
                 return q
             }
-            return .auto // Default to auto! Do not force 4K!
+            return .fhd1080 // Default to 1080p Full HD for cool thermals and efficient battery life
         }
         set {
             UserDefaults.standard.set(newValue.rawValue, forKey: "MooziacYouTube_preferredQuality")

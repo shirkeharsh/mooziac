@@ -370,6 +370,10 @@ class StatusItemManager: NSObject {
         CATransaction.begin()
         CATransaction.setAnimationDuration(0.35)
         CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeInEaseOut))
+        CATransaction.setCompletionBlock {
+            layer.transform = CATransform3DMakeRotation(targetAngle, 0, 0, 1)
+            layer.removeAnimation(forKey: "menuBarLogoRotation")
+        }
         
         let bounds = layer.bounds
         layer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
