@@ -65,7 +65,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Initialize menu bar status item & webview popover
         statusItemManager = StatusItemManager()
 
-        if CommandLine.arguments.contains("--open-youtube") {
+        if let urlIdx = CommandLine.arguments.firstIndex(of: "--youtube-url"),
+           urlIdx + 1 < CommandLine.arguments.count,
+           let targetURL = URL(string: CommandLine.arguments[urlIdx + 1]) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                StatusItemManager.shared?.presentYouTubeWindow()
+                MainVideoWindowController.shared.loadURL(targetURL)
+            }
+        } else if CommandLine.arguments.contains("--open-youtube") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                 StatusItemManager.shared?.presentYouTubeWindow()
             }
