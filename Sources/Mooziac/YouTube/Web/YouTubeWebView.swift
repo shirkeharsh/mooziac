@@ -37,11 +37,44 @@ public class YouTubeWebView: WKWebView {
         wkPrefs.setValue(true, forKey: "webGLEnabled")
 
         if #available(macOS 14.0, *) {
-            config.preferences.inactiveSchedulingPolicy = .none
+            config.preferences.inactiveSchedulingPolicy = .throttle
         }
         if #available(macOS 15.4, *) {
             config.webExtensionController = WebExtensionManager.shared.webExtensionController
         }
+
+        // Codec optimization: On systems without dedicated hardware AV1 decode (Intel & Apple M1/M2),
+        // intercept MediaSource.isTypeSupported to report false for AV1 (av01), ensuring YouTube
+        // serves 100% hardware-accelerated VP9 (and H.264) streams via Apple VideoToolbox.
+        let codecOptimizer = WKUserScript(
+            source: """
+            (function() {
+                try {
+                    if (window.MediaSource && typeof window.MediaSource.isTypeSupported === 'function') {
+                        var origIsTypeSupported = window.MediaSource.isTypeSupported.bind(window.MediaSource);
+                        window.MediaSource.isTypeSupported = function(mimeType) {
+                            if (typeof mimeType === 'string' && (mimeType.indexOf('av01') !== -1 || mimeType.indexOf('av1') !== -1)) {
+                                return false;
+                            }
+                            return origIsTypeSupported(mimeType);
+                        };
+                    }
+                    if (window.HTMLMediaElement && window.HTMLMediaElement.prototype.canPlayType) {
+                        var origCanPlay = window.HTMLMediaElement.prototype.canPlayType;
+                        window.HTMLMediaElement.prototype.canPlayType = function(type) {
+                            if (typeof type === 'string' && (type.indexOf('av01') !== -1 || type.indexOf('av1') !== -1)) {
+                                return '';
+                            }
+                            return origCanPlay.apply(this, arguments);
+                        };
+                    }
+                } catch(e) {}
+            })();
+            """,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: false
+        )
+        config.userContentController.addUserScript(codecOptimizer)
 
         // Configure ad blocker scripts & content rules
         YouTubeAdBlocker.configure(userContentController: config.userContentController)
@@ -63,15 +96,11 @@ public class YouTubeWebView: WKWebView {
         config.userContentController.addUserScript(YouTubePlayerBridge.observerScript)
         config.userContentController.add(bridge, name: YouTubePlayerBridge.handlerName)
 
-        // Visibility & Fullscreen shield: ensures smooth playback and early Fullscreen API readiness
+        // Fullscreen shield: ensures native Fullscreen API readiness without overriding page visibility
         let visibilityShield = WKUserScript(
             source: """
             (function() {
                 try {
-                    Object.defineProperty(Document.prototype, 'hidden', { get: function() { return false; }, configurable: true });
-                    Object.defineProperty(Document.prototype, 'visibilityState', { get: function() { return 'visible'; }, configurable: true });
-                    Object.defineProperty(Document.prototype, 'webkitHidden', { get: function() { return false; }, configurable: true });
-                    Object.defineProperty(Document.prototype, 'webkitVisibilityState', { get: function() { return 'visible'; }, configurable: true });
                     Object.defineProperty(Document.prototype, 'fullscreenEnabled', { get: function() { return true; }, configurable: true });
                     Object.defineProperty(Document.prototype, 'webkitFullscreenEnabled', { get: function() { return true; }, configurable: true });
                 } catch(e) {}
