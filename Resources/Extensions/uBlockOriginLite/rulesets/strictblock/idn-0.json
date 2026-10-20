@@ -1,0 +1,27 @@
+[
+{
+ "action": {
+  "redirect": {
+   "regexSubstitution": "/strictblock.html#\\0"
+  },
+  "type": "redirect"
+ },
+ "condition": {
+  "regexFilter": "^https?://.*",
+  "requestDomains": [
+   "ads.shinigami.io",
+   "driverhugoverblown.com",
+   "earmuffpostnasalrisotto.com",
+   "investopedia.today",
+   "lockerimage.com",
+   "lolhello.com",
+   "macory.com"
+  ],
+  "resourceTypes": [
+   "main_frame"
+  ]
+ },
+ "id": 1,
+ "priority": 29
+}
+]

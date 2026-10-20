@@ -1,0 +1,25 @@
+[
+{
+ "action": {
+  "redirect": {
+   "regexSubstitution": "/strictblock.html#\\0"
+  },
+  "type": "redirect"
+ },
+ "condition": {
+  "regexFilter": "^https?://.*",
+  "requestDomains": [
+   "chat.cdn-plain.com",
+   "chat.g4media.org",
+   "embed.chatnode.ai",
+   "urbandictionary.ai",
+   "widget.indexfox.ai"
+  ],
+  "resourceTypes": [
+   "main_frame"
+  ]
+ },
+ "id": 1,
+ "priority": 29
+}
+]

@@ -1,5 +1,11 @@
 import AppKit
 import WebKit
+import MediaPlayer
+
+public enum AppPlaybackMode {
+    case music
+    case youtube
+}
 
 class StatusItemManager: NSObject {
     public static weak var shared: StatusItemManager?
@@ -8,6 +14,7 @@ class StatusItemManager: NSObject {
     var panel: StatusItemPanel!
     let mainViewController = MainViewController()
     public private(set) var isDraggedFromDock: Bool = false
+    public private(set) var currentMode: AppPlaybackMode = .music
     
     private var globalEventMonitor: Any?
     private var localEventMonitor: Any?
@@ -331,6 +338,17 @@ class StatusItemManager: NSObject {
     
     @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
         let event = NSApp.currentEvent
+        if currentMode == .youtube {
+            if event?.type == .rightMouseUp || event?.type == .rightMouseDown {
+                showYouTubeContextMenu(sender)
+            } else {
+                MainVideoWindowController.shared.showWindow(nil)
+                MainVideoWindowController.shared.window?.makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
+            }
+            return
+        }
+
         if event?.type == .rightMouseUp || event?.type == .rightMouseDown {
             showContextMenu(sender)
         } else if isDraggedFromDock {
@@ -340,6 +358,116 @@ class StatusItemManager: NSObject {
         } else {
             togglePanel(sender)
         }
+    }
+
+    public func animateMenuBarIcon(to mode: AppPlaybackMode) {
+        guard let button = statusItem?.button else { return }
+        button.wantsLayer = true
+        guard let layer = button.layer else { return }
+        
+        let targetAngle: CGFloat = (mode == .youtube) ? (.pi / 2.0) : 0.0
+        
+        CATransaction.begin()
+        CATransaction.setAnimationDuration(0.35)
+        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeInEaseOut))
+        
+        let bounds = layer.bounds
+        layer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+        layer.position = CGPoint(x: bounds.midX, y: bounds.midY)
+        
+        let rotationAnim = CABasicAnimation(keyPath: "transform.rotation.z")
+        rotationAnim.fromValue = (mode == .youtube) ? 0.0 : (.pi / 2.0)
+        rotationAnim.toValue = targetAngle
+        rotationAnim.duration = 0.35
+        rotationAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        rotationAnim.fillMode = .forwards
+        rotationAnim.isRemovedOnCompletion = false
+        layer.add(rotationAnim, forKey: "menuBarLogoRotation")
+        
+        CATransaction.commit()
+        
+        button.toolTip = (mode == .youtube)
+            ? "Mooziac YouTube Player (Click to focus, Right-click for options)"
+            : "Mooziac Music Player (Scroll to adjust volume)"
+    }
+
+    public func presentYouTubeWindow() {
+        let winController = MainVideoWindowController.shared
+        winController.ensureWebView()
+
+        guard currentMode != .youtube else {
+            winController.showWindow(nil)
+            winController.window?.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        // 1. Suspend Mooziac Player completely to eliminate all resource usage
+        suspendMooziacForYouTube()
+
+        // 2. Switch mode and animate icon smoothly to vertical
+        currentMode = .youtube
+        animateMenuBarIcon(to: .youtube)
+
+        // 3. Keep activation policy as .accessory so YouTube stays strictly in the menu bar with NO Dock icon
+        NSApp.setActivationPolicy(.accessory)
+
+        // 4. Precompile ad rules & show YouTube window
+        YouTubeAdBlocker.precompileRules()
+        if #available(macOS 15.4, *) {
+            Task {
+                await WebExtensionManager.shared.loadAllExtensions()
+            }
+        }
+
+        let defaultFrame = MainVideoWindowController.calculateDefaultFrame()
+        winController.window?.setFrame(defaultFrame, display: true)
+        winController.showWindow(nil)
+        winController.window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    public func suspendMooziacForYouTube() {
+        // Pause all music playback
+        NativeAudioPlayer.shared.pause()
+        NowPlayingManager.shared.pause()
+
+        // Close music panel
+        if panel.isVisible {
+            closePanel()
+        }
+
+        // Suppress audio output in WebKit to trigger App Nap
+        mainViewController.webViewContainer.webView.evaluateJavaScript("""
+            window.__mooziacPlaybackSuppressed = true;
+            (function() {
+                var v = document.querySelector('video');
+                if (v) v.pause();
+            })();
+        """, completionHandler: nil)
+
+        if #available(macOS 12.0, *) {
+            mainViewController.webViewContainer.webView.pauseAllMediaPlayback()
+        }
+
+        // Clear Now Playing info so Control Center / media keys pass to YouTube
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+    }
+
+    public func resumeMooziacFromYouTube() {
+        currentMode = .music
+
+        // Animate icon smoothly back to horizontal
+        animateMenuBarIcon(to: .music)
+
+        // Switch activation policy back to accessory (cleans up macOS Dock)
+        NSApp.setActivationPolicy(.accessory)
+
+        // Un-suppress playback flag
+        mainViewController.webViewContainer.webView.evaluateJavaScript("window.__mooziacPlaybackSuppressed = false;", completionHandler: nil)
+
+        // Dock back to menu bar
+        dockBackToMenuBar()
     }
     
     public func dockBackToMenuBar() {
@@ -580,6 +708,15 @@ class StatusItemManager: NSObject {
             delta = dy > 0 ? 0.04 : -0.04
         }
         
+        if currentMode == .youtube {
+            let currentVol = VideoPlayerCoordinator.shared.currentState.volume
+            let newVol = max(0.0, min(1.0, currentVol + delta))
+            VideoPlayerCoordinator.shared.setVolume(newVol)
+            let percent = Int(round(newVol * 100))
+            FloatingHUDWindowController.shared.showCustomTextOverlay(text: "Volume: \(percent)%")
+            return true
+        }
+
         let currentVol = AppVolumeManager.shared.getEffectiveVolume()
         let newVol = max(0.0, min(1.0, currentVol + delta))
         AppVolumeManager.shared.setEffectiveVolume(newVol)

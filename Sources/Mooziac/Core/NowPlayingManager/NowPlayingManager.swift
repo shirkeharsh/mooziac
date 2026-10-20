@@ -364,31 +364,37 @@ extension NowPlayingManager {
         let rcc = MPRemoteCommandCenter.shared()
 
         rcc.playCommand.addTarget { [weak self] _ in
+            guard StatusItemManager.shared?.currentMode != .youtube else { return .commandFailed }
             self?.play()
             return .success
         }
 
         rcc.pauseCommand.addTarget { [weak self] _ in
+            guard StatusItemManager.shared?.currentMode != .youtube else { return .commandFailed }
             self?.pause()
             return .success
         }
 
         rcc.togglePlayPauseCommand.addTarget { [weak self] _ in
+            guard StatusItemManager.shared?.currentMode != .youtube else { return .commandFailed }
             self?.togglePlayPause()
             return .success
         }
 
         rcc.nextTrackCommand.addTarget { [weak self] _ in
+            guard StatusItemManager.shared?.currentMode != .youtube else { return .commandFailed }
             self?.nextTrack()
             return .success
         }
 
         rcc.previousTrackCommand.addTarget { [weak self] _ in
+            guard StatusItemManager.shared?.currentMode != .youtube else { return .commandFailed }
             self?.previousTrack()
             return .success
         }
 
         rcc.changePlaybackPositionCommand.addTarget { [weak self] event in
+            guard StatusItemManager.shared?.currentMode != .youtube else { return .commandFailed }
             guard let e = event as? MPChangePlaybackPositionCommandEvent else {
                 return .commandFailed
             }

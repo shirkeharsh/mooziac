@@ -481,7 +481,15 @@ final class EdgeVolumeEngine {
                         let change = max(-0.25, min(0.25, Float(activeTravelMm / fullRangeMm)))
                         let newVol = max(0.0, min(1.0, startVolume + change))
 
-                        AppVolumeManager.shared.setEffectiveVolume(newVol)
+                        let isYT = GestureMappingManager.shared.isYouTubeMode
+                        DispatchQueue.main.async {
+                            AppVolumeManager.shared.setEffectiveVolume(newVol)
+                            if isYT {
+                                VideoPlayerCoordinator.shared.setVolume(newVol)
+                                let percent = Int(round(newVol * 100))
+                                FloatingHUDWindowController.shared.showVolumeOverlay(volumePercent: percent)
+                            }
+                        }
                     }
                     break
                 }

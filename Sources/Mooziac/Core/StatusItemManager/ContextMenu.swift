@@ -145,10 +145,18 @@ extension StatusItemManager {
         
         menu.addItem(NSMenuItem.separator())
 
+        let openYouTubeItem = NSMenuItem(title: "Open YouTube", action: #selector(openYouTubeFromMenu), keyEquivalent: "y")
+        menu.addItem(openYouTubeItem)
+
+        menu.addItem(NSMenuItem.separator())
+
         let settingsParent = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
         let settingsMenu = NSMenu(title: "Settings")
+        let settingsOpenYouTubeItem = NSMenuItem(title: "Open YouTube", action: #selector(openYouTubeFromMenu), keyEquivalent: "")
+        settingsMenu.addItem(settingsOpenYouTubeItem)
+        settingsMenu.addItem(NSMenuItem.separator())
         settingsMenu.addItem(NSMenuItem(title: "Download Location", action: nil, keyEquivalent: ""))
-        let downloadLocationItem = NSMenuItem(title: "📁 \(currentDownloadLocationTitle())", action: nil, keyEquivalent: "")
+        let downloadLocationItem = NSMenuItem(title: currentDownloadLocationTitle(), action: nil, keyEquivalent: "")
         downloadLocationItem.isEnabled = false
         settingsMenu.addItem(downloadLocationItem)
         settingsMenu.addItem(NSMenuItem.separator())
@@ -231,7 +239,7 @@ extension StatusItemManager {
         panel.begin { [weak self] response in
             guard let self = self, response == .OK, let url = panel.url else { return }
             LocalLibraryManager.shared.setMusicFolder(url)
-            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "📁 Download location set to \(url.lastPathComponent)")
+            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Download location set to \(url.lastPathComponent)")
             if self.panel.isVisible {
                 self.mainViewController.dynamicIslandPlayer.refreshPlaylistsSection()
             }
@@ -240,7 +248,7 @@ extension StatusItemManager {
 
     @objc private func resetDownloadLocationFromMenu() {
         LocalLibraryManager.shared.resetMusicFolderToDefault()
-        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "📁 Download location reset to default")
+        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Download location reset to default")
         if panel.isVisible {
             mainViewController.dynamicIslandPlayer.refreshPlaylistsSection()
         }
@@ -280,7 +288,7 @@ extension StatusItemManager {
         alert.addButton(withTitle: "Cancel")
         if alert.runModal() == .alertFirstButtonReturn {
             HistoryManager.shared.clearHistory()
-            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "🗑 Listening history cleared")
+            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Listening history cleared")
             if panel.isVisible {
                 mainViewController.dynamicIslandPlayer.refreshPlaylistsSection()
             }
@@ -390,5 +398,141 @@ extension StatusItemManager {
                 }
             }
         }
+    }
+
+    // MARK: - YouTube Mode Integration
+    @objc func openYouTubeFromMenu() {
+        presentYouTubeWindow()
+    }
+
+    @objc func switchToMusicPlayerFromMenu() {
+        MainVideoWindowController.shared.closeYouTubeAndReturnToMooziac()
+    }
+
+    func showYouTubeContextMenu(_ sender: NSStatusBarButton) {
+        let menu = NSMenu()
+
+        let titleItem = NSMenuItem(title: "Mooziac YouTube (Active)", action: nil, keyEquivalent: "")
+        titleItem.isEnabled = false
+        menu.addItem(titleItem)
+        menu.addItem(NSMenuItem.separator())
+
+        // Ad Blocker toggle
+        let isAdBlock = YouTubeSettings.shared.isAdBlockEnabled
+        let adBlockItem = NSMenuItem(title: "Ad Blocker", action: #selector(toggleYouTubeAdBlockerFromMenu(_:)), keyEquivalent: "")
+        adBlockItem.state = isAdBlock ? .on : .off
+        adBlockItem.target = self
+        menu.addItem(adBlockItem)
+
+        // SponsorBlock toggle
+        let isSponsorBlock = YouTubeSettings.shared.isSponsorBlockEnabled
+        let sponsorItem = NSMenuItem(title: "SponsorBlock (Auto-Skip)", action: #selector(toggleYouTubeSponsorBlockFromMenu(_:)), keyEquivalent: "")
+        sponsorItem.state = isSponsorBlock ? .on : .off
+        sponsorItem.target = self
+        menu.addItem(sponsorItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        // Video Quality Submenu
+        let qualityParent = NSMenuItem(title: "Video Quality", action: nil, keyEquivalent: "")
+        let qualityMenu = NSMenu(title: "Video Quality")
+        let qualities: [(String, VideoQuality)] = [
+            ("Auto (Recommended)", .auto),
+            ("4K Ultra HD (2160p)", .uhd2160),
+            ("1440p QHD", .qhd1440),
+            ("1080p Full HD", .fhd1080),
+            ("720p HD", .hd720)
+        ]
+        let currentQuality = VideoPlayerCoordinator.shared.currentState.currentQuality
+        for (qTitle, qVal) in qualities {
+            let qItem = NSMenuItem(title: qTitle, action: #selector(selectYouTubeQualityFromMenu(_:)), keyEquivalent: "")
+            qItem.representedObject = qVal.rawValue
+            qItem.state = (currentQuality == qVal) ? .on : .off
+            qItem.target = self
+            qualityMenu.addItem(qItem)
+        }
+        qualityParent.submenu = qualityMenu
+        menu.addItem(qualityParent)
+
+        // Playback Speed Submenu
+        let speedParent = NSMenuItem(title: "Playback Speed", action: nil, keyEquivalent: "")
+        let speedMenu = NSMenu(title: "Playback Speed")
+        let speeds: [Double] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
+        let currentSpeed = VideoPlayerCoordinator.shared.currentState.playbackRate
+        for sp in speeds {
+            let label = sp == 1.0 ? "1.0× (Normal)" : String(format: "%.2f×", sp)
+            let spItem = NSMenuItem(title: label, action: #selector(selectYouTubeSpeedFromMenu(_:)), keyEquivalent: "")
+            spItem.representedObject = sp
+            spItem.state = (abs(currentSpeed - sp) < 0.05) ? .on : .off
+            spItem.target = self
+            speedMenu.addItem(spItem)
+        }
+        speedParent.submenu = speedMenu
+        menu.addItem(speedParent)
+
+        // Trackpad Gestures Submenu for YouTube
+        let gestureParent = NSMenuItem(title: "Trackpad Gestures", action: nil, keyEquivalent: "")
+        let gestureMenu = NSMenu(title: "Trackpad Gestures")
+
+        for gesture in GestureType.allCases {
+            let action = GestureMappingManager.shared.getYouTubeAction(for: gesture)
+            let item = NSMenuItem(title: "\(gesture.displayName) → \(action.displayName)", action: nil, keyEquivalent: "")
+            item.isEnabled = false
+            gestureMenu.addItem(item)
+        }
+        gestureMenu.addItem(NSMenuItem.separator())
+        let edgeItem = NSMenuItem(title: "Right Edge Slide → Volume Up/Down", action: nil, keyEquivalent: "")
+        edgeItem.isEnabled = false
+        gestureMenu.addItem(edgeItem)
+        let menuBarScrollItem = NSMenuItem(title: "Menu Bar Scroll → Volume Up/Down", action: nil, keyEquivalent: "")
+        menuBarScrollItem.isEnabled = false
+        gestureMenu.addItem(menuBarScrollItem)
+
+        gestureParent.submenu = gestureMenu
+        menu.addItem(gestureParent)
+
+        menu.addItem(NSMenuItem.separator())
+
+        let switchItem = NSMenuItem(title: "Switch to Music Player", action: #selector(switchToMusicPlayerFromMenu), keyEquivalent: "")
+        switchItem.target = self
+        menu.addItem(switchItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        let quitItem = NSMenuItem(title: "Quit Mooziac", action: #selector(quitFromMenu), keyEquivalent: "q")
+        quitItem.target = self
+        menu.addItem(quitItem)
+
+        statusItem.menu = menu
+        statusItem.button?.performClick(nil)
+        statusItem.menu = nil
+    }
+
+    @objc private func toggleYouTubeAdBlockerFromMenu(_ sender: NSMenuItem) {
+        let newState = !YouTubeSettings.shared.isAdBlockEnabled
+        YouTubeSettings.shared.isAdBlockEnabled = newState
+        sender.state = newState ? .on : .off
+        FloatingHUDWindowController.shared.showCustomTextOverlay(text: newState ? "Ad Blocker: Enabled" : "Ad Blocker: Disabled")
+        MainVideoWindowController.shared.reconfigureAndReload()
+    }
+
+    @objc private func toggleYouTubeSponsorBlockFromMenu(_ sender: NSMenuItem) {
+        let newState = !YouTubeSettings.shared.isSponsorBlockEnabled
+        YouTubeSettings.shared.isSponsorBlockEnabled = newState
+        sender.state = newState ? .on : .off
+        FloatingHUDWindowController.shared.showCustomTextOverlay(text: newState ? "SponsorBlock: Enabled" : "SponsorBlock: Disabled")
+        MainVideoWindowController.shared.reconfigureAndReload()
+    }
+
+    @objc private func selectYouTubeQualityFromMenu(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let quality = VideoQuality(rawValue: raw) else { return }
+        VideoPlayerCoordinator.shared.setQuality(quality)
+        FloatingHUDWindowController.shared.showCustomTextOverlay(text: "Quality: \(quality.displayName)")
+    }
+
+    @objc private func selectYouTubeSpeedFromMenu(_ sender: NSMenuItem) {
+        guard let speed = sender.representedObject as? Double else { return }
+        VideoPlayerCoordinator.shared.setPlaybackSpeed(speed)
+        FloatingHUDWindowController.shared.showCustomTextOverlay(text: String(format: "Speed: %.2f×", speed))
     }
 }

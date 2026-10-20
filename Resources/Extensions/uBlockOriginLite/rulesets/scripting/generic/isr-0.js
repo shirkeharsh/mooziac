@@ -1,0 +1,41 @@
+/*******************************************************************************
+
+    uBlock Origin Lite - a comprehensive, MV3-compliant content blocker
+    Copyright (C) 2014-present Raymond Hill
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see {http://www.gnu.org/licenses/}.
+
+    Home: https://github.com/gorhill/uBlock
+*/
+
+// isr-0
+
+// Important!
+// Isolate from global scope
+(function uBOL_cssGenericImport() {
+
+const lowlyGeneric = new Map(/* 3 */[[35711,"#HiddenMovie > [src^=\"http://www.youtube.com\"] + #video-blocker"],[14271,".entry > .entry-inner > .wpvl.wpvl-youtube.ng-scope.size-l"],[3031,".wpvl.wpvl-dailymotion > .fblogin.lockoverlay.ng-scope,\n.wpvl.wpvl-youtube.ng-scope.size-xl > .ng-scope + .fblogin.lockoverlay.ng-scope,\n.wpvl.wpvl-youtube.ng-scope.size-xxl > [ng-show=\"!blocked\"] + * + .ng-scope + .fblogin.lockoverlay.ng-scope"]]);
+const highlyGeneric = /* 0 */"";
+const exceptions = /* 21 */[".ad-link","#taboola-below-article-thumbnails\n.share-zone",".small-ad",".addtitle","#fwdevpDiv0",".banner-300",".pub-container",".header-ad",".adclass\n.shareBtn",".cookieAlert",".adunit","#taboola-below-article-thumbnails\n.share-zone","#printads\n.adlist\n.adpic","#AdTop",".cookies-popup-wrapper","#findABroker\n.generalOverlay",".postad",".ad-body","#topAds","#gnb",".image-advertisement"];
+const hostnames = /* 21 */["ad.co.il","c14.co.il","adi.gov.il","blms.co.il","ch10.co.il","leyada.net","masa.co.il","pitria.com","ynet.co.il","bezeq.co.il","kikar.co.il","now14.co.il","bipbip.co.il","callil.co.il","cellcom.co.il","investing.com","homeless.co.il","junkyard.co.il","lavender.co.il","davidson.org.il","holmesplace.co.il"];
+const hasEntities = false;
+
+self.genericSelectorMaps = self.genericSelectorMaps ?? [];
+self.genericSelectorMaps.push(lowlyGeneric);
+self.genericDetails = self.genericDetails ?? [];
+self.genericDetails.push({ highlyGeneric, exceptions, hostnames, hasEntities });
+
+})();
+
+/******************************************************************************/

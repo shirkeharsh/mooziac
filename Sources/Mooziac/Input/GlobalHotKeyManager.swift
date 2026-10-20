@@ -36,17 +36,30 @@ public final class GlobalHotKeyManager {
             guard err == noErr, hotKeyID.signature == OSType(0x4D4F4F5A) else { return noErr } // 'MOOZ'
             
             DispatchQueue.main.async {
-                switch hotKeyID.id {
-                case 1: // Play / Pause
-                    NowPlayingManager.shared.togglePlayPause()
-                case 2: // Next Track
-                    NowPlayingManager.shared.nextTrack()
-                case 3: // Previous Track
-                    NowPlayingManager.shared.previousTrack()
-                case 4: // Like Track
-                    NowPlayingManager.shared.toggleLike()
-                default:
-                    break
+                if GestureMappingManager.shared.isYouTubeMode {
+                    switch hotKeyID.id {
+                    case 1: // Play / Pause
+                        VideoPlayerCoordinator.shared.togglePlayPause()
+                    case 2: // Next Track -> Seek +10s
+                        VideoPlayerCoordinator.shared.seekBy(seconds: 10)
+                    case 3: // Previous Track -> Seek -10s
+                        VideoPlayerCoordinator.shared.seekBy(seconds: -10)
+                    default:
+                        break
+                    }
+                } else {
+                    switch hotKeyID.id {
+                    case 1: // Play / Pause
+                        NowPlayingManager.shared.togglePlayPause()
+                    case 2: // Next Track
+                        NowPlayingManager.shared.nextTrack()
+                    case 3: // Previous Track
+                        NowPlayingManager.shared.previousTrack()
+                    case 4: // Like Track
+                        NowPlayingManager.shared.toggleLike()
+                    default:
+                        break
+                    }
                 }
             }
             return noErr
@@ -100,6 +113,28 @@ public final class GlobalHotKeyManager {
         
         guard isControlOption || isCmdShift else { return false }
         
+        if GestureMappingManager.shared.isYouTubeMode {
+            switch event.keyCode {
+            case 49: // Spacebar -> Play / Pause
+                DispatchQueue.main.async {
+                    VideoPlayerCoordinator.shared.togglePlayPause()
+                }
+                return true
+            case 124: // Right Arrow -> Seek +10s
+                DispatchQueue.main.async {
+                    VideoPlayerCoordinator.shared.seekBy(seconds: 10)
+                }
+                return true
+            case 123: // Left Arrow -> Seek -10s
+                DispatchQueue.main.async {
+                    VideoPlayerCoordinator.shared.seekBy(seconds: -10)
+                }
+                return true
+            default:
+                return false
+            }
+        }
+
         switch event.keyCode {
         case 49: // Spacebar -> Play / Pause
             DispatchQueue.main.async {

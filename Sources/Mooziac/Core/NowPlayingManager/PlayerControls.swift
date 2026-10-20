@@ -43,6 +43,7 @@ extension NowPlayingManager {
     
     // Playback Controls Injection using native #movie_player API or NativeAudioPlayer
     func togglePlayPause() {
+        guard StatusItemManager.shared?.currentMode != .youtube else { return }
         if engineMode == .offline {
             if NativeAudioPlayer.shared.currentTrack == nil {
                 NativeAudioPlayer.shared.playLastOrFirstTrack()
@@ -300,6 +301,7 @@ extension NowPlayingManager {
     }
     
     func play() {
+        guard StatusItemManager.shared?.currentMode != .youtube else { return }
         if engineMode == .offline {
             if NativeAudioPlayer.shared.currentTrack == nil {
                 NativeAudioPlayer.shared.playLastOrFirstTrack()
@@ -422,6 +424,7 @@ extension NowPlayingManager {
     }
     
     func nextTrack() {
+        guard StatusItemManager.shared?.currentMode != .youtube else { return }
         if PlaylistManager.shared.hasActiveContext {
             if PlaylistManager.shared.playNextTrackInPlaylist() {
                 return
@@ -565,6 +568,7 @@ extension NowPlayingManager {
     }
     
     func previousTrack() {
+        guard StatusItemManager.shared?.currentMode != .youtube else { return }
         if PlaylistManager.shared.hasActiveContext {
             if PlaylistManager.shared.playPreviousTrackInPlaylist() {
                 return

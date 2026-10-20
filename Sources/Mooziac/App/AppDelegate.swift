@@ -64,6 +64,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Initialize menu bar status item & webview popover
         statusItemManager = StatusItemManager()
+
+        if CommandLine.arguments.contains("--open-youtube") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                StatusItemManager.shared?.presentYouTubeWindow()
+            }
+        }
         
         // Play visual launch animation (haptic feedback & sound disabled)
         let animationController = LaunchAnimationController()

@@ -144,6 +144,21 @@ for asset in AppIcon.icns MOOZIAC_transparent.png launch_transparent.png MOOZIAC
     fi
 done
 
+if [ -d "Resources/Extensions" ]; then
+    echo "    Bundling Web Extensions (uBlock Origin Lite)..."
+    cp -R "Resources/Extensions" "$RESOURCES_DIR/"
+fi
+
+if [ -f "/opt/homebrew/bin/yt-dlp" ]; then
+    echo "    Bundling yt-dlp from /opt/homebrew/bin/yt-dlp..."
+    cp "/opt/homebrew/bin/yt-dlp" "$RESOURCES_DIR/yt-dlp"
+    chmod +x "$RESOURCES_DIR/yt-dlp"
+elif [ -f "/usr/local/bin/yt-dlp" ]; then
+    echo "    Bundling yt-dlp from /usr/local/bin/yt-dlp..."
+    cp "/usr/local/bin/yt-dlp" "$RESOURCES_DIR/yt-dlp"
+    chmod +x "$RESOURCES_DIR/yt-dlp"
+fi
+
 # Create production Info.plist
 cat << EOF > "$BUNDLE_DIR/Info.plist"
 <?xml version="1.0" encoding="UTF-8"?>
@@ -211,11 +226,18 @@ fi
 
 SIGN_STATUS="Ad-hoc signed (Hardened Runtime)"
 SIGN_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | awk '/Apple Development|Developer ID Application/ {print $2}' | head -1)
+SIGNED_WITH_CERT=false
 if [ -n "$SIGN_IDENTITY" ]; then
-    echo "    Signing with certificate: $SIGN_IDENTITY"
-    codesign --force --deep --options runtime $ENTITLEMENTS_FLAG --sign "$SIGN_IDENTITY" --identifier "$APP_BUNDLE_ID" "$TARGET_APP"
-    SIGN_STATUS="Valid signature ($SIGN_IDENTITY)"
-else
+    echo "    Attempting to sign with certificate: $SIGN_IDENTITY"
+    if codesign --force --deep --options runtime $ENTITLEMENTS_FLAG --sign "$SIGN_IDENTITY" --identifier "$APP_BUNDLE_ID" "$TARGET_APP" 2>/dev/null; then
+        SIGN_STATUS="Valid signature ($SIGN_IDENTITY)"
+        SIGNED_WITH_CERT=true
+    else
+        echo "    Certificate signing failed or requires keychain authorization, falling back to ad-hoc..."
+    fi
+fi
+
+if [ "$SIGNED_WITH_CERT" = false ]; then
     echo "    Ad-hoc signing with Hardened Runtime..."
     codesign --force --deep --options runtime $ENTITLEMENTS_FLAG --sign - --identifier "$APP_BUNDLE_ID" "$TARGET_APP"
 fi

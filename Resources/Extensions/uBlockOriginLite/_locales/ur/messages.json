@@ -1,0 +1,466 @@
+{
+  "extName": {
+    "message": "uBlock Origin Lite",
+    "description": "extension name."
+  },
+  "extShortDesc": {
+    "message": "ایک تجرباتی، اجازت سے کم مواد بلاکر۔ انسٹال ہونے پر اشتہارات، ٹریکرز، کان کنوں اور مزید کو فوری طور پر روکتا ہے۔",
+    "description": "this will be in the Chrome web store: must be 132 characters or less"
+  },
+  "perRulesetStats": {
+    "message": "{{ruleCount}} rules, converted from {{filterCount}} network filters",
+    "description": "Appears aside each filter list in the _3rd-party filters_ pane"
+  },
+  "dashboardName": {
+    "message": "یو بلاکر لائٹ-ڈیش بورڈ",
+    "description": "English: uBO Lite — Dashboard"
+  },
+  "settingsPageName": {
+    "message": "ترتیبات",
+    "description": "appears as tab name in dashboard"
+  },
+  "customFiltersPageName": {
+    "message": "حسب ضرورت فلٹرز",
+    "description": "appears as tab name in dashboard"
+  },
+  "developPageName": {
+    "message": "ڈیولپ",
+    "description": "appears as tab name in dashboard. Inspired from 'Develop' menu in Safari, see https://developer.apple.com/documentation/safari-developer-tools/develop-menu"
+  },
+  "aboutPageName": {
+    "message": "تعارف",
+    "description": "appears as tab name in dashboard"
+  },
+  "aboutPrivacyPolicy": {
+    "message": "پرائیویسی پالیسی",
+    "description": "Link to privacy policy on GitHub (English)"
+  },
+  "aboutDocumentation": {
+    "message": "دستاویزات",
+    "description": "Link to documentation in About pane"
+  },
+  "popupFilteringModeLabel": {
+    "message": "فلٹرنگ موڈ",
+    "description": "Label in the popup panel for the current filtering mode"
+  },
+  "popupLocalToolsLabel": {
+    "message": "اس ویب سائٹ پر",
+    "description": "Label in the popup panel for the local tools section"
+  },
+  "popupTipReport": {
+    "message": "مسئلہ رپورٹ کریں",
+    "description": "Tooltip used for the 'chat' icon in the panel"
+  },
+  "popupTipDashboard": {
+    "message": "ڈیش بورڈ کھولیں۔",
+    "description": "English: Click to open the dashboard"
+  },
+  "popupMoreButton": {
+    "message": "مزید",
+    "description": "Label to be used to show popup panel sections"
+  },
+  "popupLessButton": {
+    "message": "کم",
+    "description": "Label to be used to hide popup panel sections"
+  },
+  "popupNoWebsite": {
+    "message": "not a website",
+    "description": "Used when popup panel is opened for a local web page"
+  },
+  "3pGroupDefault": {
+    "message": "طے شدہ",
+    "description": "Header for a ruleset section in 'Filter lists pane'"
+  },
+  "3pGroupAds": {
+    "message": "اشتہارات",
+    "description": "Header for a ruleset section in 'Filter lists pane'"
+  },
+  "3pGroupPrivacy": {
+    "message": "رازداری",
+    "description": "Header for a ruleset section in 'Filter lists pane'"
+  },
+  "3pGroupMalware": {
+    "message": "مالویئر تحفظ، سیکیورٹی",
+    "description": "Header for a ruleset section in 'Filter lists pane'"
+  },
+  "3pGroupAnnoyances": {
+    "message": "پریشانیاں",
+    "description": "Header for a ruleset section in 'Filter lists pane'"
+  },
+  "3pGroupMisc": {
+    "message": "متفرق",
+    "description": "Header for a ruleset section in 'Filter lists pane'"
+  },
+  "3pGroupRegions": {
+    "message": "علاقے، زبانیں۔",
+    "description": "Header for a ruleset section in 'Filter lists pane'"
+  },
+  "3pGroupImported": {
+    "message": "درآمد شدہ فہرستیں",
+    "description": "Header for a ruleset section in 'Filter lists pane'"
+  },
+  "customListImportLabel": {
+    "message": "فلٹر لسٹ شامل کریں…",
+    "description": "Text label heading the import area of custom filter lists"
+  },
+  "customListImportPlaceholder": {
+    "message": "شامل کرنے کے لیے فلٹر لسٹ کا URL",
+    "description": "Placeholder text which describes the purpose of the textarea widget"
+  },
+  "customListImportUserScriptsInfo": {
+    "message": "To enforce cosmetic or scriptlet filters from imported lists, you must grant uBO Lite permission to run user scripts.",
+    "description": "A notice to inform user that the enforcement of some filters requires permission to execute 'user scripts'"
+  },
+  "customFiltersImportExportLabel": {
+    "message": "درآمد / برآمد",
+    "description": "Text label heading the import/export area of custom filters"
+  },
+  "customFiltersImportTextareaPlaceholder": {
+    "message": "شامل کرنے کے لیے مخصوص کاسمیٹک/اسکرپٹلیٹ فلٹرز",
+    "description": "Placeholder text which describes the purpose of the textarea widget"
+  },
+  "userScriptsInfo": {
+    "message": "اپنے براؤزر کے ایکسٹینشنز پیج (<code>chrome://extensions</code> Chrome میں یا <code>about:addons</code> Firefox میں) کو کھولیں، <b>uBO Lite</b> کی تفصیلات کھولیں، اور <b>Allow user scripts</b> کو آن کریں (جسے “unverified third-party scripts” بھی کہا جاتا ہے)۔",
+    "description": "A notice to inform user on how to enable 'user scripts' permission"
+  },
+  "aboutChangelog": {
+    "message": "چینج لاگ",
+    "description": ""
+  },
+  "aboutCode": {
+    "message": "ماخذ کوڈ (GPLv3)",
+    "description": "English: Source code (GPLv3)"
+  },
+  "aboutContributors": {
+    "message": "تعاون کرنے والے",
+    "description": "English: Contributors"
+  },
+  "aboutSourceCode": {
+    "message": "سورس کوڈ",
+    "description": "Link text to source code repo"
+  },
+  "aboutTranslations": {
+    "message": "ترجمہ",
+    "description": "Link text to translations repo"
+  },
+  "aboutFilterLists": {
+    "message": "فہرستوں کو فلٹر کریں۔",
+    "description": "Link text to uBO's own filter lists repo"
+  },
+  "aboutDependencies": {
+    "message": "بیرونی انحصار (GPLv3-مطابق):",
+    "description": "Shown in the About pane"
+  },
+  "supportS6H": {
+    "message": "فلٹر کا مسئلہ رپورٹ کریں",
+    "description": "Header of 'Report a filter issue' section in Support pane"
+  },
+  "supportS3P1": {
+    "message": "مخصوص ویب سائٹس کے ساتھ فلٹر کے مسائل کو <span data-url=\"https://github.com/uBlockOrigin/uAssets/issues?q=is%3Aissue\"><code>uBlockOrigin/uAssets</code> ایشو ٹریکر</span> کو رپورٹ کریں۔ <u>GitHub اکاؤنٹ درکار ہے۔</u>",
+    "description": "First paragraph of 'Filter issues' section in Support pane"
+  },
+  "supportS5H": {
+    "message": "خرابیوں کا ازالہ کرنے کی معلومات",
+    "description": "Label of 'Troubleshooting information' section in 'Report a filter issue' page"
+  },
+  "supportS6P1S1": {
+    "message": "رضاکاروں کو نقلی رپورٹوں سے بوجھل کرنے سے بچنے کے لیے، براہ کرم تصدیق کریں کہ مسئلہ پہلے سے رپورٹ نہیں کیا گیا ہے۔ <b>نوٹ:</b> بٹن پر کلک کرنے سے صفحے کا ماخذ GitHub کو بھیج دیا جائے گا۔",
+    "description": "A paragraph in the filter issue reporter section"
+  },
+  "supportFindSpecificButton": {
+    "message": "GitHub پر مماثل رپورٹیں تلاش کریں",
+    "description": "A clickable link in the filter issue reporter section"
+  },
+  "supportS6URL": {
+    "message": "ویب صفحے کا پتہ:",
+    "description": "Label for the URL of the page"
+  },
+  "supportS6Select1": {
+    "message": "ویب صفحہ…",
+    "description": "Label for widget to select type of issue"
+  },
+  "supportS6Select1Option0": {
+    "message": "-- ایک اندراج منتخب کریں --",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option1": {
+    "message": "اشتہارات یا اشتہارات کی باقیات دکھاتا ہے",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option2": {
+    "message": "اوورلے یا دیگر پریشانیاں ہیں",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option3": {
+    "message": "uBO Lite کا پتہ لگاتا ہے",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option4": {
+    "message": "رازداری سے متعلق مسائل ہیں",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option5": {
+    "message": "جب uBO Lite فعال ہو تو خرابی پیدا کرتا ہے",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option6": {
+    "message": "نادیدہ ٹیبز یا ونڈوز کھولتا ہے",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option7": {
+    "message": "بیڈویئر، فشنگ کی طرف لے جاتا ہے",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Checkbox1": {
+    "message": "ویب صفحے کو “NSFW” کا لیبل لگائیں (<a href=\"https://wikipedia.org/wiki/Not_safe_for_work\">“Not Safe For Work”</a>)",
+    "description": "A checkbox to use for NSFW sites"
+  },
+  "supportReportSpecificButton": {
+    "message": "GitHub پر نئی رپورٹ بنائیں",
+    "description": "Text for button which opens an external web page in Support pane"
+  },
+  "defaultFilteringModeSectionLabel": {
+    "message": "ڈیفالٹ فلٹرنگ موڈ",
+    "description": "The header text for the default filtering mode section"
+  },
+  "defaultFilteringModeDescription": {
+    "message": "ڈیفالٹ فلٹرنگ موڈ کو فی ویب سائٹ فلٹرنگ موڈز کے ذریعے اوور رائیڈ کر دیا جائے گا۔ آپ کسی بھی ویب سائٹ پر فلٹرنگ موڈ کو ایڈجسٹ کرسکتے ہیں اس کے مطابق جو بھی موڈ اس ویب سائٹ پر بہترین کام کرتا ہے۔ ہر موڈ کے اپنے فوائد اور نقصانات ہیں۔",
+    "description": "This describes the default filtering mode setting"
+  },
+  "filteringMode0Name": {
+    "message": "کوئی فلٹرنگ نہیں",
+    "description": "Name of blocking mode 0"
+  },
+  "filteringMode1Name": {
+    "message": "بنیادی",
+    "description": "Name of blocking mode 1"
+  },
+  "filteringMode2Name": {
+    "message": "بہترین",
+    "description": "Name of blocking mode 2"
+  },
+  "filteringMode3Name": {
+    "message": "مکمل",
+    "description": "Name of blocking mode 3"
+  },
+  "basicFilteringModeDescription": {
+    "message": "منتخب فلٹر فہرستوں سے بنیادی نیٹ ورک فلٹرنگ۔\n\nویب سائٹس پر ڈیٹا کو پڑھنے اور اس میں ترمیم کرنے کے لیے اجازت کی ضرورت نہیں ہے۔",
+    "description": "This describes the 'basic' filtering mode"
+  },
+  "optimalFilteringModeDescription": {
+    "message": "اعلی درجے کی نیٹ ورک فلٹرنگ کے علاوہ منتخب فلٹر فہرستوں سے مخصوص توسیعی فلٹرنگ۔\n\nتمام ویب سائٹس پر ڈیٹا کو پڑھنے اور اس میں ترمیم کرنے کے لیے وسیع اجازت درکار ہے۔",
+    "description": "This describes the 'optimal' filtering mode"
+  },
+  "completeFilteringModeDescription": {
+    "message": "اعلی درجے کی نیٹ ورک فلٹرنگ کے علاوہ منتخب فلٹر فہرستوں سے مخصوص اور عام توسیعی فلٹرنگ۔\n\nتمام ویب سائٹس پر ڈیٹا کو پڑھنے اور اس میں ترمیم کرنے کے لیے وسیع اجازت درکار ہے۔\n\nعام توسیع شدہ فلٹرنگ ویب پیج کے وسائل کے زیادہ استعمال کا سبب بن سکتی ہے۔",
+    "description": "This describes the 'complete' filtering mode"
+  },
+  "noFilteringModeDescription": {
+    "message": "میزبان ناموں کی فہرست جن کے لیے کوئی فلٹرنگ نہیں ہوگی۔",
+    "description": "A short description for the editable field which lists trusted sites"
+  },
+  "noFilteringModePlaceholder": {
+    "message": "[صرف ہوسٹ نام]\nexample.com\ngames.example\n...",
+    "description": "Default text for in edit field"
+  },
+  "behaviorSectionLabel": {
+    "message": "رویہ",
+    "description": "The header text for the 'Behavior' section"
+  },
+  "autoReloadLabel": {
+    "message": "فلٹرنگ موڈ تبدیل کرتے وقت صفحہ خودکار طور پر دوبارہ لوڈ کریں۔",
+    "description": "Label for a checkbox in the options page"
+  },
+  "showBlockedCountLabel": {
+    "message": "ٹول بار کے آئیکن پر بلاک شدہ درخواستوں کی تعداد دکھائیں۔",
+    "description": "Label for a checkbox in the options page"
+  },
+  "enableStrictBlockLabel": {
+    "message": "سخت بلاکنگ کو فعال کریں",
+    "description": "Label for a checkbox in the options page"
+  },
+  "enableStrictBlockLegend": {
+    "message": "ممکنہ طور پر ناپسندیدہ سائٹس پر نیویگیشن کو مسدود کر دیا جائے گا، اور آپ کو آگے بڑھنے کا اختیار دیا جائے گا۔",
+    "description": "Short description for a checkbox in the options page"
+  },
+  "enablePopupBlockLabel": {
+    "message": "پاپ اپ بلاکنگ کو فعال کریں",
+    "description": "Label for a checkbox in the options page"
+  },
+  "enablePopupBlockLegend": {
+    "message": "جب فعال ہو، مماثل فلٹرز ویب سائٹس کے ذریعے بنائے گئے ناپسندیدہ براؤزر ٹیبز کو خودکار طور پر بند کر دیں گے۔",
+    "description": "Short description for a checkbox in the options page"
+  },
+  "sandboxEditorLabel": {
+    "message": "فلٹر تخلیق سینڈ باکس",
+    "description": "Header for filter-creation section in the dashboard"
+  },
+  "sandboxEditorUserScriptsInfo": {
+    "message": "To enforce cosmetic or scriptlet filters from the sandbox, you must grant uBO Lite permission to run user scripts.",
+    "description": "A notice to inform user that the enforcement of some filters requires permission to execute 'user scripts'"
+  },
+  "developerModeLabel": {
+    "message": "ڈویلپر موڈ",
+    "description": "Label for a checkbox in the options page"
+  },
+  "developerModeLegend": {
+    "message": "تکنیکی صارفین کے لیے موزوں خصوصیات تک رسائی کو قابل بناتا ہے۔",
+    "description": "Short description for a checkbox in the options page"
+  },
+  "settingsBackupRestoreLabel": {
+    "message": "بیک اپ",
+    "description": "The header text for the back up/restore section"
+  },
+  "settingsBackupRestoreSummary": {
+    "message": "اپنی حسب ضرورت ترتیبات کو فائل میں بیک اپ کریں، یا فائل سے اپنی حسب ضرورت ترتیبات بحال کریں۔",
+    "description": "A summary description of the back up/restore section."
+  },
+  "settingsBackupRestoreLegend": {
+    "message": "بحال کرنے سے آپ کی تمام موجودہ حسب ضرورت ترتیبات تبدیل ہو جائیں گی۔",
+    "description": "Important information about the back up/restore section."
+  },
+  "findListsPlaceholder": {
+    "message": "فہرستیں تلاش کریں",
+    "description": "Placeholder for the input field used to find lists"
+  },
+  "strictblockTitle": {
+    "message": "صفحہ مسدود ہے",
+    "description": "Web page title for the strict-blocked page"
+  },
+  "strictblockSentence1": {
+    "message": "uBO Lite نے درج ذیل صفحہ کو لوڈ ہونے سے روک دیا ہے:",
+    "description": "Sentence used in the strict-blocked page"
+  },
+  "strictblockReasonSentence1": {
+    "message": "صفحہ {{listname}} میں مماثل فلٹر کی وجہ سے مسدود کیا گیا تھا۔",
+    "description": "Text informing about what is causing the page to be blocked"
+  },
+  "strictblockRedirectSentence1": {
+    "message": "مسدود صفحہ کسی دوسری سائٹ پر ری ڈائریکٹ کرنا چاہتا ہے۔ اگر آپ آگے بڑھنے کا انتخاب کرتے ہیں، تو آپ براہ راست اس پر تشریف لے جائیں گے: {{url}}",
+    "description": "Text warning about an incoming redirect"
+  },
+  "strictblockNoParamsPrompt": {
+    "message": "پیرامیٹرز کے بغیر",
+    "description": "Label to be used for the parameter-less URL"
+  },
+  "strictblockBack": {
+    "message": "واپس جائیں",
+    "description": "A button to go back to the previous web page"
+  },
+  "strictblockClose": {
+    "message": "یہ ونڈو بند کریں",
+    "description": "A button to close the current tab"
+  },
+  "strictblockDontWarn": {
+    "message": "مجھے اس سائٹ کے بارے میں دوبارہ خبردار نہ کریں",
+    "description": "Label for checkbox in document-blocked page"
+  },
+  "strictblockProceed": {
+    "message": "آگے بڑھیں",
+    "description": "A button to navigate to the blocked page"
+  },
+  "zapperTipEnter": {
+    "message": "ایک عنصر ہٹائیں",
+    "description": "Tooltip for the button used to enter zapper mode"
+  },
+  "zapperTipQuit": {
+    "message": "عنصر زاپر موڈ سے باہر نکلیں",
+    "description": "Tooltip for the button used to exit zapper mode"
+  },
+  "pickerTipEnter": {
+    "message": "حسب ضرورت فلٹر بنائیں",
+    "description": "Label for the menu entry to create cosmetic filters"
+  },
+  "unpickerTipEnter": {
+    "message": "حسب ضرورت فلٹر ہٹائیں",
+    "description": "Label for the menu entry to delete cosmetic filters"
+  },
+  "developDropdownLabel": {
+    "message": "دیکھیں:",
+    "description": "A label of a dropdown list"
+  },
+  "developOptionFilteringModeDetails": {
+    "message": "فلٹرنگ موڈ کی تفصیلات",
+    "description": "An option in a dropdown list"
+  },
+  "developOptionCustomDnrRules": {
+    "message": "حسب ضرورت DNR قواعد",
+    "description": "An option in a dropdown list"
+  },
+  "developOptionDnrRulesOf": {
+    "message": "کے DNR قواعد …",
+    "description": "A section header in a dropdown list"
+  },
+  "developOptionDynamicRuleset": {
+    "message": "متحرک قواعد کا مجموعہ",
+    "description": "An option in a dropdown list"
+  },
+  "developOptionSessionRuleset": {
+    "message": "سیشن قواعد کا مجموعہ",
+    "description": "An option in a dropdown list"
+  },
+  "saveButton": {
+    "message": "محفوظ کریں",
+    "description": "Text for buttons used to save changes"
+  },
+  "revertButton": {
+    "message": "واپس جائیں",
+    "description": "Text for buttons used to revert changes"
+  },
+  "addButton": {
+    "message": "شامل کریں",
+    "description": "Text for buttons used to add content"
+  },
+  "importAndAppendButton": {
+    "message": "درآمد کریں اور منسلک کریں…",
+    "description": "Text for buttons used to import and append content"
+  },
+  "exportButton": {
+    "message": "برآمد کریں…",
+    "description": "Text for buttons used to export content"
+  },
+  "backupButton": {
+    "message": "بیک اپ کریں…",
+    "description": "Text for buttons used to back up content"
+  },
+  "restoreButton": {
+    "message": "بحال کریں…",
+    "description": "Text for buttons used to restore content"
+  },
+  "resetToDefaultButton": {
+    "message": "پہلے سے طے شدہ ترتیبات پر ری سیٹ کریں…",
+    "description": "Text for buttons used to reset configurations to default"
+  },
+  "resetToDefaultConfirm": {
+    "message": "آپ کی تمام حسب ضرورت ترتیبات ہٹا دی جائیں گی۔ کیا آپ واقعی پہلے سے طے شدہ ترتیبات پر ری سیٹ کرنا چاہتے ہیں؟",
+    "description": "Message asking user to confirm reset to default settings"
+  },
+  "dnrRulesWarning": {
+    "message": "ناقابل اعتماد ذرائع سے مواد شامل نہ کریں",
+    "description": "Short description of the DNR rules editor pane"
+  },
+  "dnrRulesCountInfo": {
+    "message": "رجسٹرڈ قواعد کی تعداد: {count}",
+    "description": "Short sentence to report the number of currently registered DNR rules"
+  },
+  "pickerSliderLabel": {
+    "message": "بہترین مماثلت منتخب کرنے کے لیے سلائیڈر کو منتقل کریں",
+    "description": "Label to describe the purpose of the slider"
+  },
+  "pickerPick": {
+    "message": "منتخب کریں",
+    "description": "Text for the button to re-enter element-picking mode"
+  },
+  "pickerPreview": {
+    "message": "پیش منظر",
+    "description": "Text for the button to activate preview mode"
+  },
+  "pickerCreate": {
+    "message": "بنائیں",
+    "description": "Text for the button to create the filter"
+  },
+  "unpickerUsage": {
+    "message": "ویب صفحے میں مماثل عناصر کو نمایاں کرنے کے لیے نیچے دیے گئے فلٹر کو منتخب کریں۔ فلٹر کو ہٹانے کے لیے کوڑے دان پر کلک کریں۔",
+    "description": "Summary description on how to use the tool to remove custom filters"
+  }
+}

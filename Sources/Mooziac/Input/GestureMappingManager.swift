@@ -6,7 +6,13 @@ public final class GestureMappingManager {
 
     private init() {}
 
-    /// Retrieves the current mapped action for a specific gesture trigger.
+    /// True when Mooziac is in YouTube video mode or the YouTube window is active.
+    public var isYouTubeMode: Bool {
+        return StatusItemManager.shared?.currentMode == .youtube ||
+               MainVideoWindowController.isWindowVisible
+    }
+
+    /// Retrieves the current mapped action for a specific gesture trigger in Music mode.
     public func getAction(for gesture: GestureType) -> GestureAction {
         let key = "YTM_gestureMapping_\(gesture.rawValue)"
         if let savedRaw = UserDefaults.standard.string(forKey: key),
@@ -16,28 +22,71 @@ public final class GestureMappingManager {
         return gesture.defaultAction
     }
 
-    /// Persists a custom gesture mapping to UserDefaults.
+    /// Retrieves the mapped action for a specific gesture trigger in YouTube mode.
+    public func getYouTubeAction(for gesture: GestureType) -> GestureAction {
+        let key = "YouTube_gestureMapping_\(gesture.rawValue)"
+        if let savedRaw = UserDefaults.standard.string(forKey: key),
+           let action = GestureAction(rawValue: savedRaw) {
+            return action
+        }
+        // Dedicated YouTube defaults: 2 taps = Play/Pause & Seek +10s; 3 taps = Seek -10s & Seek +30s
+        switch gesture {
+        case .bottomLeftDoubleTap:
+            return .togglePlayPause
+        case .bottomLeftTripleTap:
+            return .seekBackward
+        case .bottomRightDoubleTap:
+            return .seekForward
+        case .bottomRightTripleTap:
+            return .seekForward30
+        }
+    }
+
+    /// Persists a custom gesture mapping to UserDefaults for Music mode.
     public func setAction(_ action: GestureAction, for gesture: GestureType) {
         let key = "YTM_gestureMapping_\(gesture.rawValue)"
+        UserDefaults.standard.set(action.rawValue, forKey: key)
+    }
+
+    /// Persists a custom gesture mapping to UserDefaults for YouTube mode.
+    public func setYouTubeAction(_ action: GestureAction, for gesture: GestureType) {
+        let key = "YouTube_gestureMapping_\(gesture.rawValue)"
         UserDefaults.standard.set(action.rawValue, forKey: key)
     }
 
     /// Resets all gesture mappings back to factory defaults.
     public func resetToDefaults() {
         for gesture in GestureType.allCases {
-            let key = "YTM_gestureMapping_\(gesture.rawValue)"
-            UserDefaults.standard.removeObject(forKey: key)
+            UserDefaults.standard.removeObject(forKey: "YTM_gestureMapping_\(gesture.rawValue)")
+            UserDefaults.standard.removeObject(forKey: "YouTube_gestureMapping_\(gesture.rawValue)")
         }
     }
 
     /// Executes the assigned action for a gesture trigger.
     public func executeAction(for gesture: GestureType) {
-        let action = getAction(for: gesture)
-        executeAction(action)
+        if isYouTubeMode {
+            let action = getYouTubeAction(for: gesture)
+            executeYouTubeAction(action)
+        } else {
+            let action = getAction(for: gesture)
+            executeAction(action)
+        }
     }
 
-    /// Executes a specific gesture action.
+    /// Executes a specific gesture action for Music mode.
     public func executeAction(_ action: GestureAction) {
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in
+                self?.executeAction(action)
+            }
+            return
+        }
+
+        if isYouTubeMode {
+            executeYouTubeAction(action)
+            return
+        }
+
         switch action {
         case .nextTrack:
             NowPlayingManager.shared.nextTrack()
@@ -46,15 +95,11 @@ public final class GestureMappingManager {
             NowPlayingManager.shared.previousTrack()
             CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Previous Track")
         case .togglePlayPause:
-            let targetPlaying =
-                !NowPlayingManager.shared.currentState.isPlaying
-
+            let targetPlaying = !NowPlayingManager.shared.currentState.isPlaying
             NowPlayingManager.shared.togglePlayPause()
-
-            CenteredMenuBarLyricsWindowController.shared
-                .showCustomTextOverlay(
-                    text: targetPlaying ? "Playing" : "Paused"
-                )
+            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(
+                text: targetPlaying ? "Playing" : "Paused"
+            )
         case .toggleLyrics:
             CenteredMenuBarLyricsWindowController.shared.toggleOverlay()
             let enabled = CenteredMenuBarLyricsWindowController.shared.isEnabled
@@ -106,6 +151,63 @@ public final class GestureMappingManager {
             NowPlayingManager.shared.toggleRepeat()
             let mode = NowPlayingManager.shared.repeatMode
             CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Repeat: \(mode.displayName)")
+        }
+    }
+
+    /// Executes a specific gesture action routed exclusively to the YouTube Player.
+    public func executeYouTubeAction(_ action: GestureAction) {
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in
+                self?.executeYouTubeAction(action)
+            }
+            return
+        }
+
+        switch action {
+        case .nextTrack:
+            VideoPlayerCoordinator.shared.nextVideo()
+            FloatingHUDWindowController.shared.showCustomTextOverlay(text: "Next Video")
+        case .previousTrack:
+            VideoPlayerCoordinator.shared.previousVideo()
+            FloatingHUDWindowController.shared.showCustomTextOverlay(text: "Previous Video")
+        case .togglePlayPause:
+            let isPlaying = VideoPlayerCoordinator.shared.currentState.isPlaying
+            VideoPlayerCoordinator.shared.togglePlayPause()
+            FloatingHUDWindowController.shared.showCustomTextOverlay(text: isPlaying ? "Paused" : "Playing")
+        case .toggleLyrics:
+            VideoPlayerCoordinator.shared.toggleSubtitles()
+        case .volumeUp:
+            VideoPlayerCoordinator.shared.adjustVolume(by: 0.05)
+        case .volumeDown:
+            VideoPlayerCoordinator.shared.adjustVolume(by: -0.05)
+        case .toggleMute:
+            VideoPlayerCoordinator.shared.toggleMute()
+        case .togglePlayer:
+            if let win = MainVideoWindowController.shared.window {
+                if win.isKeyWindow {
+                    MainVideoWindowController.shared.performMinimize()
+                } else {
+                    MainVideoWindowController.shared.showWindow(nil)
+                    win.makeKeyAndOrderFront(nil)
+                    NSApp.activate(ignoringOtherApps: true)
+                }
+            }
+        case .seekForward:
+            VideoPlayerCoordinator.shared.seekBy(seconds: 10)
+        case .seekBackward:
+            VideoPlayerCoordinator.shared.seekBy(seconds: -10)
+        case .seekForward15:
+            VideoPlayerCoordinator.shared.seekBy(seconds: 15)
+        case .seekBackward15:
+            VideoPlayerCoordinator.shared.seekBy(seconds: -15)
+        case .seekForward30:
+            VideoPlayerCoordinator.shared.seekBy(seconds: 30)
+        case .seekBackward30:
+            VideoPlayerCoordinator.shared.seekBy(seconds: -30)
+        case .toggleShuffle:
+            VideoPlayerCoordinator.shared.togglePictureInPicture()
+        case .toggleRepeat:
+            VideoPlayerCoordinator.shared.toggleTheaterMode()
         }
     }
 }

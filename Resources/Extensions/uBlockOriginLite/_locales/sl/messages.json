@@ -1,0 +1,466 @@
+{
+  "extName": {
+    "message": "uBlock Origin Lite",
+    "description": "extension name."
+  },
+  "extShortDesc": {
+    "message": "Učinkovit blokator vsebin. Takoj po namestitvi blokira oglase, sledilnike, rudarje in več.",
+    "description": "this will be in the Chrome web store: must be 132 characters or less"
+  },
+  "perRulesetStats": {
+    "message": "{{ruleCount}} pravil, pretvorjenih iz {{filterCount}} omrežnih filtrov",
+    "description": "Appears aside each filter list in the _3rd-party filters_ pane"
+  },
+  "dashboardName": {
+    "message": "uBO Lite — Nadzorna plošča",
+    "description": "English: uBO Lite — Dashboard"
+  },
+  "settingsPageName": {
+    "message": "Nastavitve",
+    "description": "appears as tab name in dashboard"
+  },
+  "customFiltersPageName": {
+    "message": "Filtri po meri",
+    "description": "appears as tab name in dashboard"
+  },
+  "developPageName": {
+    "message": "Razvoj",
+    "description": "appears as tab name in dashboard. Inspired from 'Develop' menu in Safari, see https://developer.apple.com/documentation/safari-developer-tools/develop-menu"
+  },
+  "aboutPageName": {
+    "message": "O programu",
+    "description": "appears as tab name in dashboard"
+  },
+  "aboutPrivacyPolicy": {
+    "message": "Politika zasebnosti",
+    "description": "Link to privacy policy on GitHub (English)"
+  },
+  "aboutDocumentation": {
+    "message": "Dokumentacija",
+    "description": "Link to documentation in About pane"
+  },
+  "popupFilteringModeLabel": {
+    "message": "način filtriranja",
+    "description": "Label in the popup panel for the current filtering mode"
+  },
+  "popupLocalToolsLabel": {
+    "message": "Na tem spletnem mestu",
+    "description": "Label in the popup panel for the local tools section"
+  },
+  "popupTipReport": {
+    "message": "Prijavi težavo",
+    "description": "Tooltip used for the 'chat' icon in the panel"
+  },
+  "popupTipDashboard": {
+    "message": "Odpri nadzorno ploščo",
+    "description": "English: Click to open the dashboard"
+  },
+  "popupMoreButton": {
+    "message": "Več",
+    "description": "Label to be used to show popup panel sections"
+  },
+  "popupLessButton": {
+    "message": "Manj",
+    "description": "Label to be used to hide popup panel sections"
+  },
+  "popupNoWebsite": {
+    "message": "not a website",
+    "description": "Used when popup panel is opened for a local web page"
+  },
+  "3pGroupDefault": {
+    "message": "Privzeto",
+    "description": "Header for a ruleset section in 'Filter lists pane'"
+  },
+  "3pGroupAds": {
+    "message": "Oglasi",
+    "description": "Header for a ruleset section in 'Filter lists pane'"
+  },
+  "3pGroupPrivacy": {
+    "message": "Zasebnost",
+    "description": "Header for a ruleset section in 'Filter lists pane'"
+  },
+  "3pGroupMalware": {
+    "message": "Zaščita pred zlonamerno programsko opremo, varnost",
+    "description": "Header for a ruleset section in 'Filter lists pane'"
+  },
+  "3pGroupAnnoyances": {
+    "message": "Nadloge",
+    "description": "Header for a ruleset section in 'Filter lists pane'"
+  },
+  "3pGroupMisc": {
+    "message": "Razno",
+    "description": "Header for a ruleset section in 'Filter lists pane'"
+  },
+  "3pGroupRegions": {
+    "message": "Regije, jeziki",
+    "description": "Header for a ruleset section in 'Filter lists pane'"
+  },
+  "3pGroupImported": {
+    "message": "Uvoženi seznami",
+    "description": "Header for a ruleset section in 'Filter lists pane'"
+  },
+  "customListImportLabel": {
+    "message": "Dodaj seznam filtrov…",
+    "description": "Text label heading the import area of custom filter lists"
+  },
+  "customListImportPlaceholder": {
+    "message": "URL seznama filtrov za dodajanje",
+    "description": "Placeholder text which describes the purpose of the textarea widget"
+  },
+  "customListImportUserScriptsInfo": {
+    "message": "To enforce cosmetic or scriptlet filters from imported lists, you must grant uBO Lite permission to run user scripts.",
+    "description": "A notice to inform user that the enforcement of some filters requires permission to execute 'user scripts'"
+  },
+  "customFiltersImportExportLabel": {
+    "message": "Uvozi / Izvozi",
+    "description": "Text label heading the import/export area of custom filters"
+  },
+  "customFiltersImportTextareaPlaceholder": {
+    "message": "Specifični kozmetični/skriptletni filtri za dodajanje",
+    "description": "Placeholder text which describes the purpose of the textarea widget"
+  },
+  "userScriptsInfo": {
+    "message": "Odprite stran z razširitvami v brskalniku (<code>chrome://extensions</code> v Chromu ali <code>about:addons</code> v Firefoxu), odprite podrobnosti za <b>uBO Lite</b> in omogočite <b>Dovoli uporabniške skripte</b> (imenovane tudi “nepreverjene skripte tretjih oseb”).",
+    "description": "A notice to inform user on how to enable 'user scripts' permission"
+  },
+  "aboutChangelog": {
+    "message": "Dnevnik sprememb",
+    "description": ""
+  },
+  "aboutCode": {
+    "message": "Izvorna koda (GPLv3)",
+    "description": "English: Source code (GPLv3)"
+  },
+  "aboutContributors": {
+    "message": "Sodelavci",
+    "description": "English: Contributors"
+  },
+  "aboutSourceCode": {
+    "message": "Izvorna koda",
+    "description": "Link text to source code repo"
+  },
+  "aboutTranslations": {
+    "message": "Prevodi",
+    "description": "Link text to translations repo"
+  },
+  "aboutFilterLists": {
+    "message": "Seznami filtrov",
+    "description": "Link text to uBO's own filter lists repo"
+  },
+  "aboutDependencies": {
+    "message": "Zunanje odvisnosti (združljive z GPLv3):",
+    "description": "Shown in the About pane"
+  },
+  "supportS6H": {
+    "message": "Prijavi težavo s filtrom",
+    "description": "Header of 'Report a filter issue' section in Support pane"
+  },
+  "supportS3P1": {
+    "message": "Težave s filtri na določenih spletnih mestih prijavite na <span data-url=\"https://github.com/uBlockOrigin/uAssets/issues?q=is%3Aissue\"><code>uBlockOrigin/uAssets</code> sledilniku težav</span>. <u>Zahteva račun GitHub.</u>",
+    "description": "First paragraph of 'Filter issues' section in Support pane"
+  },
+  "supportS5H": {
+    "message": "Informacije za odpravljanje težav",
+    "description": "Label of 'Troubleshooting information' section in 'Report a filter issue' page"
+  },
+  "supportS6P1S1": {
+    "message": "Da ne bi obremenjevali prostovoljcev z dvojnimi poročili, preverite, ali težava še ni bila prijavljena. <b>Opomba:</b> s klikom na gumb se izvor strani pošlje na GitHub.",
+    "description": "A paragraph in the filter issue reporter section"
+  },
+  "supportFindSpecificButton": {
+    "message": "Poišči podobna poročila na GitHubu",
+    "description": "A clickable link in the filter issue reporter section"
+  },
+  "supportS6URL": {
+    "message": "Naslov spletne strani:",
+    "description": "Label for the URL of the page"
+  },
+  "supportS6Select1": {
+    "message": "Spletna stran…",
+    "description": "Label for widget to select type of issue"
+  },
+  "supportS6Select1Option0": {
+    "message": "-- Izberite vnos --",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option1": {
+    "message": "Prikazuje oglase ali ostanke oglasov",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option2": {
+    "message": "Ima prekrivne elemente ali druge nadloge",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option3": {
+    "message": "Zazna uBO Lite",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option4": {
+    "message": "Ima težave, povezane z zasebnostjo",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option5": {
+    "message": "Ne deluje pravilno, ko je uBO Lite omogočen",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option6": {
+    "message": "Odpre neželene zavihke ali okna",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Select1Option7": {
+    "message": "Vodi do zlonamerne programske opreme, lažnega predstavljanja",
+    "description": "An entry in the widget used to select the type of issue"
+  },
+  "supportS6Checkbox1": {
+    "message": "Označi spletno stran kot “NSFW” (<a href=\"https://wikipedia.org/wiki/Not_safe_for_work\">“Ni primerno za delo”</a>)",
+    "description": "A checkbox to use for NSFW sites"
+  },
+  "supportReportSpecificButton": {
+    "message": "Ustvari novo poročilo na GitHubu",
+    "description": "Text for button which opens an external web page in Support pane"
+  },
+  "defaultFilteringModeSectionLabel": {
+    "message": "Privzeti način filtriranja",
+    "description": "The header text for the default filtering mode section"
+  },
+  "defaultFilteringModeDescription": {
+    "message": "Privzeti način filtriranja bo prepisan z načini filtriranja za posamezna spletna mesta. Na katerem koli spletnem mestu lahko prilagodite način filtriranja glede na to, kateri način na tem mestu najbolje deluje. Vsak način ima svoje prednosti in slabosti.",
+    "description": "This describes the default filtering mode setting"
+  },
+  "filteringMode0Name": {
+    "message": "brez filtriranja",
+    "description": "Name of blocking mode 0"
+  },
+  "filteringMode1Name": {
+    "message": "osnovno",
+    "description": "Name of blocking mode 1"
+  },
+  "filteringMode2Name": {
+    "message": "optimalno",
+    "description": "Name of blocking mode 2"
+  },
+  "filteringMode3Name": {
+    "message": "popolno",
+    "description": "Name of blocking mode 3"
+  },
+  "basicFilteringModeDescription": {
+    "message": "Osnovno omrežno filtriranje iz izbranih seznamov filtrov.\n\nNe zahteva dovoljenja za branje in spreminjanje podatkov na spletnih mestih.",
+    "description": "This describes the 'basic' filtering mode"
+  },
+  "optimalFilteringModeDescription": {
+    "message": "Napredno omrežno filtriranje in specifično razširjeno filtriranje iz izbranih seznamov filtrov.\n\nZahteva široko dovoljenje za branje in spreminjanje podatkov na vseh spletnih mestih.",
+    "description": "This describes the 'optimal' filtering mode"
+  },
+  "completeFilteringModeDescription": {
+    "message": "Napredno omrežno filtriranje ter specifično in generično razširjeno filtriranje iz izbranih seznamov filtrov.\n\nZahteva široko dovoljenje za branje in spreminjanje podatkov na vseh spletnih mestih.\n\nGenerično razširjeno filtriranje lahko povzroči večjo porabo virov spletne strani.",
+    "description": "This describes the 'complete' filtering mode"
+  },
+  "noFilteringModeDescription": {
+    "message": "Seznam spletnih mest, za katera filtriranje ne bo potekalo.",
+    "description": "A short description for the editable field which lists trusted sites"
+  },
+  "noFilteringModePlaceholder": {
+    "message": "[samo imena gostiteljev]\nexample.com\ngames.example\n...",
+    "description": "Default text for in edit field"
+  },
+  "behaviorSectionLabel": {
+    "message": "Vedenje",
+    "description": "The header text for the 'Behavior' section"
+  },
+  "autoReloadLabel": {
+    "message": "Ob spremembi načina filtriranja samodejno ponovno naloži stran",
+    "description": "Label for a checkbox in the options page"
+  },
+  "showBlockedCountLabel": {
+    "message": "Na ikoni orodne vrstice prikaži število blokiranih zahtevkov",
+    "description": "Label for a checkbox in the options page"
+  },
+  "enableStrictBlockLabel": {
+    "message": "Omogoči strogo blokiranje",
+    "description": "Label for a checkbox in the options page"
+  },
+  "enableStrictBlockLegend": {
+    "message": "Navigacija na potencialno nezaželena spletna mesta bo blokirana, ponujena pa vam bo možnost nadaljevanja.",
+    "description": "Short description for a checkbox in the options page"
+  },
+  "enablePopupBlockLabel": {
+    "message": "Omogoči blokiranje pojavnih oken",
+    "description": "Label for a checkbox in the options page"
+  },
+  "enablePopupBlockLegend": {
+    "message": "Ko je aktivno, bodo ustrezni filtri samodejno zaprli neželene zavihke brskalnika, ki jih ustvarijo spletna mesta.",
+    "description": "Short description for a checkbox in the options page"
+  },
+  "sandboxEditorLabel": {
+    "message": "Peskovnik za ustvarjanje filtrov",
+    "description": "Header for filter-creation section in the dashboard"
+  },
+  "sandboxEditorUserScriptsInfo": {
+    "message": "To enforce cosmetic or scriptlet filters from the sandbox, you must grant uBO Lite permission to run user scripts.",
+    "description": "A notice to inform user that the enforcement of some filters requires permission to execute 'user scripts'"
+  },
+  "developerModeLabel": {
+    "message": "Razvojni način",
+    "description": "Label for a checkbox in the options page"
+  },
+  "developerModeLegend": {
+    "message": "Omogoča dostop do funkcij, primernih za tehnične uporabnike.",
+    "description": "Short description for a checkbox in the options page"
+  },
+  "settingsBackupRestoreLabel": {
+    "message": "Varnostno kopiranje",
+    "description": "The header text for the back up/restore section"
+  },
+  "settingsBackupRestoreSummary": {
+    "message": "Varnostno kopirajte svoje nastavitve po meri v datoteko ali jih obnovite iz datoteke.",
+    "description": "A summary description of the back up/restore section."
+  },
+  "settingsBackupRestoreLegend": {
+    "message": "Obnovitev bo prepisala vse vaše trenutne nastavitve po meri.",
+    "description": "Important information about the back up/restore section."
+  },
+  "findListsPlaceholder": {
+    "message": "Poišči sezname",
+    "description": "Placeholder for the input field used to find lists"
+  },
+  "strictblockTitle": {
+    "message": "Stran blokirana",
+    "description": "Web page title for the strict-blocked page"
+  },
+  "strictblockSentence1": {
+    "message": "uBO Lite je preprečil nalaganje naslednje strani:",
+    "description": "Sentence used in the strict-blocked page"
+  },
+  "strictblockReasonSentence1": {
+    "message": "Stran je bila blokirana zaradi ustreznega filtra v {{listname}}.",
+    "description": "Text informing about what is causing the page to be blocked"
+  },
+  "strictblockRedirectSentence1": {
+    "message": "Blokirana stran želi preusmeriti na drugo spletno mesto. Če izberete nadaljevanje, boste neposredno preusmerjeni na: {{url}}",
+    "description": "Text warning about an incoming redirect"
+  },
+  "strictblockNoParamsPrompt": {
+    "message": "brez parametrov",
+    "description": "Label to be used for the parameter-less URL"
+  },
+  "strictblockBack": {
+    "message": "Nazaj",
+    "description": "A button to go back to the previous web page"
+  },
+  "strictblockClose": {
+    "message": "Zapri to okno",
+    "description": "A button to close the current tab"
+  },
+  "strictblockDontWarn": {
+    "message": "Ne opozarjaj me več za to spletno mesto",
+    "description": "Label for checkbox in document-blocked page"
+  },
+  "strictblockProceed": {
+    "message": "Nadaljuj",
+    "description": "A button to navigate to the blocked page"
+  },
+  "zapperTipEnter": {
+    "message": "Odstrani element",
+    "description": "Tooltip for the button used to enter zapper mode"
+  },
+  "zapperTipQuit": {
+    "message": "Izhod iz načina odstranjevanja elementov",
+    "description": "Tooltip for the button used to exit zapper mode"
+  },
+  "pickerTipEnter": {
+    "message": "Ustvari filter po meri",
+    "description": "Label for the menu entry to create cosmetic filters"
+  },
+  "unpickerTipEnter": {
+    "message": "Odstrani filter po meri",
+    "description": "Label for the menu entry to delete cosmetic filters"
+  },
+  "developDropdownLabel": {
+    "message": "Pogled:",
+    "description": "A label of a dropdown list"
+  },
+  "developOptionFilteringModeDetails": {
+    "message": "Podrobnosti načina filtriranja",
+    "description": "An option in a dropdown list"
+  },
+  "developOptionCustomDnrRules": {
+    "message": "Pravila DNR po meri",
+    "description": "An option in a dropdown list"
+  },
+  "developOptionDnrRulesOf": {
+    "message": "Pravila DNR za …",
+    "description": "A section header in a dropdown list"
+  },
+  "developOptionDynamicRuleset": {
+    "message": "Dinamični sklop pravil",
+    "description": "An option in a dropdown list"
+  },
+  "developOptionSessionRuleset": {
+    "message": "Sejni sklop pravil",
+    "description": "An option in a dropdown list"
+  },
+  "saveButton": {
+    "message": "Shrani",
+    "description": "Text for buttons used to save changes"
+  },
+  "revertButton": {
+    "message": "Povrni",
+    "description": "Text for buttons used to revert changes"
+  },
+  "addButton": {
+    "message": "Dodaj",
+    "description": "Text for buttons used to add content"
+  },
+  "importAndAppendButton": {
+    "message": "Uvozi in dodaj…",
+    "description": "Text for buttons used to import and append content"
+  },
+  "exportButton": {
+    "message": "Izvozi…",
+    "description": "Text for buttons used to export content"
+  },
+  "backupButton": {
+    "message": "Varnostno kopiraj…",
+    "description": "Text for buttons used to back up content"
+  },
+  "restoreButton": {
+    "message": "Obnovi…",
+    "description": "Text for buttons used to restore content"
+  },
+  "resetToDefaultButton": {
+    "message": "Ponastavi na privzete nastavitve…",
+    "description": "Text for buttons used to reset configurations to default"
+  },
+  "resetToDefaultConfirm": {
+    "message": "Vse vaše nastavitve po meri bodo odstranjene. Ali res želite ponastaviti na privzete nastavitve?",
+    "description": "Message asking user to confirm reset to default settings"
+  },
+  "dnrRulesWarning": {
+    "message": "Ne dodajajte vsebin iz nezaupanja vrednih virov",
+    "description": "Short description of the DNR rules editor pane"
+  },
+  "dnrRulesCountInfo": {
+    "message": "Število registriranih pravil: {count}",
+    "description": "Short sentence to report the number of currently registered DNR rules"
+  },
+  "pickerSliderLabel": {
+    "message": "Premaknite drsnik, da izberete najboljše ujemanje",
+    "description": "Label to describe the purpose of the slider"
+  },
+  "pickerPick": {
+    "message": "Izberi",
+    "description": "Text for the button to re-enter element-picking mode"
+  },
+  "pickerPreview": {
+    "message": "Predogled",
+    "description": "Text for the button to activate preview mode"
+  },
+  "pickerCreate": {
+    "message": "Ustvari",
+    "description": "Text for the button to create the filter"
+  },
+  "unpickerUsage": {
+    "message": "Spodaj izberite filter, da označite ustrezne elemente na spletni strani. Kliknite koš za odstranitev filtra.",
+    "description": "Summary description on how to use the tool to remove custom filters"
+  }
+}

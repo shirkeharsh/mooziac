@@ -3,8 +3,18 @@ import QuartzCore
 
 class ReactiveIconButton: NSButton {
     var hoverScale: CGFloat = 1.18
+    var pressScale: CGFloat = 0.85
     var representedObject: Any?
     private var trackingArea: NSTrackingArea?
+
+    override var isEnabled: Bool {
+        didSet {
+            alphaValue = isEnabled ? 1.0 : 0.35
+            if !isEnabled {
+                layer?.transform = CATransform3DIdentity
+            }
+        }
+    }
     
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)

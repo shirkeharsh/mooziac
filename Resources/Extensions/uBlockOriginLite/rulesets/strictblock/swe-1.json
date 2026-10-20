@@ -1,0 +1,220 @@
+[
+{
+ "action": {
+  "redirect": {
+   "regexSubstitution": "/strictblock.html#\\0"
+  },
+  "type": "redirect"
+ },
+ "condition": {
+  "regexFilter": "^https?://.*",
+  "requestDomains": [
+   "ads.samnytt.se",
+   "analytics-smhise.smhi.se",
+   "analytics.alandpost.com",
+   "analytics.citreamedia.com",
+   "analytics.gen.shield.monitoringservice.co",
+   "analytics.samnytt.se",
+   "analytics.teknikveckan.se",
+   "annons.dagen.se",
+   "api-sa.rikatillsammans.se",
+   "app-statistics.puzzel.com",
+   "aservice.tools",
+   "assets.zubitracker.io",
+   "borsvarlden-banners.azurewebsites.net",
+   "brandy.bonniernewslifestyle.se",
+   "bvads.bovision.se",
+   "cdn.stroeerdigitalgroup.de",
+   "cmp.radioplay.se",
+   "collect.breakit.se",
+   "commercial-cms-prod.aller.se",
+   "consent.podplay.com",
+   "creativeconsortiuminspired.com",
+   "engine.groweo.com",
+   "es.loppi.se",
+   "gtm.findroommate.dk",
+   "hasher.schibsted.com",
+   "images-ads.aland.com",
+   "imp.laget.se",
+   "ingest.analytics.nation.dev",
+   "insights.analys.cloud",
+   "insights.hemnet.se",
+   "insights.tv4.a2d.tv",
+   "js.evtr.nordiskemedier.dk",
+   "load.znq.tt.se",
+   "logger.tv.nu",
+   "m1.analytics.sitevision-cloud.se",
+   "mediaserver.gvcaffiliates.com.cdn.cloudflare.net",
+   "newstats.blogg.se",
+   "owa.agriprim.se",
+   "pcf.tdscd.com",
+   "pixel.playbuzz.com",
+   "plowking.mecenat.com",
+   "pm.azerioncircle.com",
+   "prylguiden.expressen.se",
+   "r1.ddlnk.net",
+   "se-affiliate-gallery.aws.aller.com",
+   "se-recommendation-microservice.labrador.allermedia.io",
+   "smartstats.kla.tv",
+   "spcmp.woxikon.se",
+   "spelguiden.samnytt.se",
+   "stats.allabolag.se",
+   "stats.blogg.se",
+   "stats.docu.info",
+   "stats.helsingborg.se",
+   "stats.jibber.social",
+   "stats.poddtoppen.se",
+   "stm.eniro.se",
+   "stp.gaffa.se",
+   "t.atmng.io",
+   "t.fastcmp.com",
+   "telemetry.bambuser.io",
+   "tracing.yelp.com",
+   "track.intersport.se",
+   "track.mediaintelliview.com",
+   "track.yetric.net",
+   "tracking.fasab6f.se",
+   "tvm-tv4-freewheel.akamaized.net",
+   "ues.vk.se",
+   "um.merinfo.se",
+   "umami.nordiskehandel.cloud",
+   "views.sociablekit.com",
+   "wb-analytics.onecruiter.com",
+   "webstat.abf.se"
+  ],
+  "resourceTypes": [
+   "main_frame"
+  ]
+ },
+ "id": 1,
+ "priority": 29
+},
+{
+ "action": {
+  "redirect": {
+   "regexSubstitution": "/strictblock.html#\\0"
+  },
+  "type": "redirect"
+ },
+ "condition": {
+  "regexFilter": "^.*\\/aftonbladet\\/crypt\\/\\?lpkey.*",
+  "resourceTypes": [
+   "main_frame"
+  ]
+ },
+ "id": 2,
+ "priority": 29
+},
+{
+ "action": {
+  "redirect": {
+   "regexSubstitution": "/strictblock.html#\\0"
+  },
+  "type": "redirect"
+ },
+ "condition": {
+  "regexFilter": "^.*\\/expressen\\/crypt\\/\\?lpkey.*",
+  "resourceTypes": [
+   "main_frame"
+  ]
+ },
+ "id": 3,
+ "priority": 29
+},
+{
+ "action": {
+  "redirect": {
+   "regexSubstitution": "/strictblock.html#\\0"
+  },
+  "type": "redirect"
+ },
+ "condition": {
+  "regexFilter": "^.*\\/prylguiden-expressen.*",
+  "resourceTypes": [
+   "main_frame"
+  ]
+ },
+ "id": 4,
+ "priority": 29
+},
+{
+ "action": {
+  "redirect": {
+   "regexSubstitution": "/strictblock.html#\\0"
+  },
+  "type": "redirect"
+ },
+ "condition": {
+  "regexFilter": "^.*\\/www\\.swedbank-.*?\\/telegram.*",
+  "resourceTypes": [
+   "main_frame"
+  ]
+ },
+ "id": 5,
+ "priority": 29
+},
+{
+ "action": {
+  "redirect": {
+   "regexSubstitution": "/strictblock.html#\\0"
+  },
+  "type": "redirect"
+ },
+ "condition": {
+  "regexFilter": "^[^:]+:\\/\\/([^:/]+\\.)?aftonbladet\\.se\\..*?\\..*",
+  "resourceTypes": [
+   "main_frame"
+  ]
+ },
+ "id": 6,
+ "priority": 29
+},
+{
+ "action": {
+  "redirect": {
+   "regexSubstitution": "/strictblock.html#\\0"
+  },
+  "type": "redirect"
+ },
+ "condition": {
+  "regexFilter": "^[^:]+:\\/\\/([^:/]+\\.)?best-prizes-now\\..*",
+  "resourceTypes": [
+   "main_frame"
+  ]
+ },
+ "id": 7,
+ "priority": 29
+},
+{
+ "action": {
+  "redirect": {
+   "regexSubstitution": "/strictblock.html#\\0"
+  },
+  "type": "redirect"
+ },
+ "condition": {
+  "regexFilter": "^[^:]+:\\/\\/([^:/]+\\.)?online\\.swedbank\\.se\\.swedd\\..*",
+  "resourceTypes": [
+   "main_frame"
+  ]
+ },
+ "id": 8,
+ "priority": 29
+},
+{
+ "action": {
+  "redirect": {
+   "regexSubstitution": "/strictblock.html#\\0"
+  },
+  "type": "redirect"
+ },
+ "condition": {
+  "regexFilter": "^[^:]+:\\/\\/([^:/]+\\.)?s\\.arclk\\.net\\/tr\\?.*",
+  "resourceTypes": [
+   "main_frame"
+  ]
+ },
+ "id": 9,
+ "priority": 29
+}
+]

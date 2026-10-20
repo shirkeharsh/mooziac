@@ -342,13 +342,21 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
     }
 
     public func showCustomTextOverlay(text: String, duration: TimeInterval = 1.5) {
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in
+                self?.showCustomTextOverlay(text: text, duration: duration)
+            }
+            return
+        }
+        guard StatusItemManager.shared?.currentMode != .youtube else { return }
         volumeOverlayTimer?.invalidate()
         isShowingVolumeOverlay = true
         showOverlay()
 
         lyricsLabel.stringValue = text
 
-        let fontAttributes = [NSAttributedString.Key.font: lyricsLabel.font!]
+        let font = lyricsLabel.font ?? NSFont.systemFont(ofSize: 13, weight: .medium)
+        let fontAttributes = [NSAttributedString.Key.font: font]
         let textWidth = (text as NSString).size(withAttributes: fontAttributes).width
         let targetWidth = min(max(ceil(textWidth / 30.0) * 30.0 + 30.0, 180), 300)
 
