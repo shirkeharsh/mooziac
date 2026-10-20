@@ -30,8 +30,8 @@
 <br>
 
 <p align="center">
-  <b>Mooziac is an ultra-lightweight, 100% native Swift & AppKit music player built specifically for macOS.</b><br>
-  The native alternative to YouTube Music Desktop, Spotify, and Electron players — tucked right into your menu bar with an invisible trackpad edge volume slider, real-time synchronized lyrics HUD, and zero battery-draining Chromium bloat.
+  <b>Mooziac is an ultra-lightweight, 100% native Swift & AppKit music and YouTube video player built specifically for macOS.</b><br>
+  The native alternative to YouTube Music Desktop, Spotify, and Electron players — combining a menu bar music player with a 4K hardware-accelerated YouTube video window, an invisible trackpad edge volume slider, real-time synchronized lyrics HUD, and zero battery-draining Chromium bloat.
 </p>
 
 ---
@@ -53,6 +53,8 @@ Most desktop music players are heavy Electron wrappers that bundle a full Chromi
 | Feature | ⚡️ Mooziac | 🌐 Official YTM Web / Desktop | 📦 Electron Wrappers |
 | :--- | :---: | :---: | :---: |
 | **Technology** | **100% Native Swift & AppKit** | Chromium / Web App | Heavy Chromium + Node.js |
+| **YouTube Video Player** | **✅ 4K Hardware GPU Decode** | ⚠️ High CPU in Browser | ⚠️ Heavy Electron / Lags |
+| **Ad-Blocking & SponsorBlock**| **✅ Built-in (uBlock Lite + SponsorBlock)** | ❌ No | ⚠️ Third-party plugins |
 | **Trackpad Edge Volume** | **✅ Yes (with haptic feedback)** | ❌ No | ❌ No |
 | **Synchronized Lyrics HUD** | **✅ Line-by-line LRC** | ⚠️ Basic / Unsynced | ❌ No |
 | **Local Offline Audio** | **✅ FLAC, MP3, WAV, AAC, M4A** | ❌ Cloud only | ❌ No |
@@ -67,14 +69,25 @@ Most desktop music players are heavy Electron wrappers that bundle a full Chromi
 <table>
   <tr>
     <td width="50%" valign="top">
+      <h4>🎬 4K YouTube Video Player &amp; Hardware Acceleration</h4>
+      <p>Watch full YouTube videos in a dedicated native window with zero battery-draining CPU churn.</p>
+      <ul>
+        <li><b>VideoToolbox GPU Decode:</b> Hardware-accelerated AV1 and VP9 video decoding directly via Apple Silicon and Intel Metal GPUs.</li>
+        <li><b>Ad-Free &amp; SponsorBlock:</b> Declarative uBlock Origin Lite rules and SponsorBlock auto-skipping built into the native engine.</li>
+        <li><b>Native Fullscreen:</b> Seamless edge-to-edge macOS fullscreen toggle via <code>F</code> key, double-click, or native window controls.</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
       <h4>🎛️ Invisible Trackpad Volume Slider</h4>
       <p>Turn the rightmost 1mm border of your MacBook trackpad into an invisible hardware volume dial.</p>
       <ul>
-        <li><b>1mm Border Edge:</b> Slide along the outer bezel for fine-grained system volume adjustment.</li>
+        <li><b>1mm Border Edge:</b> Slide along the outer bezel for fine-grained system volume adjustment across music and video.</li>
         <li><b>Tactile Taptic Engine:</b> Real physical haptic ticks as volume levels increment or decrement.</li>
-        <li><b>Zero Ghost Touches:</b> Palm and Touch ID rejection prevents accidental triggers during typing.</li>
+        <li><b>Continuous Level Tracking:</b> Lift finger and resume adjusting smoothly from current level without snapping back.</li>
       </ul>
     </td>
+  </tr>
+  <tr>
     <td width="50%" valign="top">
       <h4>🎤 Floating Synchronized Lyrics HUD</h4>
       <p>Sing along with real-time, line-by-line synchronized LRC lyrics right beneath your menu bar.</p>
@@ -84,8 +97,6 @@ Most desktop music players are heavy Electron wrappers that bundle a full Chromi
         <li><b>Instant Local Cache:</b> Stored in SQLite for zero-latency retrieval on repeat listens.</li>
       </ul>
     </td>
-  </tr>
-  <tr>
     <td width="50%" valign="top">
       <h4>⚡️ Dual Audio Engine (Cloud + Local Hi-Res)</h4>
       <p>Stream your cloud favorites or play lossless offline libraries in one seamless unified queue.</p>
@@ -95,6 +106,7 @@ Most desktop music players are heavy Electron wrappers that bundle a full Chromi
         <li><b>Built-in Downloader:</b> Integrated <code>yt-dlp</code> pipeline with automatic tag and artwork embedding.</li>
       </ul>
     </td>
+  </tr>
     <td width="50%" valign="top">
       <h4>🌊 Interactive Waveform & Adaptive Glow</h4>
       <p>Dynamic ambient interface that harmonizes with your music and desktop wallpaper.</p>
@@ -143,6 +155,8 @@ Most desktop music players are heavy Electron wrappers that bundle a full Chromi
 
 ### Keyboard Shortcuts
 
+#### Music Player Mode
+
 | Shortcut | Action |
 | :--- | :--- |
 | `Space` | Play / Pause |
@@ -151,6 +165,18 @@ Most desktop music players are heavy Electron wrappers that bundle a full Chromi
 | `L` | Like / Unlike Song |
 | `⌘ + R` | Reload Web Engine |
 | `⌘ + Q` | Quit Mooziac |
+
+#### YouTube Video Mode
+
+| Shortcut | Action |
+| :--- | :--- |
+| `F` | Toggle macOS Native Fullscreen |
+| `Space` / `K` | Play / Pause Video |
+| `J` / `L` | Seek 10s Backward / Forward |
+| `M` | Mute / Unmute Audio |
+| `C` | Toggle Closed Captions / Subtitles |
+| `[` / `]` | Decrease / Increase Playback Speed |
+| `Esc` | Exit Fullscreen |
 
 ---
 
@@ -251,6 +277,11 @@ Mooziac's JSON playlist format is versioned and uses UTF-8:
 ---
 
 ## ❓ Frequently Asked Questions (FAQ)
+
+<details>
+<summary><b>Can I watch regular YouTube videos in Mooziac or only listen to music?</b></summary>
+<p>You can do both! In addition to the menu bar music player, Mooziac features a dedicated native YouTube video player window. It includes 4K hardware acceleration via VideoToolbox, built-in ad blocking powered by uBlock Origin Lite rules, automatic SponsorBlock skipping, and trackpad edge volume gestures. You can switch between music and video modes anytime from the menu bar context menu.</p>
+</details>
 
 <details>
 <summary><b>Is Mooziac free and open-source?</b></summary>
