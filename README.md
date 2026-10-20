@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://mooziac.pages.dev">
-    <img src="Resources/banner.svg" alt="Mooziac macOS Music Player" width="100%">
+    <img src="Resources/banner.svg" alt="Mooziac macOS Music & Video Player" width="100%">
   </a>
 </p>
 
@@ -9,7 +9,7 @@
   <a href="https://github.com/shirkeharsh/mooziac/stargazers"><img src="https://img.shields.io/github/stars/shirkeharsh/mooziac?style=flat-square&logo=github&color=FA4059" alt="GitHub Stars"></a>
   <a href="https://github.com/shirkeharsh/mooziac/releases/latest"><img src="https://img.shields.io/badge/macOS-13.0%2B-000000?style=flat-square&logo=apple&logoColor=white" alt="macOS 13.0+ Compatibility"></a>
   <a href="https://github.com/shirkeharsh/mooziac/releases/latest"><img src="https://img.shields.io/badge/Architecture-Universal-2ea44f?style=flat-square" alt="Universal Binary (Apple Silicon & Intel)"></a>
-  <a href="#-privacy-first-architecture"><img src="https://img.shields.io/badge/Privacy-100%25%20Local--First-28cd41?style=flat-square&logo=shield&logoColor=white" alt="Zero Telemetry (100% Local-First)"></a>
+  <a href="#privacy-first-architecture"><img src="https://img.shields.io/badge/Privacy-100%25%20Local--First-28cd41?style=flat-square&logo=shield&logoColor=white" alt="Zero Telemetry (100% Local-First)"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="MIT License"></a>
 </p>
 
@@ -30,13 +30,13 @@
 <br>
 
 <p align="center">
-  <b>Mooziac is an ultra-lightweight, 100% native Swift & AppKit music and YouTube video player built specifically for macOS.</b><br>
+  <b>Mooziac is an ultra-lightweight, 100% native Swift & AppKit player for YouTube Videos, YouTube Music, and local audio built specifically for macOS.</b><br>
   The native alternative to YouTube Music Desktop, Spotify, and Electron players — combining a menu bar music player with a 4K hardware-accelerated YouTube video window, an invisible trackpad edge volume slider, real-time synchronized lyrics HUD, and zero battery-draining Chromium bloat.
 </p>
 
 ---
 
-## ✨ See Mooziac in Action
+## See Mooziac in Action
 
 <p align="center">
   <img src="Resources/gif.gif" alt="Mooziac macOS Interface & Preferences" width="100%" style="border-radius: 12px; box-shadow: 0 16px 40px rgba(0,0,0,0.4);">
@@ -46,39 +46,39 @@
 
 ---
 
-## ⚡️ Why Mooziac?
+## Why Mooziac?
 
-Most desktop music players are heavy Electron wrappers that bundle a full Chromium browser, devouring system resources and draining laptop battery life. Mooziac was built from scratch in **pure native Swift and AppKit** with zero third-party dependencies.
+Most desktop music players are heavy Electron wrappers that bundle a full Chromium browser, devouring system resources and draining laptop battery life. Mooziac was built from scratch in **pure native Swift and AppKit** with zero third-party runtime dependencies.
 
-| Feature | ⚡️ Mooziac | 🌐 Official YTM Web / Desktop | 📦 Electron Wrappers |
+| Feature | Mooziac | Official YTM Web / Desktop | Electron Wrappers |
 | :--- | :---: | :---: | :---: |
 | **Technology** | **100% Native Swift & AppKit** | Chromium / Web App | Heavy Chromium + Node.js |
-| **YouTube Video Player** | **✅ 4K Hardware GPU Decode** | ⚠️ High CPU in Browser | ⚠️ Heavy Electron / Lags |
-| **Ad-Blocking & SponsorBlock**| **✅ Built-in (uBlock Lite + SponsorBlock)** | ❌ No | ⚠️ Third-party plugins |
-| **Trackpad Edge Volume** | **✅ Yes (with haptic feedback)** | ❌ No | ❌ No |
-| **Synchronized Lyrics HUD** | **✅ Line-by-line LRC** | ⚠️ Basic / Unsynced | ❌ No |
-| **Local Offline Audio** | **✅ FLAC, MP3, WAV, AAC, M4A** | ❌ Cloud only | ❌ No |
-| **Background Media Keys** | **✅ Native macOS integration** | ⚠️ Browser permissions | ⚠️ Inconsistent |
-| **Discord Rich Presence** | **✅ Native Unix socket (0 deps)** | ❌ No | ⚠️ Third-party plugins |
-| **Telemetry & Privacy** | **🔒 100% Local (Zero tracking)** | ⚠️ Extensive Google telemetry | ⚠️ Varies |
+| **YouTube Video Player** | **Native 4K GPU Decode (Apple VideoToolbox)** | High CPU in Browser | Heavy Electron / Lags |
+| **Distraction-Free Playback** | **Built-in clean styling & SponsorBlock** | No | Third-party plugins |
+| **Trackpad Edge Volume** | **Yes (with haptic feedback)** | No | No |
+| **Synchronized Lyrics HUD** | **Line-by-line LRC** | Basic / Unsynced | No |
+| **Local Offline Audio** | **FLAC, MP3, WAV, AAC, M4A** | Cloud only | No |
+| **Background Media Keys** | **Native macOS integration** | Browser permissions | Inconsistent |
+| **Discord Rich Presence** | **Native Unix socket (0 deps)** | No | Third-party plugins |
+| **Telemetry & Privacy** | **100% Local (Zero tracking)** | Extensive Google telemetry | Varies |
 
 ---
 
-## 🎛️ Native macOS Features: Trackpad Gestures, Synced Lyrics & Audio Engine
+## Native macOS Features: YouTube Video Player, Trackpad Gestures & Audio Engine
 
 <table>
   <tr>
     <td width="50%" valign="top">
-      <h4>🎬 4K YouTube Video Player &amp; Hardware Acceleration</h4>
+      <h4>4K YouTube Video Player &amp; Hardware Acceleration</h4>
       <p>Watch full YouTube videos in a dedicated native window with zero battery-draining CPU churn.</p>
       <ul>
-        <li><b>VideoToolbox GPU Decode:</b> Hardware-accelerated AV1 and VP9 video decoding directly via Apple Silicon and Intel Metal GPUs.</li>
-        <li><b>Ad-Free &amp; SponsorBlock:</b> Declarative uBlock Origin Lite rules and SponsorBlock auto-skipping built into the native engine.</li>
+        <li><b>VideoToolbox GPU Decode:</b> Hardware-accelerated VP9 and H.264 video decoding directly via Apple Silicon and Intel Metal GPUs.</li>
+        <li><b>Distraction-Free Viewing:</b> Built-in clutter filtering, distraction-free focus mode, and automatic SponsorBlock segment skipping directly inside the native engine.</li>
         <li><b>Native Fullscreen:</b> Seamless edge-to-edge macOS fullscreen toggle via <code>F</code> key, double-click, or native window controls.</li>
       </ul>
     </td>
     <td width="50%" valign="top">
-      <h4>🎛️ Invisible Trackpad Volume Slider</h4>
+      <h4>Invisible Trackpad Volume Slider</h4>
       <p>Turn the rightmost 1mm border of your MacBook trackpad into an invisible hardware volume dial.</p>
       <ul>
         <li><b>1mm Border Edge:</b> Slide along the outer bezel for fine-grained system volume adjustment across music and video.</li>
@@ -89,7 +89,7 @@ Most desktop music players are heavy Electron wrappers that bundle a full Chromi
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <h4>🎤 Floating Synchronized Lyrics HUD</h4>
+      <h4>Floating Synchronized Lyrics HUD</h4>
       <p>Sing along with real-time, line-by-line synchronized LRC lyrics right beneath your menu bar.</p>
       <ul>
         <li><b>Line-by-Line LRC:</b> Powered by LRCLib and native YouTube Music synced endpoints.</li>
@@ -98,7 +98,7 @@ Most desktop music players are heavy Electron wrappers that bundle a full Chromi
       </ul>
     </td>
     <td width="50%" valign="top">
-      <h4>⚡️ Dual Audio Engine (Cloud + Local Hi-Res)</h4>
+      <h4>Dual Audio Engine (Cloud + Local Hi-Res)</h4>
       <p>Stream your cloud favorites or play lossless offline libraries in one seamless unified queue.</p>
       <ul>
         <li><b>YouTube Music Bridge:</b> Direct access to your cloud playlists, liked songs, and history.</li>
@@ -107,8 +107,9 @@ Most desktop music players are heavy Electron wrappers that bundle a full Chromi
       </ul>
     </td>
   </tr>
+  <tr>
     <td width="50%" valign="top">
-      <h4>🌊 Interactive Waveform & Adaptive Glow</h4>
+      <h4>Interactive Waveform & Adaptive Glow</h4>
       <p>Dynamic ambient interface that harmonizes with your music and desktop wallpaper.</p>
       <ul>
         <li><b>Live Audio Visualizer:</b> Interactive waveform scrub bar with real-time seeking.</li>
@@ -116,10 +117,8 @@ Most desktop music players are heavy Electron wrappers that bundle a full Chromi
         <li><b>Curated Themes:</b> OLED Pitch Black, Crystal Glass, and Liquid Fluid visual styles.</li>
       </ul>
     </td>
-  </tr>
-  <tr>
     <td width="50%" valign="top">
-      <h4>🎮 Native Discord Rich Presence</h4>
+      <h4>Native Discord Rich Presence</h4>
       <p>Broadcast your now-playing status without third-party bloat or background daemons.</p>
       <ul>
         <li><b>Native Unix Socket IPC:</b> Direct connection with zero Node.js or Python runtime overhead.</li>
@@ -127,9 +126,11 @@ Most desktop music players are heavy Electron wrappers that bundle a full Chromi
         <li><b>Auto-Pause Sync:</b> Updates status in real time when playback is paused or resumed.</li>
       </ul>
     </td>
-    <td width="50%" valign="top">
-      <h4>🔒 100% Local & Privacy-First</h4>
-      <p>Architected with strict privacy principles — your music and listening data remain strictly on your Mac.</p>
+  </tr>
+  <tr>
+    <td width="100%" colspan="2" valign="top">
+      <h4>100% Local & Privacy-First</h4>
+      <p>Architected with strict privacy principles — your listening data and video activity remain strictly on your Mac.</p>
       <ul>
         <li><b>Zero Telemetry:</b> No analytics SDKs, trackers, beacons, or crash reporters phoning home.</li>
         <li><b>Local SQLite3:</b> History, likes, and cached playlists stay entirely in your local storage.</li>
@@ -141,7 +142,7 @@ Most desktop music players are heavy Electron wrappers that bundle a full Chromi
 
 ---
 
-## ⌨️ Gestures & Shortcuts
+## Gestures & Shortcuts
 
 ### Trackpad MultiTouch Gestures
 
@@ -160,11 +161,11 @@ Most desktop music players are heavy Electron wrappers that bundle a full Chromi
 | Shortcut | Action |
 | :--- | :--- |
 | `Space` | Play / Pause |
-| `⌘ + Right Arrow` | Next Track |
-| `⌘ + Left Arrow` | Previous Track |
+| `Cmd + Right Arrow` | Next Track |
+| `Cmd + Left Arrow` | Previous Track |
 | `L` | Like / Unlike Song |
-| `⌘ + R` | Reload Web Engine |
-| `⌘ + Q` | Quit Mooziac |
+| `Cmd + R` | Reload Web Engine |
+| `Cmd + Q` | Quit Mooziac |
 
 #### YouTube Video Mode
 
@@ -176,11 +177,14 @@ Most desktop music players are heavy Electron wrappers that bundle a full Chromi
 | `M` | Mute / Unmute Audio |
 | `C` | Toggle Closed Captions / Subtitles |
 | `[` / `]` | Decrease / Increase Playback Speed |
+| `Cmd + Shift + F` | Toggle Distraction-Free Focus Mode |
+| `Cmd + Shift + S` | Toggle SponsorBlock Auto-Skip |
+| `Cmd + Shift + C` | Copy Video URL with Timestamp |
 | `Esc` | Exit Fullscreen |
 
 ---
 
-## 🚀 Installation
+## Installation
 
 ### Option 1: Homebrew (Recommended)
 
@@ -199,7 +203,7 @@ brew upgrade --cask mooziac
 
 1. Download [`Mooziac.dmg`](https://github.com/shirkeharsh/mooziac/releases/latest/download/Mooziac.dmg) or [`Mooziac.zip`](https://github.com/shirkeharsh/mooziac/releases/latest/download/Mooziac.zip).
 2. Open `Mooziac.dmg` and drag **Mooziac** into your **Applications** folder.
-3. Launch Mooziac from Spotlight (`⌘ + Space`) or Launchpad.
+3. Launch Mooziac from Spotlight (`Cmd + Space`) or Launchpad.
 
 > [!NOTE]
 > **macOS Gatekeeper:** Because Mooziac is distributed directly outside the Mac App Store:
@@ -211,7 +215,7 @@ brew upgrade --cask mooziac
 
 ---
 
-## 🛠️ Building from Source
+## Building from Source
 
 ### Prerequisites
 - macOS 13.0 (Ventura) or later
@@ -235,32 +239,51 @@ swift test --parallel
 
 ---
 
-## 📂 Architecture and Project Structure
+## Architecture and Project Structure
 
-Mooziac is architected cleanly into modular Swift packages with native macOS frameworks:
+Mooziac is architected into modular Swift components using native macOS system frameworks:
 
 ```
 Mooziac/
-├── Package.swift                         # SPM Manifest (macOS 13+, Swift 5.9)
+├── Package.swift                         # SPM manifest (macOS 13+, Swift 5.9)
 ├── Mooziac.entitlements                  # Hardened Runtime security entitlements
 ├── build_app.sh                          # Universal build & packaging pipeline
 ├── Sources/Mooziac/                      # Main application target
-│   ├── App/                              # Application lifecycle, AppDelegate, background media
+│   ├── App/                              # Application lifecycle, AppDelegate, background media keys
 │   ├── Audio/                            # CoreAudio volume hooks, AVFoundation audio player
-│   ├── Core/                             # Central coordinators, NowPlaying, StatusItem
-│   ├── Input/                            # MultiTouch gesture engine & global shortcuts
-│   ├── Managers/                         # Local SQLite3, YTMClient, synced lyrics, yt-dlp
+│   ├── Core/                             # Central coordinators, NowPlaying, StatusItemManager
+│   ├── Input/                            # MultiTouch gesture engine & global keyboard shortcuts
+│   ├── Managers/                         # Local SQLite3, YTMClient, synced lyrics, yt-dlp downloader
 │   ├── Models/                           # State representations, playlist records, audio configs
-│   ├── Views/                            # Dynamic Island player UI, waveform, lyrics HUD
-│   └── Web/                              # Sandboxed WebKit bridge for YouTube Music
+│   ├── Views/                            # Dynamic Island player UI, waveform, floating lyrics HUD
+│   ├── Web/                              # Sandboxed WebKit bridge for YouTube Music streaming
+│   └── YouTube/                          # Native YouTube video player subsystem
+│       ├── Core/                         # MainVideoWindowController, VideoPlayerCoordinator
+│       ├── Database/                     # YouTubeDatabaseManager local watch history & likes
+│       ├── Extensions/                   # WebExtensionHost, WebExtensionManager
+│       ├── Input/                        # KeyboardShortcutHandler for fullscreen & playback
+│       ├── Models/                       # VideoQuality, VideoPlaybackState, PlayerTheme
+│       ├── Services/                     # YouTubeDownloadService via yt-dlp
+│       ├── Settings/                     # YouTubeSettings (clutter filters, distraction-free)
+│       ├── Views/                        # MooziacHeaderBarView, FloatingHUD, DownloadSheet
+│       └── Web/                          # YouTubeWebView, QualityManager, SponsorBlock, Highlight
 └── Tests/MooziacTests/                   # Parallelized unit test suite
+    ├── DownloadManagerURLTests.swift     # URL & YouTube shorts ID extraction tests
+    ├── DownloadQueuePersistenceTests.swift# Download queue SQLite/JSON persistence tests
+    ├── MooziacTests.swift                # Hotkeys, seek modifiers, and playlist advancing tests
+    ├── PlaylistFileCodecTests.swift      # JSON & M3U8 import/export codec tests
+    ├── PlaylistReorderTests.swift        # Drag-and-drop playlist reordering tests
+    ├── SyncedLyricsParserTests.swift     # LRC line-by-line timestamp parser tests
+    ├── URLFilterTests.swift              # Link recognition & streaming domain tests
+    ├── YouTubeVideoTests.swift           # Video quality, thermal defaults, state, & settings tests
+    └── YTMClientSearchTests.swift        # YouTube Music search endpoint client tests
 ```
 
 ---
 
-## 🎵 Playlist File Import & Export
+## Playlist File Import & Export
 
-In the Playlists view, use the **＋** button to import an M3U/M3U8 or JSON playlist file. Right-click a playlist and choose **Export Playlist** to save it as M3U8 or JSON. Import creates a new playlist and references the local file paths in the playlist; it does not copy or move audio files. Relative paths are resolved from the playlist file's folder. Missing local files remain as references and can resolve when they become available. Online entries in imported playlists and non-local entries during export are skipped.
+In the Playlists view, use the **+** button to import an M3U/M3U8 or JSON playlist file. Right-click a playlist and choose **Export Playlist** to save it as M3U8 or JSON. Import creates a new playlist and references the local file paths in the playlist; it does not copy or move audio files. Relative paths are resolved from the playlist file's folder. Missing local files remain as references and can resolve when they become available. Online entries in imported playlists and non-local entries during export are skipped.
 
 Mooziac's JSON playlist format is versioned and uses UTF-8:
 
@@ -276,16 +299,16 @@ Mooziac's JSON playlist format is versioned and uses UTF-8:
 
 ---
 
-## ❓ Frequently Asked Questions (FAQ)
+## Frequently Asked Questions (FAQ)
 
 <details>
 <summary><b>Can I watch regular YouTube videos in Mooziac or only listen to music?</b></summary>
-<p>You can do both! In addition to the menu bar music player, Mooziac features a dedicated native YouTube video player window. It includes 4K hardware acceleration via VideoToolbox, built-in ad blocking powered by uBlock Origin Lite rules, automatic SponsorBlock skipping, and trackpad edge volume gestures. You can switch between music and video modes anytime from the menu bar context menu.</p>
+<p>You can do both! In addition to the menu bar music player, Mooziac features a dedicated native YouTube video player window. It includes 4K hardware acceleration via VideoToolbox, distraction-free clean playback, automatic SponsorBlock skipping, and trackpad edge volume gestures. You can switch between music and video modes anytime from the menu bar context menu.</p>
 </details>
 
 <details>
 <summary><b>Is Mooziac free and open-source?</b></summary>
-<p>Yes. Mooziac is 100% free and open-source software distributed under the permissive MIT License. There are no subscriptions, paywalls, ads, or hidden tracking.</p>
+<p>Yes. Mooziac is 100% free and open-source software distributed under the permissive MIT License. There are no subscriptions, paywalls, or hidden tracking.</p>
 </details>
 
 <details>
@@ -295,7 +318,7 @@ Mooziac's JSON playlist format is versioned and uses UTF-8:
 
 <details>
 <summary><b>How is Mooziac different from the official YouTube Music web or desktop apps?</b></summary>
-<p>Official and third-party desktop wrappers are built on Electron or Chromium, often consuming 500 MB to 1.2 GB of RAM and impacting laptop battery life. Mooziac is engineered in pure native Swift and AppKit with zero third-party dependencies, consuming minimal system resources while running directly in the macOS menu bar.</p>
+<p>Official and third-party desktop wrappers are built on Electron or Chromium, often consuming 500 MB to 1.2 GB of RAM and impacting laptop battery life. Mooziac is engineered in pure native Swift and AppKit with zero third-party runtime dependencies, consuming minimal system resources while running directly in the macOS menu bar.</p>
 </details>
 
 <details>
@@ -324,19 +347,19 @@ To upgrade in the future, run:
 
 ---
 
-## ⭐️ Support & Community
+## Support & Community
 
 If you find Mooziac useful, please consider **starring the repository** — it helps more Mac users discover native, lightweight open-source software!
 
 [![Star History Chart](https://api.star-history.com/svg?repos=shirkeharsh/mooziac&type=Date)](https://star-history.com/#shirkeharsh/mooziac&Date)
 
-- 🐛 **Found a bug?** [Open an issue](https://github.com/shirkeharsh/mooziac/issues)
-- 💡 **Have a feature idea?** [Submit a feature request](https://github.com/shirkeharsh/mooziac/issues/new)
-- 🌐 **Official Website:** [mooziac.pages.dev](https://mooziac.pages.dev)
+- **Found a bug?** [Open an issue](https://github.com/shirkeharsh/mooziac/issues)
+- **Have a feature idea?** [Submit a feature request](https://github.com/shirkeharsh/mooziac/issues/new)
+- **Official Website:** [mooziac.pages.dev](https://mooziac.pages.dev)
 
 ---
 
-## 📄 License & Disclaimer
+## License & Disclaimer
 
-- **License:** Distributed under the [MIT License](LICENSE). Copyright © 2026 ThreeTen.
+- **License:** Distributed under the [MIT License](LICENSE). Copyright (c) 2026 ThreeTen.
 - **Disclaimer:** YouTube Music is a trademark of Google LLC. Mooziac is an independent open-source project and is not affiliated with, authorized, or endorsed by Google LLC.
