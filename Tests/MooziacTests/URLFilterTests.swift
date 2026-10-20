@@ -13,6 +13,9 @@ final class URLFilterTests: XCTestCase {
         XCTAssertTrue(URLFilter.containsLink("youtube.com/watch?v=123"))
         XCTAssertTrue(URLFilter.containsLink("music.youtube.com/playlist?list=456"))
         XCTAssertTrue(URLFilter.containsLink("youtu.be/abc123xyz"))
+        XCTAssertTrue(URLFilter.containsLink("https://www.youtube.com/shorts/dQw4w9WgXcQ"))
+        XCTAssertTrue(URLFilter.containsLink("youtube.com/shorts/abc123xyz"))
+        XCTAssertTrue(URLFilter.containsLink("https://www.youtube.com/embed/dQw4w9WgXcQ"))
     }
     
     func testPlainTextWithoutLinks() {

@@ -1262,7 +1262,7 @@ public final class DownloadManager: NSObject {
             "[?&]v=([A-Za-z0-9_-]{11})",
             "youtu\\.be/([A-Za-z0-9_-]{11})",
             "music\\.youtube\\.com/(?:playlist|watch|embed)/([A-Za-z0-9_-]{11})",
-            "youtube\\.com/embed/([A-Za-z0-9_-]{11})"
+            "youtube\\.com/(?:embed|shorts)/([A-Za-z0-9_-]{11})"
         ]
         for pattern in patterns {
             guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }

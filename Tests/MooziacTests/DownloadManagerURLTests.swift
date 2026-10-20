@@ -32,6 +32,19 @@ final class DownloadManagerURLTests: XCTestCase {
         let url = "https://www.youtube.com/embed/dQw4w9WgXcQ"
         XCTAssertEqual(DownloadManager.extractVideoID(from: url), "dQw4w9WgXcQ")
     }
+
+    func testShortsURL() {
+        let url = "https://www.youtube.com/shorts/dQw4w9WgXcQ"
+        XCTAssertEqual(DownloadManager.extractVideoID(from: url), "dQw4w9WgXcQ")
+    }
+
+    func testTimestampedURL() {
+        let watchWithTime = "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s"
+        XCTAssertEqual(DownloadManager.extractVideoID(from: watchWithTime), "dQw4w9WgXcQ")
+
+        let shortWithTime = "https://youtu.be/dQw4w9WgXcQ?t=120"
+        XCTAssertEqual(DownloadManager.extractVideoID(from: shortWithTime), "dQw4w9WgXcQ")
+    }
     
     func testInvalidURLs() {
         XCTAssertNil(DownloadManager.extractVideoID(from: ""))
