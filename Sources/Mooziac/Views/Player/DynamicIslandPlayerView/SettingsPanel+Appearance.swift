@@ -213,6 +213,145 @@ extension DynamicIslandPlayerView {
         CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Progress Bar: \(next.displayName)")
     }
 
+    func currentAccentColorDisplayName() -> String {
+        if let custom = CustomAccentColorManager.customColor {
+            return "Custom: \(custom.hexString.uppercased())"
+        } else {
+            return "Auto dynamic tint"
+        }
+    }
+
+    func makeAccentColorFeatureRow() -> NSView {
+        let row = NSView()
+        row.wantsLayer = true
+        row.layer?.cornerRadius = 8
+        row.translatesAutoresizingMaskIntoConstraints = false
+
+        let iconImg = NSImageView()
+        iconImg.translatesAutoresizingMaskIntoConstraints = false
+        let config = NSImage.SymbolConfiguration(pointSize: 12, weight: .medium)
+        if let img = NSImage(systemSymbolName: "eyedropper.halffull", accessibilityDescription: "Accent Tint Color")?.withSymbolConfiguration(config) {
+            iconImg.image = img
+        }
+        iconImg.widthAnchor.constraint(equalToConstant: 16).isActive = true
+        iconImg.heightAnchor.constraint(equalToConstant: 16).isActive = true
+
+        let titleLbl = NSTextField(labelWithString: "Accent Tint")
+        titleLbl.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        titleLbl.isEditable = false
+        titleLbl.isSelectable = false
+        titleLbl.refusesFirstResponder = true
+
+        let descLbl = NSTextField(labelWithString: currentAccentColorDisplayName())
+        descLbl.font = NSFont.systemFont(ofSize: 10, weight: .regular)
+        descLbl.isEditable = false
+        descLbl.isSelectable = false
+        descLbl.refusesFirstResponder = true
+        self.accentColorDescLabel = descLbl
+
+        featureIconViews.append(iconImg)
+        featureTitleLabels.append(titleLbl)
+        featureDescLabels.append(descLbl)
+        featureRowContainers.append(row)
+
+        let textStack = NSStackView(views: [titleLbl, descLbl])
+        textStack.orientation = .vertical
+        textStack.alignment = .leading
+        textStack.spacing = 1
+        textStack.translatesAutoresizingMaskIntoConstraints = false
+        titleLbl.setContentCompressionResistancePriority(.required, for: .vertical)
+        descLbl.setContentCompressionResistancePriority(.required, for: .vertical)
+
+        // Native NSColorWell (Color Picker)
+        colorWell.translatesAutoresizingMaskIntoConstraints = false
+        if #available(macOS 13.0, *) {
+            colorWell.colorWellStyle = .minimal
+        }
+        colorWell.isBordered = false
+        colorWell.wantsLayer = true
+        colorWell.layer?.cornerRadius = 5
+        colorWell.color = CustomAccentColorManager.customColor ?? settingsAccentColor(tone: currentSettingsTone())
+        colorWell.target = self
+        colorWell.action = #selector(colorWellChanged(_:))
+        colorWell.widthAnchor.constraint(equalToConstant: 24).isActive = true
+        colorWell.heightAnchor.constraint(equalToConstant: 20).isActive = true
+
+        // Reset to Auto button (circular with small xmark)
+        colorResetButton.translatesAutoresizingMaskIntoConstraints = false
+        colorResetButton.isBordered = false
+        colorResetButton.wantsLayer = true
+        let resetConfig = NSImage.SymbolConfiguration(pointSize: 9, weight: .bold)
+        colorResetButton.image = NSImage(systemSymbolName: "arrow.counterclockwise", accessibilityDescription: "Reset Color")?.withSymbolConfiguration(resetConfig)
+        colorResetButton.target = self
+        colorResetButton.action = #selector(resetCustomAccentColor)
+        colorResetButton.toolTip = "Reset to Auto Tint"
+        colorResetButton.widthAnchor.constraint(equalToConstant: 16).isActive = true
+        colorResetButton.heightAnchor.constraint(equalToConstant: 16).isActive = true
+        colorResetButton.isHidden = !CustomAccentColorManager.hasCustomColor
+
+        let pickerStack = NSStackView(views: [colorResetButton, colorWell])
+        pickerStack.orientation = .horizontal
+        pickerStack.alignment = .centerY
+        pickerStack.spacing = 4
+        pickerStack.translatesAutoresizingMaskIntoConstraints = false
+        self.colorPickerContainer = pickerStack
+
+        let rowStack = NSStackView(views: [iconImg, textStack, pickerStack])
+        rowStack.orientation = .horizontal
+        rowStack.alignment = .centerY
+        rowStack.spacing = 8
+        rowStack.translatesAutoresizingMaskIntoConstraints = false
+
+        row.addSubview(rowStack)
+        NSLayoutConstraint.activate([
+            row.heightAnchor.constraint(equalToConstant: 35),
+            rowStack.leadingAnchor.constraint(equalTo: row.leadingAnchor, constant: 6),
+            rowStack.trailingAnchor.constraint(equalTo: row.trailingAnchor, constant: -6),
+            rowStack.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+            textStack.widthAnchor.constraint(greaterThanOrEqualToConstant: 0)
+        ])
+        rowStack.setHuggingPriority(.init(251), for: .horizontal)
+        pickerStack.setContentHuggingPriority(.required, for: .horizontal)
+        pickerStack.setContentCompressionResistancePriority(.required, for: .horizontal)
+        return row
+    }
+
+    @objc func colorWellChanged(_ sender: NSColorWell) {
+        let picked = sender.color
+        CustomAccentColorManager.customColor = picked
+        accentColorDescLabel?.stringValue = currentAccentColorDisplayName()
+        colorResetButton.isHidden = false
+        applyTheme()
+        updateSettingsThemeHighlight()
+        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Accent: \(picked.hexString.uppercased())")
+    }
+
+    @objc func resetCustomAccentColor() {
+        CustomAccentColorManager.resetToDefault()
+        colorWell.color = settingsAccentColor(tone: currentSettingsTone())
+        accentColorDescLabel?.stringValue = currentAccentColorDisplayName()
+        colorResetButton.isHidden = true
+        applyTheme()
+        updateSettingsThemeHighlight()
+        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Accent: Auto Tint")
+    }
+
+    @objc func customAccentColorChanged() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            if let custom = CustomAccentColorManager.customColor {
+                self.colorWell.color = custom
+                self.colorResetButton.isHidden = false
+            } else {
+                self.colorWell.color = settingsAccentColor(tone: self.currentSettingsTone())
+                self.colorResetButton.isHidden = true
+            }
+            self.accentColorDescLabel?.stringValue = self.currentAccentColorDisplayName()
+            self.applyTheme()
+            self.updateSettingsThemeHighlight()
+        }
+    }
+
     func makeFeatureRow(icon: String, title: String, description: String, isOn: Bool, toggle: NativeCapsuleToggleView, onToggle: @escaping (Bool) -> Void) -> NSView {
         let row = NSView()
         row.wantsLayer = true
@@ -374,6 +513,15 @@ extension DynamicIslandPlayerView {
 
         themeDescLabel?.stringValue = currentThemeDisplayName()
         progressDescLabel?.stringValue = ProgressStyle.current.displayName
+        accentColorDescLabel?.stringValue = currentAccentColorDisplayName()
+        if let custom = CustomAccentColorManager.customColor {
+            colorWell.color = custom
+            colorResetButton.isHidden = false
+        } else {
+            colorWell.color = settingsAccentColor(tone: tone)
+            colorResetButton.isHidden = true
+        }
+        colorResetButton.contentTintColor = tone.secondaryText
 
         themeToggle.updateVisuals()
         progressToggle.updateVisuals()
@@ -439,7 +587,9 @@ extension DynamicIslandPlayerView {
 
         let isDark = (PlayerDesign.current == .darkMode || tone == .dark)
         let cyan: NSColor
-        if isGlass {
+        if let custom = CustomAccentColorManager.customColor {
+            cyan = custom
+        } else if isGlass {
             cyan = NSColor.lightThemeSelector
         } else if isDark {
             cyan = NSColor.darkThemeSelector

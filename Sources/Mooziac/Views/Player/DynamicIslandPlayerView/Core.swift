@@ -163,8 +163,12 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     var settingsSupportButton: SettingsLinkButton?
     var themeToggle = NativeCapsuleStepToggleView()
     var progressToggle = NativeCapsuleStepToggleView()
+    var colorWell = NSColorWell()
+    var colorResetButton = NSButton()
+    var colorPickerContainer: NSView?
     var progressDescLabel: NSTextField?
     var themeDescLabel: NSTextField?
+    var accentColorDescLabel: NSTextField?
 
     // Gesture Mapping Sub-View
     var gestureMappingSubView: NSView?
@@ -228,6 +232,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         setupUI()
         restoreSavedState()
         NotificationCenter.default.addObserver(self, selector: #selector(applyTheme), name: NSNotification.Name("YTM_playerDesignChanged"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(customAccentColorChanged), name: CustomAccentColorManager.notificationName, object: nil)
         DistributedNotificationCenter.default().addObserver(self, selector: #selector(appearanceChangedNotification), name: NSNotification.Name("AppleInterfaceThemeChangedNotification"), object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(networkStatusChanged(_:)), name: NetworkMonitor.statusChangedNotification, object: nil)
         applyTheme()
@@ -239,6 +244,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         setupUI()
         restoreSavedState()
         NotificationCenter.default.addObserver(self, selector: #selector(applyTheme), name: NSNotification.Name("YTM_playerDesignChanged"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(customAccentColorChanged), name: CustomAccentColorManager.notificationName, object: nil)
         DistributedNotificationCenter.default().addObserver(self, selector: #selector(appearanceChangedNotification), name: NSNotification.Name("AppleInterfaceThemeChangedNotification"), object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(networkStatusChanged(_:)), name: NetworkMonitor.statusChangedNotification, object: nil)
         applyTheme()
@@ -879,7 +885,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
 
     public func expandPreferences() {
         activeSettingsMode = .preferences
-        settingsContainerHeightConstraint?.constant = 272
+        settingsContainerHeightConstraint?.constant = 310
         showMainSettingsView()
         expandSettingsPanel()
     }
