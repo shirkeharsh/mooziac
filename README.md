@@ -1,10 +1,19 @@
+<h1 align="center">Mooziac — The Native YouTube &amp; YouTube Music Player for Mac</h1>
+
+<p align="center">
+  <b>The lightweight, native macOS desktop player for YouTube Videos, YouTube Music &amp; local audio.</b><br>
+  Stream YouTube Music in your menu bar, watch 4K YouTube videos with Apple VideoToolbox GPU acceleration, skip sponsorships with SponsorBlock, and control volume with invisible trackpad edge gestures — with zero battery-draining Chromium bloat.
+</p>
+
 <p align="center">
   <a href="https://mooziac.pages.dev">
-    <img src="Resources/banner.svg" alt="Mooziac macOS Music & Video Player" width="100%">
+    <img src="Resources/banner.svg" alt="Mooziac - Native YouTube and YouTube Music Player for Mac" width="100%">
   </a>
 </p>
 
 <p align="center">
+  <a href="https://mooziac.pages.dev"><img src="https://img.shields.io/badge/YouTube_for_Mac-100%25_Native_Swift-FF0000?style=flat-square&logo=youtube&logoColor=white" alt="YouTube for Mac"></a>
+  <a href="https://mooziac.pages.dev"><img src="https://img.shields.io/badge/YouTube_Music_for_Mac-Menu_Bar-FA4059?style=flat-square&logo=youtubemusic&logoColor=white" alt="YouTube Music for Mac"></a>
   <a href="https://github.com/shirkeharsh/mooziac/releases/latest"><img src="https://img.shields.io/github/v/release/shirkeharsh/mooziac?style=flat-square&logo=github&logoColor=white&color=8B7BFF" alt="Latest Release"></a>
   <a href="https://github.com/shirkeharsh/mooziac/stargazers"><img src="https://img.shields.io/github/stars/shirkeharsh/mooziac?style=flat-square&logo=github&color=FA4059" alt="GitHub Stars"></a>
   <a href="https://github.com/shirkeharsh/mooziac/releases/latest"><img src="https://img.shields.io/badge/macOS-13.0%2B-000000?style=flat-square&logo=apple&logoColor=white" alt="macOS 13.0+ Compatibility"></a>
@@ -30,8 +39,8 @@
 <br>
 
 <p align="center">
-  <b>Mooziac is an ultra-lightweight, 100% native Swift & AppKit player for YouTube Videos, YouTube Music, and local audio built specifically for macOS.</b><br>
-  The native alternative to YouTube Music Desktop, Spotify, and Electron players — combining a menu bar music player with a 4K hardware-accelerated YouTube video window, an invisible trackpad edge volume slider, real-time synchronized lyrics HUD, and zero battery-draining Chromium bloat.
+  <b>Mooziac is the ultimate native YouTube for Mac and YouTube Music for Mac client built specifically for macOS.</b><br>
+  Say goodbye to laggy browser tabs and 1GB+ Electron apps. Mooziac delivers an instant menu bar music player, a 4K hardware-accelerated YouTube video window, an invisible trackpad edge volume slider, real-time synchronized lyrics HUD, and zero battery drain.
 </p>
 
 ---
@@ -48,19 +57,22 @@
 
 ## Why Mooziac?
 
-Most desktop music players are heavy Electron wrappers that bundle a full Chromium browser, devouring system resources and draining laptop battery life. Mooziac was built from scratch in **pure native Swift and AppKit** with zero third-party runtime dependencies.
+Most desktop players are heavy Electron wrappers that bundle a full Chromium browser, devouring system resources and draining laptop battery life. Mooziac was built from scratch in **pure native Swift and AppKit** with zero third-party runtime dependencies, delivering the fastest **YouTube for Mac** and **YouTube Music for Mac** experience.
 
-| Feature | Mooziac | Official YTM Web / Desktop | Electron Wrappers |
+| Feature | Mooziac (Native Swift) | Official YouTube Web (Chrome/Safari) | Electron Wrappers (YTM Desktop, etc.) |
 | :--- | :---: | :---: | :---: |
-| **Technology** | **100% Native Swift & AppKit** | Chromium / Web App | Heavy Chromium + Node.js |
-| **YouTube Video Player** | **Native 4K GPU Decode (Apple VideoToolbox)** | High CPU in Browser | Heavy Electron / Lags |
-| **Distraction-Free Playback** | **Built-in clean styling & SponsorBlock** | No | Third-party plugins |
-| **Trackpad Edge Volume** | **Yes (with haptic feedback)** | No | No |
-| **Synchronized Lyrics HUD** | **Line-by-line LRC** | Basic / Unsynced | No |
-| **Local Offline Audio** | **FLAC, MP3, WAV, AAC, M4A** | Cloud only | No |
-| **Background Media Keys** | **Native macOS integration** | Browser permissions | Inconsistent |
-| **Discord Rich Presence** | **Native Unix socket (0 deps)** | No | Third-party plugins |
-| **Telemetry & Privacy** | **100% Local (Zero tracking)** | Extensive Google telemetry | Varies |
+| **Technology** | **100% Native Swift & AppKit** | Heavy Browser Tab | Heavy Chromium + Node.js |
+| **YouTube for Mac (Video)** | **Native 4K GPU Decode (Apple VideoToolbox)** | High CPU in Browser | Laggy Electron / High CPU |
+| **YouTube Music for Mac** | **Discreet macOS Menu Bar Player** | Trapped in browser tab | Takes up full desktop space |
+| **Distraction-Free & SponsorBlock**| **Built-in clean UI & auto-skip** | Requires browser extensions | Inconsistent / third-party plugins |
+| **RAM Footprint** | **< 50 MB** | 400 MB – 1+ GB | 500 MB – 1.2 GB |
+| **Battery & Thermal Efficiency** | **Optimized for Apple Silicon (Cool & Quiet)**| High battery drain | Heavy battery drain & warm chassis |
+| **Trackpad Edge Volume Control** | **Yes (1mm edge with Taptic haptics)** | No | No |
+| **Synchronized Lyrics HUD** | **Line-by-line real-time LRC** | Basic / Unsynced | None |
+| **Offline Local Audio** | **FLAC, MP3, WAV, AAC, M4A, ALAC** | None (Cloud only) | None |
+| **Background Media Keys** | **Native macOS Integration (NowPlaying)** | Requires browser focus | Inconsistent |
+| **Discord Rich Presence** | **Native Unix socket (0 dependencies)** | None | Third-party plugin required |
+| **Telemetry & Privacy** | **100% Local-First (Zero tracking SDKs)** | Extensive Google tracking | Varies |
 
 ---
 
@@ -302,8 +314,28 @@ Mooziac's JSON playlist format is versioned and uses UTF-8:
 ## Frequently Asked Questions (FAQ)
 
 <details>
+<summary><b>Is there an official YouTube or YouTube Music app for Mac?</b></summary>
+<p>No, Google does not provide an official native desktop app for YouTube or YouTube Music on macOS. Mac users are normally forced to keep heavy browser tabs open or run bloated Electron desktop wrappers that consume hundreds of megabytes of RAM. <b>Mooziac is built specifically to bridge this gap:</b> a 100% native Swift & AppKit application that delivers a dedicated 4K hardware-accelerated YouTube video player and a discreet YouTube Music menu bar player with minimal battery and system impact.</p>
+</details>
+
+<details>
 <summary><b>Can I watch regular YouTube videos in Mooziac or only listen to music?</b></summary>
 <p>You can do both! In addition to the menu bar music player, Mooziac features a dedicated native YouTube video player window. It includes 4K hardware acceleration via VideoToolbox, distraction-free clean playback, automatic SponsorBlock skipping, and trackpad edge volume gestures. You can switch between music and video modes anytime from the menu bar context menu.</p>
+</details>
+
+<details>
+<summary><b>How does Mooziac optimize YouTube playback for MacBook battery life?</b></summary>
+<p>Instead of launching a heavyweight Chromium or Electron browser engine, Mooziac utilizes Apple's native <code>VideoToolbox</code> framework and WebKit GPU acceleration. Hardware-decodable video codecs (VP9, AV1, and H.264) are processed directly by Apple Silicon and Intel Metal media engines, drastically reducing CPU usage, preventing fan spin-up, and keeping your MacBook cool and efficient.</p>
+</details>
+
+<details>
+<summary><b>Does Mooziac support SponsorBlock and distraction-free viewing for YouTube on Mac?</b></summary>
+<p>Yes. Mooziac integrates native SponsorBlock segment skipping directly into the playback coordinator. It automatically detects and skips sponsor segments, intro animations, interaction reminders, and non-music portions. You can toggle SponsorBlock on or off anytime with <code>Cmd + Shift + S</code>, or toggle distraction-free mode with <code>Cmd + Shift + F</code>.</p>
+</details>
+
+<details>
+<summary><b>Is Mooziac compatible with Apple Silicon M1, M2, M3, M4, and M5 Macs?</b></summary>
+<p>Yes. Mooziac is distributed as a Universal 2 macOS application. It runs 100% natively on Apple Silicon (M1, M2, M3, M4, M5, Pro, Max, and Ultra) as well as Intel 64-bit processors on macOS 13.0 (Ventura), macOS 14 (Sonoma), macOS 15 (Sequoia), and newer.</p>
 </details>
 
 <details>
