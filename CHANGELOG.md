@@ -4,6 +4,28 @@ All notable changes to Mooziac are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.2.1] - 2026-10-30
+
+### Added
+- Auto-Hiding Fullscreen Overlay: Header bar floats over fullscreen video playback and auto-reveals on top-edge hover or cursor proximity.
+- Window Fullscreen Shortcut: Added Control+Command+F shortcut to toggle standard macOS window fullscreen mode independently of player video fullscreen.
+- Multi-Space Picture-in-Picture: Added setting and notification support to keep picture-in-picture windows floating across all macOS desktop spaces.
+- Live Caption Integration: Added caption state tracking and bridge telemetry to the video playback model.
+
+### Changed
+- Dynamic Sleep Prevention: Replaced persistent system sleep prevention on launch with state-driven assertions that engage only during active audio or video playback.
+- Status Item Click Toggle: Left-clicking the status item in YouTube mode now toggles the window between frontmost and hidden.
+- DOM Mutation Optimization: Streamlined element classification for modal and toast overlays to eliminate redundant tree walks and lower CPU usage during long playback sessions.
+- Quality Badges: Standardized video quality selector labels to AUTO, SD, HD, FHD, 2K, and 4K.
+- Default Download Folder: Set default video download location to ~/Downloads/MooziacTube.
+
+### Fixed
+- SQLite String Deallocation Crash: Replaced raw pointer bindings with SQLITE_TRANSIENT across all prepared statements in YouTubeDatabaseManager.
+- Double Volume Attenuation: Fixed an issue where web volume was reduced in addition to macOS system volume adjustments.
+- Keyboard Shortcut Focus Stealing: Added strict key window checks to prevent shortcut interception while typing in other windows or text inputs.
+- Playback Command Routing: Restricted MPRemoteCommandCenter media key handlers strictly to the active player mode.
+- Download Cancellation Alert: Suppressed erroneous failure alerts when downloads are intentionally cancelled by the user.
+
 ## [1.2.0] - 2026-10-21
 
 ### Added
