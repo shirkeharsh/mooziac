@@ -107,6 +107,7 @@ public enum YouTubeSponsorBlock {
             // Event-driven (no polling timer): the browser fires timeupdate ~4x/second while playing
             // and nothing at all while paused. Media events don't bubble, so listen in capture phase.
             function sbTick() {
+                if (window.location.pathname.indexOf('/watch') !== 0) return;
                 const vid = getVideoId();
                 if (vid && vid !== currentVideoId) {
                     fetchSegments(vid);

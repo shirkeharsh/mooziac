@@ -342,9 +342,22 @@ class StatusItemManager: NSObject {
             if event?.type == .rightMouseUp || event?.type == .rightMouseDown {
                 showYouTubeContextMenu(sender)
             } else {
-                MainVideoWindowController.shared.showWindow(nil)
-                MainVideoWindowController.shared.window?.makeKeyAndOrderFront(nil)
-                NSApp.activate(ignoringOtherApps: true)
+                let winController = MainVideoWindowController.shared
+                if let win = winController.window, win.isVisible && !win.isMiniaturized {
+                    // Window is currently visible on screen: toggle it OFF (hide)
+                    win.orderOut(nil)
+                    KeyboardShortcutHandler.shared.stopMonitoring()
+                    NSApp.presentationOptions = []
+                } else {
+                    // Window is hidden or miniaturized: toggle it ON (show and bring to front)
+                    if winController.window?.isMiniaturized == true {
+                        winController.window?.deminiaturize(nil)
+                    }
+                    winController.showWindow(nil)
+                    winController.window?.makeKeyAndOrderFront(nil)
+                    KeyboardShortcutHandler.shared.startMonitoring()
+                    NSApp.activate(ignoringOtherApps: true)
+                }
             }
             return
         }
@@ -391,7 +404,7 @@ class StatusItemManager: NSObject {
         CATransaction.commit()
         
         button.toolTip = (mode == .youtube)
-            ? "Mooziac YouTube Player (Click to focus, Right-click for options)"
+            ? "Mooziac YouTube Player (Click to toggle, Right-click for options)"
             : "Mooziac Music Player (Scroll to adjust volume)"
     }
 
@@ -453,6 +466,9 @@ class StatusItemManager: NSObject {
         if #available(macOS 12.0, *) {
             mainViewController.webViewContainer.webView.pauseAllMediaPlayback()
         }
+
+        // A stale "typing in a text box" flag from the music panel would silently disable YouTube shortcuts
+        NowPlayingManager.shared.isWebTextFieldFocused = false
 
         // Clear Now Playing info so Control Center / media keys pass to YouTube
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil

@@ -10,6 +10,7 @@ public final class YouTubeSettings {
     public static let distractionFreeDidChangeNotification = Notification.Name("YouTubeSettingsDistractionFreeDidChangeNotification")
     public static let extensionsDidChangeNotification = Notification.Name("YouTubeSettingsExtensionsDidChangeNotification")
     public static let themeDidChangeNotification = Notification.Name("YouTubeSettingsThemeDidChangeNotification")
+    public static let pipSpacesDidChangeNotification = Notification.Name("YouTubeSettingsPiPSpacesDidChangeNotification")
 
     private enum Keys {
         static let isAdBlockEnabled = "app.mooziac.youtube.settings.adBlockEnabled"
@@ -18,6 +19,7 @@ public final class YouTubeSettings {
         static let defaultPlaybackSpeed = "app.mooziac.youtube.settings.defaultPlaybackSpeed"
         static let playerTheme = "app.mooziac.youtube.settings.playerTheme"
         static let hasUserExplicitlySetAdBlock = "app.mooziac.youtube.settings.hasUserExplicitlySetAdBlock"
+        static let isPiPKeepAcrossSpaces = "app.mooziac.youtube.settings.pipKeepAcrossSpaces"
     }
 
     private let defaults = UserDefaults.standard
@@ -30,7 +32,8 @@ public final class YouTubeSettings {
             Keys.isDistractionFreeEnabled: false,
             Keys.defaultPlaybackSpeed: 1.0,
             Keys.playerTheme: PlayerTheme.liquidFluid.rawValue,
-            Keys.hasUserExplicitlySetAdBlock: false
+            Keys.hasUserExplicitlySetAdBlock: false,
+            Keys.isPiPKeepAcrossSpaces: true
         ])
     }
 
@@ -82,6 +85,19 @@ public final class YouTubeSettings {
         }
         set {
             defaults.set(newValue, forKey: Keys.defaultPlaybackSpeed)
+        }
+    }
+
+    public var isPiPKeepAcrossSpaces: Bool {
+        get {
+            if defaults.object(forKey: Keys.isPiPKeepAcrossSpaces) == nil {
+                return true
+            }
+            return defaults.bool(forKey: Keys.isPiPKeepAcrossSpaces)
+        }
+        set {
+            defaults.set(newValue, forKey: Keys.isPiPKeepAcrossSpaces)
+            NotificationCenter.default.post(name: Self.pipSpacesDidChangeNotification, object: newValue)
         }
     }
 

@@ -4,7 +4,7 @@ import AppKit
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItemManager: StatusItemManager?
     private var signInObserver: NSObjectProtocol?
-    private let backgroundMediaController = BackgroundMediaController()
+    private let backgroundMediaController = BackgroundMediaController.shared
     private var launchAnimationController: LaunchAnimationController?
 
     static func main() {
@@ -43,8 +43,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             UserDefaults.standard.removeObject(forKey: key)
         }
         
-        // Prevent music audio playback from stopping when display locks/sleeps
-        backgroundMediaController.startPreventingSleep()
+        // Prevent sleep ONLY during active audio/video playback to preserve battery
+        backgroundMediaController.startMonitoring()
 
         // Initialize Trackpad Right-Edge Volume Control (0.01mm edge)
         EdgeVolumeEngine.shared.start()
@@ -138,7 +138,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        backgroundMediaController.stopPreventingSleep()
+        backgroundMediaController.stopMonitoring()
         if let observer = signInObserver {
             NotificationCenter.default.removeObserver(observer)
             signInObserver = nil

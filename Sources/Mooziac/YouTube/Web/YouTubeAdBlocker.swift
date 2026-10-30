@@ -24,14 +24,8 @@ public enum YouTubeAdBlocker {
                 /* Comprehensive YouTube interruption & anti-adblock popups/toasts */
                 yt-notification-action-renderer,
                 ytd-notification-action-renderer,
-                tp-yt-paper-toast:has(yt-notification-action-renderer),
-                tp-yt-paper-toast:has(ytd-notification-action-renderer),
-                tp-yt-paper-toast:has(#toast),
-                tp-yt-paper-toast:has(a[href*="support.google.com"]),
-                tp-yt-paper-toast:has(a[href*="answer"]),
-                tp-yt-paper-toast[paper-toast-open]:has(yt-notification-action-renderer),
-                tp-yt-paper-dialog:has(ytd-enforcement-message-view-model),
-                tp-yt-paper-dialog:has(#feedback),
+                tp-yt-paper-toast[data-mooziac-hidden],
+                tp-yt-paper-dialog[data-mooziac-hidden],
                 ytd-enforcement-message-view-model,
                 yt-mealbar-promo-renderer,
                 ytd-mealbar-promo-renderer,
@@ -91,6 +85,7 @@ public enum YouTubeAdBlocker {
             }
 
             var wasAdPlaying = false;
+            var mutedBeforeAd = false;
 
             function handleAds() {
                 var player = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
@@ -112,6 +107,7 @@ public enum YouTubeAdBlocker {
                 }
 
                 if (isAd) {
+                    if (!wasAdPlaying) { mutedBeforeAd = video.muted; }
                     wasAdPlaying = true;
                     // Instantly mute ad audio so user never hears ad blip
                     video.muted = true;
@@ -149,7 +145,7 @@ public enum YouTubeAdBlocker {
                         try { player.setPlaybackRate(targetSpeed); } catch(e) {}
                     }
                     video.playbackRate = targetSpeed;
-                    video.muted = false;
+                    video.muted = mutedBeforeAd;
                     if (video.paused && !window.__mooziacUserPaused) {
                         video.play().catch(function() {});
                     }
@@ -261,87 +257,96 @@ public enum YouTubeAdBlocker {
                 }
             }
 
-            // Text-based hider, scoped to popup/toast/dialog containers only (never the whole page).
-            // YouTube keeps renaming the tag of the "Experiencing interruptions?" card, so we match
-            // by text, but only inside the few places such cards can live.
-            var POPUP_SEL = 'ytd-popup-container, tp-yt-paper-toast, tp-yt-paper-dialog, yt-notification-action-renderer, ytd-notification-action-renderer, ytd-mealbar-promo-renderer, yt-mealbar-promo-renderer, ytd-enforcement-message-view-model, yt-toast, ytd-toast, [role="alert"], [role="dialog"]';
-            function isInterruptionText(t) {
-                if (!t) return false;
-                var low = t.toLowerCase();
-                return low.indexOf('experiencing interruptions') !== -1 || low.indexOf('ad blockers violate') !== -1;
-            }
-            function hideEl(el) {
-                el.setAttribute('data-mooziac-hidden', '1');
-                el.style.setProperty('display', 'none', 'important');
-                el.style.setProperty('visibility', 'hidden', 'important');
-                el.style.setProperty('pointer-events', 'none', 'important');
-            }
-            function hideInterruptionByText() {
-                var cands = document.querySelectorAll(POPUP_SEL);
-                for (var i = 0; i < cands.length; i++) {
-                    var c = cands[i];
-                    if (c.hasAttribute('data-mooziac-hidden')) continue;
-                    var txt = c.textContent;
-                    if (!txt || !isInterruptionText(txt)) continue;
-                    if (c.tagName === 'YTD-POPUP-CONTAINER') {
-                        // Hide only the child card that holds the message, not the whole container
-                        for (var k = 0; k < c.children.length; k++) {
-                            var child = c.children[k];
-                            if (isInterruptionText(child.textContent)) hideEl(child);
-                        }
-                    } else {
-                        hideEl(c);
-                    }
+            // Targeted popup / interruption observer:
+            // Interruption dialogs, toasts and modals are inserted either as direct children of
+            // <ytd-popup-container> or directly into document.body. They are never children of
+            // video cards or grid items. Observing specific containers with shallow childList: true
+            // completely eliminates thousands of redundant DOM node inspections and closest()
+            // tree traversals during infinite scrolling.
+            var POPUP_TAGS = {
+                'TP-YT-PAPER-TOAST': 1,
+                'TP-YT-PAPER-DIALOG': 1,
+                'YT-NOTIFICATION-ACTION-RENDERER': 1,
+                'YTD-NOTIFICATION-ACTION-RENDERER': 1,
+                'YTD-ENFORCEMENT-MESSAGE-VIEW-MODEL': 1,
+                'YT-MEALBAR-PROMO-RENDERER': 1,
+                'YTD-MEALBAR-PROMO-RENDERER': 1,
+                'YT-TOAST': 1,
+                'YTD-TOAST': 1,
+                'TP-YT-IRON-OVERLAY-BACKDROP': 1,
+                'IRON-OVERLAY-BACKDROP': 1
+            };
+
+            function isInterruptionNode(node) {
+                if (!node || node.nodeType !== 1) return false;
+                var tag = node.tagName;
+                if (POPUP_TAGS[tag]) return true;
+                if (node.getAttribute) {
+                    var role = node.getAttribute('role');
+                    if (role === 'dialog' || role === 'alert') return true;
                 }
-            }
-            var hideTimer = null;
-            function scheduleHide() {
-                if (hideTimer) return;
-                hideTimer = setTimeout(function() { hideTimer = null; hideInterruptionByText(); }, 150);
+                return false;
             }
 
-            // Cheap observer: per added node we only do matches()/closest(), never querySelector on
-            // big subtrees, and we only do real work when a popup-like node actually appears.
-            var popupObserver = new MutationObserver(function(mutations) {
-                var relevant = false;
-                for (var i = 0; i < mutations.length; i++) {
-                    var added = mutations[i].addedNodes;
-                    for (var j = 0; j < added.length; j++) {
-                        var el = added[j];
-                        if (el.nodeType !== 1) continue;
-                        if ((el.matches && el.matches(POPUP_SEL)) || (el.closest && el.closest('ytd-popup-container'))) {
-                            relevant = true;
-                            if (el.matches && el.matches('yt-notification-action-renderer, ytd-notification-action-renderer, tp-yt-paper-toast, tp-yt-paper-dialog, ytd-enforcement-message-view-model')) {
-                                dismissInterruption(el);
+            function processPopupCandidate(node) {
+                if (!isInterruptionNode(node)) return;
+                dismissInterruption(node);
+            }
+
+            function attachPopupObserver() {
+                var popupContainer = document.querySelector('ytd-popup-container');
+                if (popupContainer && !popupContainer.__mooziacObserved) {
+                    popupContainer.__mooziacObserved = true;
+                    var containerObserver = new MutationObserver(function(mutations) {
+                        for (var i = 0; i < mutations.length; i++) {
+                            var added = mutations[i].addedNodes;
+                            for (var j = 0; j < added.length; j++) {
+                                processPopupCandidate(added[j]);
                             }
                         }
-                    }
+                    });
+                    containerObserver.observe(popupContainer, { childList: true });
                 }
-                if (relevant) scheduleHide();
-            });
 
-            if (document.documentElement) {
-                popupObserver.observe(document.documentElement, { childList: true, subtree: true });
-            } else {
-                document.addEventListener('DOMContentLoaded', function() {
-                    if (document.documentElement) {
-                        popupObserver.observe(document.documentElement, { childList: true, subtree: true });
-                    }
-                });
+                // Shallow observer on document.body for top-level modals and ytd-popup-container insertion
+                if (document.body && !document.body.__mooziacObserved) {
+                    document.body.__mooziacObserved = true;
+                    var bodyObserver = new MutationObserver(function(mutations) {
+                        for (var i = 0; i < mutations.length; i++) {
+                            var added = mutations[i].addedNodes;
+                            for (var j = 0; j < added.length; j++) {
+                                var el = added[j];
+                                if (!el || el.nodeType !== 1) continue;
+                                if (el.tagName === 'YTD-POPUP-CONTAINER') {
+                                    attachPopupObserver();
+                                } else if (isInterruptionNode(el)) {
+                                    processPopupCandidate(el);
+                                }
+                            }
+                        }
+                    });
+                    bodyObserver.observe(document.body, { childList: true });
+                }
             }
 
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', attachPopupObserver);
+            } else {
+                attachPopupObserver();
+            }
+
+            // Lightweight periodic safety net: checks popup container and body only (never deep grid subtrees)
             setInterval(function() {
-                var popups = document.querySelectorAll(
-                    'yt-notification-action-renderer, ytd-notification-action-renderer, tp-yt-paper-toast, tp-yt-paper-dialog, ytd-enforcement-message-view-model'
-                );
-                for (var d = 0; d < popups.length; d++) {
-                    dismissInterruption(popups[d]);
+                var container = document.querySelector('ytd-popup-container');
+                if (container) {
+                    for (var i = 0; i < container.children.length; i++) {
+                        processPopupCandidate(container.children[i]);
+                    }
                 }
                 var backdrops = document.querySelectorAll('tp-yt-iron-overlay-backdrop, iron-overlay-backdrop');
                 for (var b = 0; b < backdrops.length; b++) {
                     backdrops[b].remove();
                 }
-                hideInterruptionByText();
             }, 3000);
         })();
         """,

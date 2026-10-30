@@ -63,13 +63,22 @@ public final class WebExtensionManager: NSObject {
 
             if !FileManager.default.fileExists(atPath: destURL.path) {
                 try? FileManager.default.copyItem(at: sourceURL, to: destURL)
+            } else if let bundledVersion = Self.manifestVersion(at: sourceURL),
+                      bundledVersion != Self.manifestVersion(at: destURL) {
+                // An app update shipped a newer bundled copy: replace the old one in Application Support
+                try? FileManager.default.removeItem(at: destURL)
+                try? FileManager.default.copyItem(at: sourceURL, to: destURL)
+                if let idx = installedExtensions.firstIndex(where: { $0.id == "ublock-origin-lite" }) {
+                    installedExtensions[idx].version = bundledVersion
+                    savePersistedList()
+                }
             }
 
             if !installedExtensions.contains(where: { $0.relativePath == relativePath || $0.id == "ublock-origin-lite" }) {
                 let managed = ManagedExtension(
                     id: "ublock-origin-lite",
                     name: "uBlock Origin Lite",
-                    version: "2026.1012.1545",
+                    version: Self.manifestVersion(at: destURL) ?? "2026.1012.1545",
                     isEnabled: true,
                     relativePath: relativePath,
                     optionsPath: "dashboard.html",
@@ -79,6 +88,12 @@ public final class WebExtensionManager: NSObject {
                 savePersistedList()
             }
         }
+    }
+
+    private static func manifestVersion(at folder: URL) -> String? {
+        guard let data = try? Data(contentsOf: folder.appendingPathComponent("manifest.json")),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        return json["version"] as? String
     }
 
     private func loadPersistedList() {
@@ -104,6 +119,14 @@ public final class WebExtensionManager: NSObject {
     }
 
     public func loadSingleExtension(_ ext: ManagedExtension) async {
+        if ext.id == "ublock-origin-lite" && !AppSettings.shared.isAdBlockEnabled {
+            Log.app.info("uBlock Origin Lite skipped: AdBlocker is disabled by user settings")
+            return
+        }
+
+        // Already loaded (this runs every time the YouTube window opens): loading twice only produces errors
+        if activeContexts[ext.id] != nil { return }
+
         let folderURL = extensionsBaseURL.appendingPathComponent(ext.relativePath, isDirectory: true)
         guard FileManager.default.fileExists(atPath: folderURL.path) else {
             Log.app.warning("Extension files missing at \(folderURL.path)")
@@ -144,6 +167,21 @@ public final class WebExtensionManager: NSObject {
             Log.app.info("Loaded WebExtension: \(ext.name) (\(ext.version))")
         } catch {
             Log.app.error("Failed to load extension \(ext.name): \(error.localizedDescription)")
+        }
+    }
+
+    public func setAdBlockExtensionsEnabled(_ enabled: Bool) async {
+        guard let ublock = installedExtensions.first(where: { $0.id == "ublock-origin-lite" }) else { return }
+        if enabled {
+            if activeContexts[ublock.id] == nil {
+                await loadSingleExtension(ublock)
+            }
+        } else {
+            if let ctx = activeContexts[ublock.id] {
+                try? self.webExtensionController.unload(ctx)
+                activeContexts.removeValue(forKey: ublock.id)
+                Log.app.info("uBlock Origin Lite successfully unloaded")
+            }
         }
     }
 

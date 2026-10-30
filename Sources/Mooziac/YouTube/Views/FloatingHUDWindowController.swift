@@ -106,7 +106,8 @@ public class FloatingHUDWindowController: NSWindowController {
                     ctx.duration = 0.25
                     window.animator().alphaValue = 0.0
                 }, completionHandler: {
-                    window.orderOut(nil)
+                    // A newer message may have faded the window back in meanwhile: only hide if it is still faded out
+                    if window.alphaValue == 0 { window.orderOut(nil) }
                 })
             }
         }

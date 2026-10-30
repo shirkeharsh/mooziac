@@ -33,7 +33,17 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
     private var canGoBackObserver: NSKeyValueObservation?
     private var canGoForwardObserver: NSKeyValueObservation?
     private var headerBarHeightConstraint: NSLayoutConstraint?
-    private var isUserSignedIn: Bool = false
+    private var webViewTopConstraint: NSLayoutConstraint?
+    private var mouseCheckTimer: Timer?
+    private var headerBarHideTimer: Timer?
+    public private(set) var isUserSignedIn: Bool = false
+    public private(set) var isPlayerFullscreen: Bool = false
+    private var wasWindowAlreadyInFullScreenBeforePlayer: Bool = false
+    private var isTransitioningFullScreen: Bool = false
+    /// Close / minimize requested while in (or entering) full screen: finish once the transition ends.
+    private var pendingCloseAfterFullScreenExit: Bool = false
+    private var pendingMinimizeAfterFullScreenExit: Bool = false
+    private var wasInPictureInPicture: Bool = false
 
     init() {
         let bridge = YouTubePlayerBridge()
@@ -51,8 +61,8 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
         window.title = "Mooziac"
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
-        window.isMovableByWindowBackground = true
-        window.acceptsMouseMovedEvents = false
+        window.isMovableByWindowBackground = false
+        window.acceptsMouseMovedEvents = true
         window.isOpaque = true
         window.backgroundColor = NSColor(red: 0.06, green: 0.06, blue: 0.08, alpha: 1.0)
         window.minSize = NSSize(width: 520, height: 340)
@@ -82,7 +92,6 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
         container.wantsLayer = true
         let darkBg = NSColor(red: 0.06, green: 0.06, blue: 0.08, alpha: 1.0)
         container.layer?.backgroundColor = darkBg.cgColor
-        container.layer?.drawsAsynchronously = true
         self.containerView = container
         window.contentView = container
 
@@ -94,6 +103,14 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
         visualEffectBackdrop.translatesAutoresizingMaskIntoConstraints = false
 
         headerBarView.translatesAutoresizingMaskIntoConstraints = false
+        headerBarView.onHoverStateChanged = { [weak self] isHovered in
+            guard let self = self, let win = self.window, win.styleMask.contains(.fullScreen) else { return }
+            if isHovered {
+                self.showOverlayHeaderBar()
+            } else {
+                self.scheduleHeaderBarHide()
+            }
+        }
 
         container.addSubview(visualEffectBackdrop)
         container.addSubview(headerBarView)
@@ -127,8 +144,15 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
 
         if let container = self.containerView {
             container.addSubview(wv)
+            container.addSubview(headerBarView, positioned: .above, relativeTo: wv)
+            headerBarView.wantsLayer = true
+            headerBarView.layer?.zPosition = 1000
+
+            let topConstraint = wv.topAnchor.constraint(equalTo: headerBarView.bottomAnchor)
+            self.webViewTopConstraint = topConstraint
+
             let constraints = [
-                wv.topAnchor.constraint(equalTo: headerBarView.bottomAnchor),
+                topConstraint,
                 wv.leadingAnchor.constraint(equalTo: container.leadingAnchor),
                 wv.trailingAnchor.constraint(equalTo: container.trailingAnchor),
                 wv.bottomAnchor.constraint(equalTo: container.bottomAnchor)
@@ -238,29 +262,8 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
         ucc.removeAllUserScripts()
         ucc.removeAllContentRuleLists()
 
-        YouTubeAdBlocker.configure(userContentController: ucc)
-        YouTubeSponsorBlock.configure(userContentController: ucc)
-        YouTubeHighlightManager.configure(userContentController: ucc)
-        ucc.addUserScript(YouTubeQualityManager.qualityControlScript)
-        ucc.addUserScript(YouTubeUIScript.uiStyleScript)
-        ucc.addUserScript(YouTubeUIScript.uiControllerScript)
-        ucc.addUserScript(YouTubePlayerBridge.observerScript)
-
-        let visibilityShield = WKUserScript(
-            source: """
-            (function() {
-                try {
-                    Object.defineProperty(Document.prototype, 'hidden', { get: function() { return false; }, configurable: true });
-                    Object.defineProperty(Document.prototype, 'visibilityState', { get: function() { return 'visible'; }, configurable: true });
-                    Object.defineProperty(Document.prototype, 'webkitHidden', { get: function() { return false; }, configurable: true });
-                    Object.defineProperty(Document.prototype, 'webkitVisibilityState', { get: function() { return 'visible'; }, configurable: true });
-                } catch(e) {}
-            })();
-            """,
-            injectionTime: .atDocumentStart,
-            forMainFrameOnly: true
-        )
-        ucc.addUserScript(visibilityShield)
+        // Same installer as the first load, so nothing gets lost or swapped on reconfigure
+        YouTubeWebView.installUserScripts(into: ucc)
 
         webView.reload()
     }
@@ -301,19 +304,19 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
     public func updatePlaybackState(_ state: VideoPlaybackState) {
         headerBarView.updatePlaybackState(state)
 
-        // If in fullscreen mode and not on watch page, keep header bar visible and accessible
-        if window?.styleMask.contains(.fullScreen) == true {
-            let isWatch = !state.videoId.isEmpty
-            if isWatch {
-                headerBarHeightConstraint?.constant = 0
-                headerBarView.isHidden = true
-            } else {
-                headerBarHeightConstraint?.constant = 44
-                headerBarView.isHidden = false
+        if state.isPictureInPicture {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+                self?.applyPiPSpacesBehavior()
             }
-            window?.contentView?.needsLayout = true
-            window?.contentView?.layoutSubtreeIfNeeded()
+        } else if wasInPictureInPicture {
+            NSApp.presentationOptions = []
         }
+        wasInPictureInPicture = state.isPictureInPicture
+
+        // NOTE: Do NOT touch the header bar's height/hidden/alpha here.
+        // In fullscreen its visibility is fully controlled by the hover logic
+        // (showOverlayHeaderBar / scheduleHeaderBarHide). Playback state updates
+        // fire constantly and used to collapse the bar to 0pt height and re-hide it.
     }
 
     // MARK: - Theme Management
@@ -351,9 +354,32 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
     }
 
     public func closeYouTubeAndReturnToMooziac() {
+        // Stop playback right away so nothing keeps playing while the window animates out
+        VideoPlayerCoordinator.shared.pause()
+
+        // Never hide a window that is still in a full-screen Space (that can leave a black screen).
+        // Leave full screen first; the real close happens when the transition has finished.
+        if isTransitioningFullScreen {
+            pendingCloseAfterFullScreenExit = true
+            return
+        }
+        if let win = window, win.styleMask.contains(.fullScreen) {
+            pendingCloseAfterFullScreenExit = true
+            win.toggleFullScreen(nil)
+            return
+        }
+        finishClosingYouTube()
+    }
+
+    private func finishClosingYouTube() {
+        pendingCloseAfterFullScreenExit = false
+        pendingMinimizeAfterFullScreenExit = false
         Self.isWindowVisible = false
+        KeyboardShortcutHandler.shared.stopMonitoring()
         VideoPlayerCoordinator.shared.pause()
         teardownWebView()
+        isPlayerFullscreen = false
+        wasWindowAlreadyInFullScreenBeforePlayer = false
         window?.orderOut(nil)
         StatusItemManager.shared?.resumeMooziacFromYouTube()
     }
@@ -367,32 +393,201 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
     }
 
     public func headerBarDidTapFullscreen() {
-        handleBridgeFullscreenRequest()
+        toggleWindowFullscreen()
+    }
+
+    public func toggleWindowFullscreen() {
+        guard let win = window, !isTransitioningFullScreen else { return }
+        if isPlayerFullscreen {
+            // If the window only went full screen because of the player, leaving player mode
+            // already leaves full screen. Toggling again would flip it straight back.
+            let windowExitsWithPlayer = !wasWindowAlreadyInFullScreenBeforePlayer
+            setPlayerFullscreen(false)
+            if windowExitsWithPlayer { return }
+        }
+        wasWindowAlreadyInFullScreenBeforePlayer = false
+        win.collectionBehavior = [.fullScreenPrimary]
+        win.toggleFullScreen(nil)
+    }
+
+    public func setPlayerFullscreen(_ enabled: Bool) {
+        isPlayerFullscreen = enabled
+        updateFullscreenLayout(isFullscreen: window?.styleMask.contains(.fullScreen) == true)
+        window?.contentView?.needsLayout = true
+        window?.contentView?.layoutSubtreeIfNeeded()
+        webView?.needsLayout = true
+        webView?.layoutSubtreeIfNeeded()
+        webView?.evaluateJavaScript("window.__mooziacSetFullscreenState && window.__mooziacSetFullscreenState(\(enabled));", completionHandler: nil)
+
+        // If player fullscreen is exiting and the window was NOT in window fullscreen before player expanded,
+        // exit window fullscreen back to windowed mode:
+        if !enabled && !wasWindowAlreadyInFullScreenBeforePlayer {
+            if let win = window, win.styleMask.contains(.fullScreen) {
+                win.toggleFullScreen(nil)
+            }
+        }
+    }
+
+    public func updateFullscreenLayout(isFullscreen: Bool) {
+        guard let container = self.containerView, let wv = self.webView else { return }
+        NSLog("[Mooziac FS] updateFullscreenLayout isFullscreen=\(isFullscreen)")
+        webViewTopConstraint?.isActive = false
+        if isFullscreen {
+            // In fullscreen: webview expands to 100% of the screen from top to bottom
+            let topConstraint = wv.topAnchor.constraint(equalTo: container.topAnchor)
+            self.webViewTopConstraint = topConstraint
+            topConstraint.isActive = true
+            headerBarHeightConstraint?.constant = 44
+            headerBarView.layer?.zPosition = 1000
+            headerBarView.alphaValue = 0.0
+            headerBarView.isHidden = true
+            startFullscreenMouseMonitoring()
+        } else {
+            stopFullscreenMouseMonitoring()
+            let topConstraint = wv.topAnchor.constraint(equalTo: headerBarView.bottomAnchor)
+            self.webViewTopConstraint = topConstraint
+            topConstraint.isActive = true
+            headerBarHeightConstraint?.constant = 44
+            headerBarView.alphaValue = 1.0
+            headerBarView.isHidden = false
+        }
+        container.layoutSubtreeIfNeeded()
+    }
+
+    public func startFullscreenMouseMonitoring() {
+        stopFullscreenMouseMonitoring()
+
+        let timer = Timer(timeInterval: 0.05, repeats: true) { [weak self] _ in
+            self?.handleMouseMovementForTopEdge()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        self.mouseCheckTimer = timer
+    }
+
+    public func stopFullscreenMouseMonitoring() {
+        mouseCheckTimer?.invalidate()
+        mouseCheckTimer = nil
+        headerBarHideTimer?.invalidate()
+        headerBarHideTimer = nil
+    }
+
+    public func handleMouseMovementForTopEdge() {
+        guard let win = window, win.styleMask.contains(.fullScreen) else { return }
+        let mouseLoc = NSEvent.mouseLocation
+        let screen = win.screen ?? NSScreen.main
+        let screenFrame = screen?.frame ?? win.frame
+
+        // Check if mouse is horizontally within the window's screen
+        guard mouseLoc.x >= screenFrame.minX && mouseLoc.x <= screenFrame.maxX else { return }
+        guard mouseLoc.y >= screenFrame.minY && mouseLoc.y <= screenFrame.maxY else { return }
+
+        let distanceFromTop = screenFrame.maxY - mouseLoc.y
+
+        // Top edge detection: mouse touches within 20 points of the top edge
+        if distanceFromTop <= 20 {
+            showOverlayHeaderBar()
+        } else if distanceFromTop <= 52 {
+            // Mouse is interacting with or hovering directly over the header bar (44pt)
+            // Cancel any pending hide countdown so it stays steady
+            if headerBarHideTimer != nil {
+                headerBarHideTimer?.invalidate()
+                headerBarHideTimer = nil
+            }
+        } else if distanceFromTop > 65 {
+            // Mouse moved down into video content
+            if !headerBarView.isHidden && headerBarView.alphaValue > 0.05 && headerBarHideTimer == nil {
+                scheduleHeaderBarHide()
+            }
+        }
+    }
+
+    public func showOverlayHeaderBar() {
+        headerBarHideTimer?.invalidate()
+        headerBarHideTimer = nil
+        guard let win = window, win.styleMask.contains(.fullScreen) else { return }
+        if headerBarView.isHidden || headerBarView.alphaValue < 0.95 {
+            NSLog("[Mooziac FS] showOverlayHeaderBar: revealing header bar")
+            headerBarView.isHidden = false
+            headerBarView.layer?.zPosition = 1000
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.2
+                self.headerBarView.animator().alphaValue = 1.0
+            }
+        }
+    }
+
+    public func scheduleHeaderBarHide() {
+        guard let win = window, win.styleMask.contains(.fullScreen) else { return }
+        headerBarHideTimer?.invalidate()
+        NSLog("[Mooziac FS] scheduleHeaderBarHide: scheduling hide in 1.5s")
+        headerBarHideTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: false) { [weak self] _ in
+            guard let self = self, let win = self.window, win.styleMask.contains(.fullScreen) else { return }
+            let mouseLoc = NSEvent.mouseLocation
+            let screen = win.screen ?? NSScreen.main
+            let screenFrame = screen?.frame ?? win.frame
+            let distanceFromTop = screenFrame.maxY - mouseLoc.y
+
+            // Safeguard: do not hide if mouse returned to or is hovering over the header bar
+            if distanceFromTop <= 52 {
+                NSLog("[Mooziac FS] scheduleHeaderBarHide cancelled: cursor is at top (dist=\(distanceFromTop))")
+                return
+            }
+
+            NSLog("[Mooziac FS] scheduleHeaderBarHide: fading out header bar")
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.25
+                self.headerBarView.animator().alphaValue = 0.0
+            } completionHandler: {
+                if let win = self.window, win.styleMask.contains(.fullScreen) && self.headerBarView.alphaValue == 0.0 {
+                    self.headerBarView.isHidden = true
+                    NSLog("[Mooziac FS] headerBar is now hidden")
+                }
+            }
+        }
     }
 
     public func handleBridgeFullscreenRequest(wantsFullscreen: Bool? = nil) {
-        guard let win = window else { return }
-        let isFs = win.styleMask.contains(.fullScreen)
+        guard let win = window, !isTransitioningFullScreen else { return }
+        let isWindowFs = win.styleMask.contains(.fullScreen)
+
+        let targetPlayerFs: Bool
         if let wants = wantsFullscreen {
-            if wants && !isFs {
-                win.collectionBehavior = [.fullScreenPrimary]
-                win.toggleFullScreen(nil)
-            } else if !wants && isFs {
-                win.toggleFullScreen(nil)
+            targetPlayerFs = wants
+        } else {
+            targetPlayerFs = !isPlayerFullscreen
+        }
+
+        if isWindowFs {
+            // Window is ALREADY in macOS fullscreen space
+            if targetPlayerFs {
+                wasWindowAlreadyInFullScreenBeforePlayer = true
+                setPlayerFullscreen(true)
+            } else {
+                setPlayerFullscreen(false)
+                wasWindowAlreadyInFullScreenBeforePlayer = false
             }
         } else {
-            win.collectionBehavior = [.fullScreenPrimary]
-            win.toggleFullScreen(nil)
+            // Window is currently in WINDOWED mode
+            if targetPlayerFs {
+                wasWindowAlreadyInFullScreenBeforePlayer = false
+                isPlayerFullscreen = true
+                win.collectionBehavior = [.fullScreenPrimary]
+                win.toggleFullScreen(nil)
+            } else {
+                setPlayerFullscreen(false)
+            }
         }
     }
 
     public func performMinimize() {
         Self.isWindowVisible = false
+        KeyboardShortcutHandler.shared.stopMonitoring()
         guard let win = window else { return }
-        if win.styleMask.contains(.fullScreen) {
-            win.toggleFullScreen(nil)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
-                self?.performMinimize()
+        if isTransitioningFullScreen || win.styleMask.contains(.fullScreen) {
+            // Minimize once the full-screen transition has really finished (no guessing with a timer)
+            pendingMinimizeAfterFullScreenExit = true
+            if !isTransitioningFullScreen {
+                win.toggleFullScreen(nil)
             }
             return
         }
@@ -417,6 +612,10 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
 
     public func headerBarDidTapReload() {
         reload()
+    }
+
+    public func headerBarDidTapCaptions() {
+        VideoPlayerCoordinator.shared.toggleSubtitles()
     }
 
     public func headerBarDidTapLike() {}
@@ -816,11 +1015,11 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
 
         menu.addItem(NSMenuItem.separator())
 
-        let slowerItem = NSMenuItem(title: "Slower (-0.25×)", action: #selector(didSelectSlowerSpeed), keyEquivalent: "[")
+        let slowerItem = NSMenuItem(title: "Slower (-0.25×)", action: #selector(didSelectSlowerSpeed), keyEquivalent: "")
         slowerItem.target = self
         menu.addItem(slowerItem)
 
-        let fasterItem = NSMenuItem(title: "Faster (+0.25×)", action: #selector(didSelectFasterSpeed), keyEquivalent: "]")
+        let fasterItem = NSMenuItem(title: "Faster (+0.25×)", action: #selector(didSelectFasterSpeed), keyEquivalent: "")
         fasterItem.target = self
         menu.addItem(fasterItem)
 
@@ -865,15 +1064,33 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
 
     public func checkAuthenticationStatus() {
         YouTubeWebView.isolatedDataStore.httpCookieStore.getAllCookies { [weak self] cookies in
+            guard let self = self else { return }
             let signedIn = cookies.contains { cookie in
                 (cookie.domain.contains("youtube.com") || cookie.domain.contains("google.com")) &&
                 (cookie.name == "LOGIN_INFO" || cookie.name == "SAPISID" || cookie.name == "SSID" || cookie.name == "SID") &&
                 !cookie.value.isEmpty
             }
             DispatchQueue.main.async {
-                self?.isUserSignedIn = signedIn
+                let previous = self.isUserSignedIn
+                self.isUserSignedIn = signedIn
                 if signedIn {
                     AppSettings.shared.applySignedInDefaultsIfNeeded()
+                }
+
+                // Notify webview DOM about authentication state
+                let js = "window.__mooziacUserSignedIn = \(signedIn); if (\(signedIn)) { document.documentElement.classList.add('mooziac-signed-in'); } else { document.documentElement.classList.remove('mooziac-signed-in'); }"
+                self.webView?.evaluateJavaScript(js, completionHandler: nil)
+
+                if previous != signedIn {
+                    Log.app.info("Authentication state transitioned: signedIn = \(signedIn). Reconfiguration triggered.")
+                    // Clear memory & disk caches to eliminate any lingering ad rules or cached responses
+                    YouTubeWebView.isolatedDataStore.removeData(ofTypes: [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache], modifiedSince: .distantPast) {}
+                    if #available(macOS 15.4, *) {
+                        Task { @MainActor in
+                            await WebExtensionManager.shared.setAdBlockExtensionsEnabled(AppSettings.shared.isAdBlockEnabled)
+                        }
+                    }
+                    self.reconfigureAndReload()
                 }
             }
         }
@@ -886,15 +1103,7 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
         if isUserSignedIn {
             let accountHeader = NSMenuItem(title: "Account: Signed In", action: nil, keyEquivalent: "")
             accountHeader.isEnabled = false
-            if let icon = NSImage(systemSymbolName: "checkmark.seal.fill", accessibilityDescription: nil) {
-                accountHeader.image = icon
-            }
             menu.addItem(accountHeader)
-
-            let safetyNote = NSMenuItem(title: "Ad Blocker Disabled (Zero Account Risk)", action: nil, keyEquivalent: "")
-            safetyNote.isEnabled = false
-            safetyNote.toolTip = "All ad blockers and auto-skippers are automatically disabled while signed in to prevent any Google account flags or interruptions."
-            menu.addItem(safetyNote)
 
             let signOutItem = NSMenuItem(title: "Sign Out of YouTube…", action: #selector(didSelectSignOut), keyEquivalent: "")
             signOutItem.target = self
@@ -904,26 +1113,21 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
         } else {
             let signInItem = NSMenuItem(title: "Sign In with Google…", action: #selector(didSelectSignIn), keyEquivalent: "")
             signInItem.target = self
-            if let icon = NSImage(systemSymbolName: "person.crop.circle", accessibilityDescription: nil) {
-                signInItem.image = icon
-            }
             menu.addItem(signInItem)
 
             menu.addItem(NSMenuItem.separator())
         }
 
-        let adBlockTitle = isUserSignedIn ? "Ad Blocker (Bypassed: Signed In)" : "Ad Blocker (Undetected)"
-        let adBlockItem = NSMenuItem(title: adBlockTitle, action: #selector(didToggleShieldAdBlock), keyEquivalent: "")
+        let adBlockItem = NSMenuItem(title: "Ad Blocker (Undetected)", action: #selector(didToggleShieldAdBlock), keyEquivalent: "")
         adBlockItem.target = self
-        adBlockItem.state = (!isUserSignedIn && AppSettings.shared.isAdBlockEnabled) ? .on : .off
-        adBlockItem.isEnabled = !isUserSignedIn
+        adBlockItem.state = AppSettings.shared.isAdBlockEnabled ? .on : .off
+        adBlockItem.isEnabled = true
         menu.addItem(adBlockItem)
 
-        let sponsorBlockTitle = isUserSignedIn ? "SponsorBlock (Bypassed: Signed In)" : "SponsorBlock (Auto-Skip)"
-        let sponsorBlockItem = NSMenuItem(title: sponsorBlockTitle, action: #selector(didToggleShieldSponsorBlock), keyEquivalent: "")
+        let sponsorBlockItem = NSMenuItem(title: "SponsorBlock (Auto-Skip)", action: #selector(didToggleShieldSponsorBlock), keyEquivalent: "")
         sponsorBlockItem.target = self
-        sponsorBlockItem.state = (!isUserSignedIn && AppSettings.shared.isSponsorBlockEnabled) ? .on : .off
-        sponsorBlockItem.isEnabled = !isUserSignedIn
+        sponsorBlockItem.state = AppSettings.shared.isSponsorBlockEnabled ? .on : .off
+        sponsorBlockItem.isEnabled = true
         menu.addItem(sponsorBlockItem)
 
         menu.addItem(NSMenuItem.separator())
@@ -934,9 +1138,15 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
         focusItem.state = AppSettings.shared.isDistractionFreeEnabled ? .on : .off
         menu.addItem(focusItem)
 
-        let ccItem = NSMenuItem(title: "Toggle Captions / Subtitles (CC)", action: #selector(didToggleSubtitles), keyEquivalent: "c")
+        let ccItem = NSMenuItem(title: "Closed Captions (CC)", action: #selector(didToggleSubtitles), keyEquivalent: "")
         ccItem.target = self
+        ccItem.state = VideoPlayerCoordinator.shared.currentState.isCaptionsActive ? .on : .off
         menu.addItem(ccItem)
+
+        let pipSpacesItem = NSMenuItem(title: "Keep PiP Across All Spaces", action: #selector(didTogglePiPSpacesBehavior), keyEquivalent: "")
+        pipSpacesItem.target = self
+        pipSpacesItem.state = AppSettings.shared.isPiPKeepAcrossSpaces ? .on : .off
+        menu.addItem(pipSpacesItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -997,6 +1207,11 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
         let text = newState ? "Ad Blocker: Enabled" : "Ad Blocker: Disabled"
         FloatingHUDWindowController.shared.showCustomTextOverlay(text: text)
         headerBarView.updatePlaybackState(VideoPlayerCoordinator.shared.currentState)
+        if #available(macOS 15.4, *) {
+            Task { @MainActor in
+                await WebExtensionManager.shared.setAdBlockExtensionsEnabled(newState)
+            }
+        }
         reconfigureAndReload()
     }
 
@@ -1013,20 +1228,42 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
         togglePiP()
     }
 
+    public func applyPiPSpacesBehavior() {
+        let keepAcrossSpaces = AppSettings.shared.isPiPKeepAcrossSpaces
+        DispatchQueue.main.async {
+            for win in NSApp.windows {
+                let className = String(describing: type(of: win))
+                if className.contains("PIP") || className.contains("PictureInPicture") {
+                    if keepAcrossSpaces {
+                        win.collectionBehavior.insert([.canJoinAllSpaces, .fullScreenAuxiliary])
+                    } else {
+                        win.collectionBehavior.remove([.canJoinAllSpaces, .fullScreenAuxiliary])
+                    }
+                }
+            }
+        }
+    }
+
+    @objc private func didTogglePiPSpacesBehavior() {
+        let current = AppSettings.shared.isPiPKeepAcrossSpaces
+        let newState = !current
+        AppSettings.shared.isPiPKeepAcrossSpaces = newState
+        applyPiPSpacesBehavior()
+        let text = newState ? "PiP: Keep Across Spaces (All Desktops)" : "PiP: This Desktop Only"
+        FloatingHUDWindowController.shared.showCustomTextOverlay(text: text)
+    }
+
     public func headerBarDidTapTheater() {
         VideoPlayerCoordinator.shared.toggleTheaterMode()
     }
 
     // MARK: - NSWindowDelegate Fullscreen Hooks
     public func windowWillEnterFullScreen(_ notification: Notification) {
-        let isWatch = VideoPlayerCoordinator.shared.currentState.videoId.isEmpty == false
-        if isWatch {
-            headerBarHeightConstraint?.constant = 0
-            headerBarView.isHidden = true
-        } else {
-            headerBarHeightConstraint?.constant = 44
-            headerBarView.isHidden = false
+        isTransitioningFullScreen = true
+        if let win = window {
+            hideDefaultTrafficLights(window: win)
         }
+        updateFullscreenLayout(isFullscreen: true)
         headerBarView.updateFullscreenState(isFullscreen: true)
         window?.contentView?.needsLayout = true
         window?.contentView?.layoutSubtreeIfNeeded()
@@ -1035,29 +1272,62 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
     }
 
     public func windowDidEnterFullScreen(_ notification: Notification) {
+        isTransitioningFullScreen = false
         if let win = window {
             hideDefaultTrafficLights(window: win)
         }
-        let isWatch = VideoPlayerCoordinator.shared.currentState.videoId.isEmpty == false
-        if isWatch {
-            headerBarHeightConstraint?.constant = 0
-            headerBarView.isHidden = true
-        } else {
-            headerBarHeightConstraint?.constant = 44
-            headerBarView.isHidden = false
-        }
+        updateFullscreenLayout(isFullscreen: true)
+        startFullscreenMouseMonitoring()
         headerBarView.updateFullscreenState(isFullscreen: true)
         window?.contentView?.needsLayout = true
         window?.contentView?.layoutSubtreeIfNeeded()
         webView?.needsLayout = true
         webView?.layoutSubtreeIfNeeded()
 
-        webView?.evaluateJavaScript("window.__mooziacSetFullscreenState && window.__mooziacSetFullscreenState(true);", completionHandler: nil)
+        webView?.evaluateJavaScript("window.__mooziacSetFullscreenState && window.__mooziacSetFullscreenState(\(isPlayerFullscreen));", completionHandler: nil)
+
+        // Close or minimize was requested while we were still entering full screen: leave again now
+        if pendingCloseAfterFullScreenExit || pendingMinimizeAfterFullScreenExit {
+            DispatchQueue.main.async { [weak self] in
+                self?.window?.toggleFullScreen(nil)
+            }
+        }
+    }
+
+    public func windowDidFailToEnterFullScreen(_ window: NSWindow) {
+        // Without this the "transitioning" flag stays true forever and full screen stops working
+        isTransitioningFullScreen = false
+        isPlayerFullscreen = false
+        wasWindowAlreadyInFullScreenBeforePlayer = false
+        updateFullscreenLayout(isFullscreen: false)
+        headerBarView.updateFullscreenState(isFullscreen: false)
+        runPendingWindowActionAfterFullScreen()
+    }
+
+    public func windowDidFailToExitFullScreen(_ window: NSWindow) {
+        isTransitioningFullScreen = false
+        pendingCloseAfterFullScreenExit = false
+        pendingMinimizeAfterFullScreenExit = false
+        updateFullscreenLayout(isFullscreen: true)
+        headerBarView.updateFullscreenState(isFullscreen: true)
+    }
+
+    private func runPendingWindowActionAfterFullScreen() {
+        if pendingCloseAfterFullScreenExit {
+            DispatchQueue.main.async { [weak self] in self?.finishClosingYouTube() }
+        } else if pendingMinimizeAfterFullScreenExit {
+            pendingMinimizeAfterFullScreenExit = false
+            DispatchQueue.main.async { [weak self] in self?.performMinimize() }
+        }
     }
 
     public func windowWillExitFullScreen(_ notification: Notification) {
-        headerBarHeightConstraint?.constant = 44
-        headerBarView.isHidden = false
+        isTransitioningFullScreen = true
+        stopFullscreenMouseMonitoring()
+        if let win = window {
+            hideDefaultTrafficLights(window: win)
+        }
+        updateFullscreenLayout(isFullscreen: false)
         headerBarView.updateFullscreenState(isFullscreen: false)
         window?.contentView?.needsLayout = true
         window?.contentView?.layoutSubtreeIfNeeded()
@@ -1066,18 +1336,30 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
     }
 
     public func windowDidExitFullScreen(_ notification: Notification) {
+        isTransitioningFullScreen = false
+        isPlayerFullscreen = false
+        wasWindowAlreadyInFullScreenBeforePlayer = false
+        stopFullscreenMouseMonitoring()
         if let win = window {
             hideDefaultTrafficLights(window: win)
         }
-        headerBarHeightConstraint?.constant = 44
-        headerBarView.isHidden = false
+        updateFullscreenLayout(isFullscreen: false)
         headerBarView.updateFullscreenState(isFullscreen: false)
         window?.contentView?.needsLayout = true
         window?.contentView?.layoutSubtreeIfNeeded()
         webView?.needsLayout = true
         webView?.layoutSubtreeIfNeeded()
 
+        // Explicitly clear macOS presentation options so system menu bar & icons are never stuck hidden
+        NSApp.presentationOptions = []
+
         webView?.evaluateJavaScript("window.__mooziacSetFullscreenState && window.__mooziacSetFullscreenState(false);", completionHandler: nil)
+
+        runPendingWindowActionAfterFullScreen()
+    }
+
+    public func window(_ window: NSWindow, willUseFullScreenPresentationOptions proposedOptions: NSApplication.PresentationOptions = []) -> NSApplication.PresentationOptions {
+        return [.hideMenuBar, .hideDock, .fullScreen]
     }
 
     public func windowShouldClose(_ sender: NSWindow) -> Bool {
@@ -1087,6 +1369,7 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
 
     public func windowWillClose(_ notification: Notification) {
         Self.isWindowVisible = false
+        stopFullscreenMouseMonitoring()
         canGoBackObserver?.invalidate()
         canGoForwardObserver?.invalidate()
         KeyboardShortcutHandler.shared.stopMonitoring()
@@ -1100,9 +1383,14 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
 
     public func windowDidBecomeKey(_ notification: Notification) {
         Self.isWindowVisible = true
+        KeyboardShortcutHandler.shared.startMonitoring()
         if let win = window {
             hideDefaultTrafficLights(window: win)
         }
+    }
+
+    public func windowDidResignKey(_ notification: Notification) {
+        KeyboardShortcutHandler.shared.stopMonitoring()
     }
 
     public func windowDidMiniaturize(_ notification: Notification) {
@@ -1121,8 +1409,7 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
             if let btn = window.standardWindowButton(type) {
                 btn.isHidden = true
                 btn.alphaValue = 0
-                btn.isEnabled = true
-                btn.superview?.isHidden = true
+                btn.isEnabled = false
             }
         }
     }

@@ -16,43 +16,55 @@ public final class VideoPlayerCoordinator: NSObject, YouTubePlayerBridgeDelegate
         setupRemoteCommands()
     }
 
+    /// Media keys belong to YouTube only while Mooziac is in YouTube mode.
+    /// (The music side applies the mirror-image check, so the two never fight over one key press.)
+    private var isYouTubeActive: Bool {
+        StatusItemManager.shared?.currentMode == .youtube
+    }
+
     private func setupRemoteCommands() {
         let center = MPRemoteCommandCenter.shared()
 
         center.playCommand.isEnabled = true
         center.playCommand.addTarget { [weak self] _ in
-            self?.play()
+            guard let self = self, self.isYouTubeActive else { return .commandFailed }
+            self.play()
             return .success
         }
 
         center.pauseCommand.isEnabled = true
         center.pauseCommand.addTarget { [weak self] _ in
-            self?.pause()
+            guard let self = self, self.isYouTubeActive else { return .commandFailed }
+            self.pause()
             return .success
         }
 
         center.togglePlayPauseCommand.isEnabled = true
         center.togglePlayPauseCommand.addTarget { [weak self] _ in
-            self?.togglePlayPause()
+            guard let self = self, self.isYouTubeActive else { return .commandFailed }
+            self.togglePlayPause()
             return .success
         }
 
         center.nextTrackCommand.isEnabled = true
         center.nextTrackCommand.addTarget { [weak self] _ in
-            self?.nextVideo()
+            guard let self = self, self.isYouTubeActive else { return .commandFailed }
+            self.nextVideo()
             return .success
         }
 
         center.previousTrackCommand.isEnabled = true
         center.previousTrackCommand.addTarget { [weak self] _ in
-            self?.previousVideo()
+            guard let self = self, self.isYouTubeActive else { return .commandFailed }
+            self.previousVideo()
             return .success
         }
 
         center.changePlaybackPositionCommand.isEnabled = true
         center.changePlaybackPositionCommand.addTarget { [weak self] event in
+            guard let self = self, self.isYouTubeActive else { return .commandFailed }
             if let posEvent = event as? MPChangePlaybackPositionCommandEvent {
-                self?.seekTo(seconds: posEvent.positionTime)
+                self.seekTo(seconds: posEvent.positionTime)
                 return .success
             }
             return .commandFailed
@@ -86,8 +98,9 @@ public final class VideoPlayerCoordinator: NSObject, YouTubePlayerBridgeDelegate
             guard let self = self else { return }
             self.updateNowPlayingInfo()
             MainVideoWindowController.shared.updatePlaybackState(state)
+            NotificationCenter.default.post(name: NSNotification.Name("Mooziac_VideoPlaybackStateChanged"), object: nil)
 
-            if state.playbackRate > 0 && abs(state.playbackRate - self.currentPlaybackSpeed) > 0.01 {
+            if !state.isAdShowing && state.playbackRate > 0 && abs(state.playbackRate - self.currentPlaybackSpeed) > 0.01 {
                 self.currentPlaybackSpeed = state.playbackRate
                 MainVideoWindowController.shared.updatePlaybackSpeed(state.playbackRate)
             }
@@ -162,7 +175,9 @@ public final class VideoPlayerCoordinator: NSObject, YouTubePlayerBridgeDelegate
         let current = AppVolumeManager.shared.getEffectiveVolume()
         let newVol = max(0.0, min(1.0, current + delta))
         AppVolumeManager.shared.setEffectiveVolume(newVol)
-        setVolume(newVol)
+        // In system-volume mode the system slider already applies this level, so keep the video itself at 100%
+        // (otherwise the volume is applied twice and gets much quieter than the HUD says)
+        setVolume(AppVolumeManager.shared.isAppVolumeOnly ? newVol : 1.0)
         let percent = Int(round(newVol * 100))
         FloatingHUDWindowController.shared.showVolumeOverlay(volumePercent: percent)
     }
@@ -180,7 +195,7 @@ public final class VideoPlayerCoordinator: NSObject, YouTubePlayerBridgeDelegate
             let prev = Float(UserDefaults.standard.double(forKey: "YTM_preMuteVolume"))
             let restore = prev > 0.05 ? prev : 0.3
             AppVolumeManager.shared.setEffectiveVolume(restore)
-            setVolume(restore)
+            setVolume(AppVolumeManager.shared.isAppVolumeOnly ? restore : 1.0)
             currentState.isMuted = false
             evaluateOnMain("window.__mooziacPlayer && window.__mooziacPlayer.toggleMute();")
             let percent = Int(round(restore * 100))

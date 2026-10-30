@@ -163,7 +163,7 @@ public final class YouTubePlayerBridge: NSObject, WKScriptMessageHandler {
                     } catch(e) {}
                 }
 
-                if (!title) {
+                if (!title && window.location.pathname.indexOf('/watch') === 0) {
                     var titleEl = document.querySelector('h1.ytd-watch-metadata yt-formatted-string') ||
                                   document.querySelector('h1.title yt-formatted-string') ||
                                   document.querySelector('#title h1');
@@ -186,6 +186,20 @@ public final class YouTubePlayerBridge: NSObject, WKScriptMessageHandler {
                 var isPiP = document.pictureInPictureElement !== null || video.webkitPresentationMode === 'picture-in-picture';
                 var isFullscreen = document.fullscreenElement !== null || (player && player.classList.contains('ytp-fullscreen'));
 
+                var ccBtn = document.querySelector('.ytp-subtitles-button');
+                var isCaptionsAvailable = !!(ccBtn && ccBtn.offsetParent !== null && ccBtn.getAttribute('aria-hidden') !== 'true');
+                var isCaptionsActive = false;
+                if (ccBtn) {
+                    isCaptionsActive = (ccBtn.getAttribute('aria-pressed') === 'true');
+                }
+                if (player && typeof player.isSubtitlesOn === 'function') {
+                    try { isCaptionsActive = isCaptionsActive || player.isSubtitlesOn(); } catch(e) {}
+                }
+
+                if (!isCaptionsActive) {
+                    // Captions turned off
+                }
+
                 var now = Date.now();
                 var timeDelta = Math.abs(currentTime - (lastState.currentTime || 0));
                 var stateChanged = (isPlaying !== lastState.isPlaying) ||
@@ -193,6 +207,8 @@ public final class YouTubePlayerBridge: NSObject, WKScriptMessageHandler {
                                    (title !== lastState.title) ||
                                    (quality !== lastState.quality) ||
                                    (isMuted !== lastState.isMuted) ||
+                                   (isCaptionsActive !== lastState.isCaptionsActive) ||
+                                   (isCaptionsAvailable !== lastState.isCaptionsAvailable) ||
                                    (timeDelta >= 0.5) ||
                                    (now - lastReportTime > 1000);
 
@@ -212,7 +228,9 @@ public final class YouTubePlayerBridge: NSObject, WKScriptMessageHandler {
                         isMuted: isMuted,
                         playbackRate: playbackRate,
                         isPiP: isPiP,
-                        isFullscreen: isFullscreen
+                        isFullscreen: isFullscreen,
+                        isCaptionsActive: isCaptionsActive,
+                        isCaptionsAvailable: isCaptionsAvailable
                     };
 
                     postBridge({
@@ -230,7 +248,9 @@ public final class YouTubePlayerBridge: NSObject, WKScriptMessageHandler {
                         isMuted: isMuted,
                         playbackRate: playbackRate,
                         isPiP: isPiP,
-                        isFullscreen: isFullscreen
+                        isFullscreen: isFullscreen,
+                        isCaptionsActive: isCaptionsActive,
+                        isCaptionsAvailable: isCaptionsAvailable
                     });
                 }
             }
@@ -259,14 +279,26 @@ public final class YouTubePlayerBridge: NSObject, WKScriptMessageHandler {
             // Pause it so it can never keep playing invisibly.
             var invisibleSince = 0;
             function backgroundGuard() {
+                // If on watch page, the video is intentionally in view; zero layout queries needed
+                if (window.location.pathname.indexOf('/watch') === 0 || document.fullscreenElement) {
+                    invisibleSince = 0;
+                    return;
+                }
+                // If popped-out miniplayer is active, user is watching while browsing
+                var mini = document.querySelector('ytd-miniplayer[active]');
+                if (mini) {
+                    invisibleSince = 0;
+                    return;
+                }
+
                 var player = document.getElementById('movie_player');
                 if (!player) { invisibleSince = 0; return; }
                 var video = player.querySelector('video');
                 if (!video || video.paused || video.ended) { invisibleSince = 0; return; }
 
-                var rects = player.getClientRects();
-                var visible = rects.length > 0 && rects[0].width > 1 && rects[0].height > 1;
-                if (visible || document.fullscreenElement) { invisibleSince = 0; return; }
+                // Check visibility without forcing getClientRects layout reflow
+                var visible = player.offsetWidth > 1 && player.offsetHeight > 1;
+                if (visible) { invisibleSince = 0; return; }
 
                 var now = Date.now();
                 if (!invisibleSince) { invisibleSince = now; return; }
@@ -316,6 +348,24 @@ public final class YouTubePlayerBridge: NSObject, WKScriptMessageHandler {
                     },
                     configurable: true
                 });
+                Object.defineProperty(document, 'webkitCurrentFullScreenElement', {
+                    get: function() {
+                        return window.__mooziacIsFullscreen ? (document.getElementById('movie_player') || document.querySelector('video') || document.body) : null;
+                    },
+                    configurable: true
+                });
+                Object.defineProperty(document, 'webkitIsFullScreen', {
+                    get: function() {
+                        return !!window.__mooziacIsFullscreen;
+                    },
+                    configurable: true
+                });
+                Object.defineProperty(document, 'fullscreen', {
+                    get: function() {
+                        return !!window.__mooziacIsFullscreen;
+                    },
+                    configurable: true
+                });
             } catch(e) {}
 
             Element.prototype.requestFullscreen = function() {
@@ -323,6 +373,10 @@ public final class YouTubePlayerBridge: NSObject, WKScriptMessageHandler {
                 return Promise.resolve();
             };
             Element.prototype.webkitRequestFullscreen = function() {
+                postBridge({ event: 'toggleFullscreen', wantsFullscreen: true });
+                return Promise.resolve();
+            };
+            Element.prototype.webkitRequestFullScreen = function() {
                 postBridge({ event: 'toggleFullscreen', wantsFullscreen: true });
                 return Promise.resolve();
             };
@@ -334,12 +388,50 @@ public final class YouTubePlayerBridge: NSObject, WKScriptMessageHandler {
                 postBridge({ event: 'toggleFullscreen', wantsFullscreen: false });
                 return Promise.resolve();
             };
+            document.webkitCancelFullScreen = function() {
+                postBridge({ event: 'toggleFullscreen', wantsFullscreen: false });
+                return Promise.resolve();
+            };
 
             // Catch native player fullscreen button clicks directly
             document.addEventListener('click', function(e) {
                 var btn = e.target && e.target.closest && e.target.closest('.ytp-fullscreen-button');
                 if (btn) {
-                    postBridge({ event: 'toggleFullscreen' });
+                    var player = getPlayer();
+                    var isFs = (player && player.classList && player.classList.contains('ytp-fullscreen')) || !!window.__mooziacIsFullscreen;
+                    postBridge({ event: 'toggleFullscreen', wantsFullscreen: !isFs });
+                }
+            }, true);
+
+            // Catch double-click on player to toggle between window and fullscreen (matching Safari/Chrome)
+            document.addEventListener('dblclick', function(e) {
+                var player = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
+                if (!player || !player.contains(e.target)) return;
+
+                // Never toggle fullscreen when double-clicking interactive control overlays (seekbar, volume, settings, etc.)
+                if (e.target.closest && e.target.closest('.ytp-chrome-bottom, .ytp-progress-bar-container, .ytp-settings-menu, .ytp-contextmenu, .ytp-popup, button, input, textarea, a')) {
+                    return;
+                }
+
+                e.preventDefault();
+                e.stopPropagation();
+                var isFs = (player && player.classList && player.classList.contains('ytp-fullscreen')) || !!window.__mooziacIsFullscreen;
+                postBridge({ event: 'toggleFullscreen', wantsFullscreen: !isFs });
+            }, true);
+
+            // Listen for mouse moving near top edge to reveal Mooziac header bar in fullscreen (capture phase on window)
+            var isTopHovered = false;
+            window.addEventListener('mousemove', function(e) {
+                if (e.clientY <= 18) {
+                    if (!isTopHovered) {
+                        isTopHovered = true;
+                        postBridge({ event: 'mouseTouchTopEdge' });
+                    }
+                } else if (e.clientY > 60) {
+                    if (isTopHovered) {
+                        isTopHovered = false;
+                        postBridge({ event: 'mouseLeaveTopEdge' });
+                    }
                 }
             }, true);
 
@@ -473,7 +565,9 @@ public final class YouTubePlayerBridge: NSObject, WKScriptMessageHandler {
                     if (btn) btn.click();
                 },
                 toggleFullscreen: function() {
-                    postBridge({ event: 'toggleFullscreen' });
+                    var player = getPlayer();
+                    var isFs = (player && player.classList && player.classList.contains('ytp-fullscreen')) || !!window.__mooziacIsFullscreen;
+                    postBridge({ event: 'toggleFullscreen', wantsFullscreen: !isFs });
                 },
                 nextVideo: function() {
                     var btn = document.querySelector('.ytp-next-button');
@@ -584,6 +678,20 @@ public final class YouTubePlayerBridge: NSObject, WKScriptMessageHandler {
             return
         }
 
+        if event == "mouseTouchTopEdge" {
+            DispatchQueue.main.async {
+                MainVideoWindowController.shared.showOverlayHeaderBar()
+            }
+            return
+        }
+
+        if event == "mouseLeaveTopEdge" {
+            DispatchQueue.main.async {
+                MainVideoWindowController.shared.scheduleHeaderBarHide()
+            }
+            return
+        }
+
         if event == "sponsorSkipped" {
             let displayName = dict["displayName"] as? String ?? "Sponsor"
             DispatchQueue.main.async {
@@ -622,6 +730,8 @@ public final class YouTubePlayerBridge: NSObject, WKScriptMessageHandler {
             state.isAdShowing = dict["isAd"] as? Bool ?? false
             state.isPictureInPicture = dict["isPiP"] as? Bool ?? false
             state.isFullscreen = dict["isFullscreen"] as? Bool ?? false
+            state.isCaptionsActive = dict["isCaptionsActive"] as? Bool ?? false
+            state.isCaptionsAvailable = dict["isCaptionsAvailable"] as? Bool ?? false
 
             let qStr = dict["quality"] as? String ?? "auto"
             state.currentQuality = VideoQuality(rawValue: qStr) ?? .auto

@@ -15,9 +15,8 @@ public enum YouTubeUIScript {
                     display: none !important;
                 }
 
-                /* Force dedicated GPU hardware-composited layer for HTML5 video (direct-to-display) */
-                #movie_player video,
-                .html5-main-video {
+                /* Force dedicated GPU hardware-composited layer for primary HTML5 player */
+                #movie_player video {
                     transform: translateZ(0) !important;
                     will-change: transform !important;
                     backface-visibility: hidden !important;
@@ -46,7 +45,7 @@ public enum YouTubeUIScript {
                     display: block !important;
                 }
 
-                /* Keep captions cleanly pinned near bottom */
+                /* Keep captions cleanly pinned near bottom when displayed */
                 .caption-window.ytp-caption-window-bottom {
                     bottom: 5% !important;
                 }

@@ -13,6 +13,70 @@ public class YouTubeWebView: WKWebView {
         }
     }
 
+    // Codec optimization: On systems without dedicated hardware AV1 decode (Intel & Apple M1/M2),
+    // intercept MediaSource.isTypeSupported to report false for AV1 (av01), ensuring YouTube
+    // serves 100% hardware-accelerated VP9 (and H.264) streams via Apple VideoToolbox.
+    public static let codecOptimizerScript = WKUserScript(
+        source: """
+        (function() {
+            try {
+                if (window.MediaSource && typeof window.MediaSource.isTypeSupported === 'function') {
+                    var origIsTypeSupported = window.MediaSource.isTypeSupported.bind(window.MediaSource);
+                    window.MediaSource.isTypeSupported = function(mimeType) {
+                        if (typeof mimeType === 'string' && (mimeType.indexOf('av01') !== -1 || mimeType.indexOf('av1') !== -1)) {
+                            return false;
+                        }
+                        return origIsTypeSupported(mimeType);
+                    };
+                }
+                if (window.HTMLMediaElement && window.HTMLMediaElement.prototype.canPlayType) {
+                    var origCanPlay = window.HTMLMediaElement.prototype.canPlayType;
+                    window.HTMLMediaElement.prototype.canPlayType = function(type) {
+                        if (typeof type === 'string' && (type.indexOf('av01') !== -1 || type.indexOf('av1') !== -1)) {
+                            return '';
+                        }
+                        return origCanPlay.apply(this, arguments);
+                    };
+                }
+            } catch(e) {}
+        })();
+        """,
+        injectionTime: .atDocumentStart,
+        forMainFrameOnly: false
+    )
+
+    // Fullscreen shield: ensures native Fullscreen API readiness without overriding page visibility
+    public static let fullscreenShieldScript = WKUserScript(
+        source: """
+        (function() {
+            try {
+                Object.defineProperty(Document.prototype, 'fullscreenEnabled', { get: function() { return true; }, configurable: true });
+                Object.defineProperty(Document.prototype, 'webkitFullscreenEnabled', { get: function() { return true; }, configurable: true });
+            } catch(e) {}
+        })();
+        """,
+        injectionTime: .atDocumentStart,
+        forMainFrameOnly: true
+    )
+
+    /// Installs every script the YouTube page needs, in one place.
+    /// Used when the web view is first created AND by MainVideoWindowController.reconfigureAndReload().
+    public static func installUserScripts(into ucc: WKUserContentController) {
+        ucc.addUserScript(codecOptimizerScript)
+        if AppSettings.shared.isAdBlockEnabled {
+            YouTubeAdBlocker.configure(userContentController: ucc)
+        }
+        if AppSettings.shared.isSponsorBlockEnabled {
+            YouTubeSponsorBlock.configure(userContentController: ucc)
+        }
+        YouTubeHighlightManager.configure(userContentController: ucc)
+        ucc.addUserScript(YouTubeQualityManager.qualityControlScript)
+        ucc.addUserScript(YouTubeUIScript.uiStyleScript)
+        ucc.addUserScript(YouTubeUIScript.uiControllerScript)
+        ucc.addUserScript(YouTubePlayerBridge.observerScript)
+        ucc.addUserScript(fullscreenShieldScript)
+    }
+
     public static func createConfiguration(bridge: YouTubePlayerBridge) -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = isolatedDataStore
@@ -43,73 +107,10 @@ public class YouTubeWebView: WKWebView {
             config.webExtensionController = WebExtensionManager.shared.webExtensionController
         }
 
-        // Codec optimization: On systems without dedicated hardware AV1 decode (Intel & Apple M1/M2),
-        // intercept MediaSource.isTypeSupported to report false for AV1 (av01), ensuring YouTube
-        // serves 100% hardware-accelerated VP9 (and H.264) streams via Apple VideoToolbox.
-        let codecOptimizer = WKUserScript(
-            source: """
-            (function() {
-                try {
-                    if (window.MediaSource && typeof window.MediaSource.isTypeSupported === 'function') {
-                        var origIsTypeSupported = window.MediaSource.isTypeSupported.bind(window.MediaSource);
-                        window.MediaSource.isTypeSupported = function(mimeType) {
-                            if (typeof mimeType === 'string' && (mimeType.indexOf('av01') !== -1 || mimeType.indexOf('av1') !== -1)) {
-                                return false;
-                            }
-                            return origIsTypeSupported(mimeType);
-                        };
-                    }
-                    if (window.HTMLMediaElement && window.HTMLMediaElement.prototype.canPlayType) {
-                        var origCanPlay = window.HTMLMediaElement.prototype.canPlayType;
-                        window.HTMLMediaElement.prototype.canPlayType = function(type) {
-                            if (typeof type === 'string' && (type.indexOf('av01') !== -1 || type.indexOf('av1') !== -1)) {
-                                return '';
-                            }
-                            return origCanPlay.apply(this, arguments);
-                        };
-                    }
-                } catch(e) {}
-            })();
-            """,
-            injectionTime: .atDocumentStart,
-            forMainFrameOnly: false
-        )
-        config.userContentController.addUserScript(codecOptimizer)
-
-        // Configure ad blocker scripts & content rules
-        YouTubeAdBlocker.configure(userContentController: config.userContentController)
-
-        // Configure SponsorBlock auto-skipping
-        YouTubeSponsorBlock.configure(userContentController: config.userContentController)
-
-        // Configure highlight & best part detection
-        YouTubeHighlightManager.configure(userContentController: config.userContentController)
-
-        // Configure quality management script
-        config.userContentController.addUserScript(YouTubeQualityManager.qualityControlScript)
-
-        // Configure custom UI scripts (Buttons beside search/mic, masthead drag, and cinema mode)
-        config.userContentController.addUserScript(YouTubeUIScript.uiStyleScript)
-        config.userContentController.addUserScript(YouTubeUIScript.uiControllerScript)
-
-        // Configure player state observer bridge
-        config.userContentController.addUserScript(YouTubePlayerBridge.observerScript)
+        // All page scripts are installed through one shared function so that the first
+        // load and a later reconfigure (ad blocker / SponsorBlock toggle) always match.
+        installUserScripts(into: config.userContentController)
         config.userContentController.add(bridge, name: YouTubePlayerBridge.handlerName)
-
-        // Fullscreen shield: ensures native Fullscreen API readiness without overriding page visibility
-        let visibilityShield = WKUserScript(
-            source: """
-            (function() {
-                try {
-                    Object.defineProperty(Document.prototype, 'fullscreenEnabled', { get: function() { return true; }, configurable: true });
-                    Object.defineProperty(Document.prototype, 'webkitFullscreenEnabled', { get: function() { return true; }, configurable: true });
-                } catch(e) {}
-            })();
-            """,
-            injectionTime: .atDocumentStart,
-            forMainFrameOnly: true
-        )
-        config.userContentController.addUserScript(visibilityShield)
 
         return config
     }
@@ -119,7 +120,6 @@ public class YouTubeWebView: WKWebView {
         super.init(frame: frame, configuration: config)
         self.customUserAgent = YouTubeWebView.desktopUserAgent
         self.wantsLayer = true
-        self.layer?.drawsAsynchronously = true
         self.setValue(true, forKey: "drawsBackground")
         if #available(macOS 12.0, *) {
             self.underPageBackgroundColor = NSColor(red: 0.06, green: 0.06, blue: 0.08, alpha: 1.0)

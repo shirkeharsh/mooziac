@@ -29,13 +29,10 @@ public enum VideoQuality: String, CaseIterable, Codable {
         switch self {
         case .uhd2160: return "4K"
         case .qhd1440: return "2K"
-        case .fhd1080: return "1080p"
-        case .hd720: return "720p"
-        case .large: return "480p"
-        case .medium: return "360p"
-        case .small: return "240p"
-        case .tiny: return "144p"
-        case .auto: return "Auto"
+        case .fhd1080: return "FHD"
+        case .hd720: return "HD"
+        case .large, .medium, .small, .tiny: return "SD"
+        case .auto: return "AUTO"
         }
     }
 

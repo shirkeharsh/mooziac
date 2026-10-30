@@ -17,6 +17,8 @@ public final class YouTubeDownloadService {
     }()
 
     private var activeProcess: Process?
+    /// Processes the user cancelled on purpose, so their exit is not reported as a failure
+    private var cancelledProcessIDs = Set<ObjectIdentifier>()
 
     private init() {}
 
@@ -52,23 +54,6 @@ public final class YouTubeDownloadService {
                 return p
             }
         }
-        // 4. PATH lookup via which
-        let whichProc = Process()
-        whichProc.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        whichProc.arguments = ["which", "yt-dlp"]
-        let pipe = Pipe()
-        whichProc.standardOutput = pipe
-        whichProc.standardError = FileHandle.nullDevice
-        do {
-            try whichProc.run()
-            whichProc.waitUntilExit()
-            let outStr = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            if !outStr.isEmpty && FileManager.default.isExecutableFile(atPath: outStr) {
-                return outStr
-            }
-        } catch {}
-
         return nil
     }
 
@@ -105,7 +90,8 @@ public final class YouTubeDownloadService {
     /// Fetches all available download formats for a given YouTube video ID.
     public func fetchFormats(videoId: String) async -> [DownloadFormat] {
         guard let execPath = ytdlpPath, let url = URL(string: "https://www.youtube.com/watch?v=\(videoId)") else {
-            return Self.defaultFallbackFormats()
+            // yt-dlp is not installed: return nothing so the sheet can explain it clearly
+            return []
         }
 
         return await Task.detached(priority: .userInitiated) {
@@ -148,7 +134,7 @@ public final class YouTubeDownloadService {
         [
             DownloadFormat(
                 id: "bestaudio/best",
-                label: "MP3 Audio (High Quality 320kbps)",
+                label: "MP3 Audio (Best Quality)",
                 isAudioOnly: true
             ),
             DownloadFormat(
@@ -191,7 +177,7 @@ public final class YouTubeDownloadService {
         // 1. Audio Option (Always at top)
         results.append(DownloadFormat(
             id: "bestaudio/best",
-            label: "MP3 Audio (High Quality 320kbps)",
+            label: "MP3 Audio (Best Quality)",
             isAudioOnly: true
         ))
 
@@ -276,6 +262,7 @@ public final class YouTubeDownloadService {
 
         let targetDir = self.downloadsDir
         var args = [
+            "--newline",
             "--no-playlist",
             "--no-mtime",
             "--concurrent-fragments", "4",
@@ -341,10 +328,11 @@ public final class YouTubeDownloadService {
                         .replacingOccurrences(of: "[ExtractAudio] Destination: ", with: "")
                         .trimmingCharacters(in: .whitespaces)
                 } else if trimmed.contains("has already been downloaded") {
-                    let parts = trimmed.components(separatedBy: " ")
-                    if let first = parts.dropFirst().first {
-                        detectedFilename = first
-                    }
+                    // Format: "[download] <path with spaces> has already been downloaded"
+                    detectedFilename = trimmed
+                        .replacingOccurrences(of: "[download]", with: "")
+                        .replacingOccurrences(of: "has already been downloaded", with: "")
+                        .trimmingCharacters(in: .whitespaces)
                 }
 
                 if trimmed.contains("%") {
@@ -358,22 +346,31 @@ public final class YouTubeDownloadService {
         let fallbackTitle = videoTitle.isEmpty ? "YouTube Video" : videoTitle
         proc.terminationHandler = { [weak self] process in
             pipe.fileHandleForReading.readabilityHandler = nil
+            let processID = ObjectIdentifier(process)
+            let exitStatus = process.terminationStatus
+            let foundName = detectedFilename
+
             Task { @MainActor in
-                self?.activeProcess = nil
-            }
+                // Was this a deliberate cancel? Then say nothing (no fake "failed" message).
+                let wasCancelled = self?.cancelledProcessIDs.remove(processID) != nil
+                // Only clear the active process if it is still THIS one (a newer download may have replaced it)
+                if let active = self?.activeProcess, ObjectIdentifier(active) == processID {
+                    self?.activeProcess = nil
+                }
+                if wasCancelled { return }
 
-            var cleanName = (detectedFilename as NSString).lastPathComponent
-            if cleanName.isEmpty {
-                let ext = format.isAudioOnly ? "mp3" : "mp4"
-                cleanName = "\(fallbackTitle).\(ext)"
-            }
+                var cleanName = (foundName as NSString).lastPathComponent
+                if cleanName.isEmpty {
+                    let ext = format.isAudioOnly ? "mp3" : "mp4"
+                    cleanName = "\(fallbackTitle).\(ext)"
+                }
+                let fileURL = targetDir.appendingPathComponent(cleanName)
 
-            let fileURL = targetDir.appendingPathComponent(cleanName)
-
-            if process.terminationStatus == 0 {
-                onUpdateSendable(.completed(filename: cleanName, fileURL: fileURL))
-            } else {
-                onUpdateSendable(.failed("Download failed or was canceled. Ensure yt-dlp is available: brew install yt-dlp"))
+                if exitStatus == 0 {
+                    onUpdateSendable(.completed(filename: cleanName, fileURL: fileURL))
+                } else {
+                    onUpdateSendable(.failed("Download failed. Check your connection, or update yt-dlp if YouTube changed something."))
+                }
             }
         }
 
@@ -387,8 +384,11 @@ public final class YouTubeDownloadService {
 
     /// Cancels the current download by terminating the active process.
     public func cancelDownload() {
-        if let proc = activeProcess, proc.isRunning {
-            proc.terminate()
+        if let proc = activeProcess {
+            if proc.isRunning {
+                cancelledProcessIDs.insert(ObjectIdentifier(proc))
+                proc.terminate()
+            }
             activeProcess = nil
         }
     }

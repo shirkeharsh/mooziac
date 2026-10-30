@@ -109,6 +109,8 @@ public struct LikedVideoRecord: Equatable {
     }
 }
 
+private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+
 public final class YouTubeDatabaseManager {
     public static let shared = YouTubeDatabaseManager()
 
@@ -224,7 +226,8 @@ public final class YouTubeDatabaseManager {
     }
 
     // MARK: - History Operations
-    private var lastLoggedKey = ""
+    private var lastLoggedVideoId = ""
+    private var lastLoggedAt: Double = 0
 
     public func recordHistory(videoId: String, title: String, channel: String, duration: Double, lastPosition: Double) {
         let cleanVid = videoId.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -232,18 +235,20 @@ public final class YouTubeDatabaseManager {
         guard !cleanVid.isEmpty, !cleanTitle.isEmpty else { return }
 
         let now = Date().timeIntervalSince1970
-        let key = "\(cleanVid)__\(Int(now / 15))" // 15-second debounce
-        if key == lastLoggedKey { return }
-        lastLoggedKey = key
 
         dbQueue.async { [weak self] in
             guard let self = self, let db = self.db else { return }
+
+            // 15-second debounce per video (kept on the database queue so only one thread touches it)
+            if self.lastLoggedVideoId == cleanVid && now - self.lastLoggedAt < 15 { return }
+            self.lastLoggedVideoId = cleanVid
+            self.lastLoggedAt = now
 
             // Delete previous duplicate entry if it exists to keep history deduplicated and top-recent
             let deleteSQL = "DELETE FROM history WHERE video_id = ?;"
             var delStmt: OpaquePointer?
             if sqlite3_prepare_v2(db, deleteSQL, -1, &delStmt, nil) == SQLITE_OK {
-                sqlite3_bind_text(delStmt, 1, (cleanVid as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(delStmt, 1, (cleanVid as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_step(delStmt)
                 sqlite3_finalize(delStmt)
             }
@@ -256,11 +261,11 @@ public final class YouTubeDatabaseManager {
             if sqlite3_prepare_v2(db, insertSQL, -1, &stmt, nil) == SQLITE_OK {
                 let id = UUID().uuidString
                 let artwork = "https://i.ytimg.com/vi/\(cleanVid)/hqdefault.jpg"
-                sqlite3_bind_text(stmt, 1, (id as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(stmt, 2, (cleanVid as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(stmt, 3, (cleanTitle as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(stmt, 4, (channel as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(stmt, 5, (artwork as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(stmt, 1, (id as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 2, (cleanVid as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 3, (cleanTitle as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 4, (channel as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 5, (artwork as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_double(stmt, 6, duration)
                 sqlite3_bind_double(stmt, 7, now)
                 sqlite3_bind_double(stmt, 8, lastPosition)
@@ -329,7 +334,7 @@ public final class YouTubeDatabaseManager {
             let sql = "SELECT 1 FROM liked_videos WHERE video_id = ? LIMIT 1;"
             var stmt: OpaquePointer?
             if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
-                sqlite3_bind_text(stmt, 1, (videoId as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(stmt, 1, (videoId as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 if sqlite3_step(stmt) == SQLITE_ROW {
                     liked = true
                 }
@@ -353,7 +358,7 @@ public final class YouTubeDatabaseManager {
                 let delSQL = "DELETE FROM liked_videos WHERE video_id = ?;"
                 var stmt: OpaquePointer?
                 if sqlite3_prepare_v2(db, delSQL, -1, &stmt, nil) == SQLITE_OK {
-                    sqlite3_bind_text(stmt, 1, (cleanVid as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(stmt, 1, (cleanVid as NSString).utf8String, -1, SQLITE_TRANSIENT)
                     sqlite3_step(stmt)
                     sqlite3_finalize(stmt)
                 }
@@ -365,10 +370,10 @@ public final class YouTubeDatabaseManager {
                 var stmt: OpaquePointer?
                 if sqlite3_prepare_v2(db, insertSQL, -1, &stmt, nil) == SQLITE_OK {
                     let artwork = "https://i.ytimg.com/vi/\(cleanVid)/hqdefault.jpg"
-                    sqlite3_bind_text(stmt, 1, (cleanVid as NSString).utf8String, -1, nil)
-                    sqlite3_bind_text(stmt, 2, (title as NSString).utf8String, -1, nil)
-                    sqlite3_bind_text(stmt, 3, (channel as NSString).utf8String, -1, nil)
-                    sqlite3_bind_text(stmt, 4, (artwork as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(stmt, 1, (cleanVid as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                    sqlite3_bind_text(stmt, 2, (title as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                    sqlite3_bind_text(stmt, 3, (channel as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                    sqlite3_bind_text(stmt, 4, (artwork as NSString).utf8String, -1, SQLITE_TRANSIENT)
                     sqlite3_bind_double(stmt, 5, duration)
                     sqlite3_bind_double(stmt, 6, now)
                     sqlite3_step(stmt)
@@ -426,8 +431,8 @@ public final class YouTubeDatabaseManager {
             let sql = "INSERT INTO playlists (id, name, created_at, updated_at, item_count) VALUES (?, ?, ?, ?, 0);"
             var stmt: OpaquePointer?
             if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
-                sqlite3_bind_text(stmt, 1, (id as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(stmt, 2, (resolvedName as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(stmt, 1, (id as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 2, (resolvedName as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_double(stmt, 3, now)
                 sqlite3_bind_double(stmt, 4, now)
                 sqlite3_step(stmt)
@@ -481,7 +486,7 @@ public final class YouTubeDatabaseManager {
             let sql1 = "DELETE FROM playlist_items WHERE playlist_id = ?;"
             var stmt1: OpaquePointer?
             if sqlite3_prepare_v2(db, sql1, -1, &stmt1, nil) == SQLITE_OK {
-                sqlite3_bind_text(stmt1, 1, (id as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(stmt1, 1, (id as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_step(stmt1)
                 sqlite3_finalize(stmt1)
             }
@@ -489,7 +494,7 @@ public final class YouTubeDatabaseManager {
             let sql2 = "DELETE FROM playlists WHERE id = ?;"
             var stmt2: OpaquePointer?
             if sqlite3_prepare_v2(db, sql2, -1, &stmt2, nil) == SQLITE_OK {
-                sqlite3_bind_text(stmt2, 1, (id as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(stmt2, 1, (id as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_step(stmt2)
                 sqlite3_finalize(stmt2)
             }
@@ -516,8 +521,8 @@ public final class YouTubeDatabaseManager {
             let checkSQL = "SELECT 1 FROM playlist_items WHERE playlist_id = ? AND video_id = ? LIMIT 1;"
             var checkStmt: OpaquePointer?
             if sqlite3_prepare_v2(db, checkSQL, -1, &checkStmt, nil) == SQLITE_OK {
-                sqlite3_bind_text(checkStmt, 1, (playlistId as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(checkStmt, 2, (cleanVid as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(checkStmt, 1, (playlistId as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(checkStmt, 2, (cleanVid as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 if sqlite3_step(checkStmt) == SQLITE_ROW {
                     sqlite3_finalize(checkStmt)
                     return // Already exists
@@ -532,12 +537,12 @@ public final class YouTubeDatabaseManager {
             var stmt: OpaquePointer?
             if sqlite3_prepare_v2(db, insertSQL, -1, &stmt, nil) == SQLITE_OK {
                 let artwork = "https://i.ytimg.com/vi/\(cleanVid)/hqdefault.jpg"
-                sqlite3_bind_text(stmt, 1, (itemId as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(stmt, 2, (playlistId as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(stmt, 3, (cleanVid as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(stmt, 4, (title as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(stmt, 5, (channel as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(stmt, 6, (artwork as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(stmt, 1, (itemId as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 2, (playlistId as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 3, (cleanVid as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 4, (title as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 5, (channel as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 6, (artwork as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_double(stmt, 7, duration)
                 sqlite3_bind_double(stmt, 8, now)
                 if sqlite3_step(stmt) == SQLITE_DONE {
@@ -551,7 +556,7 @@ public final class YouTubeDatabaseManager {
             var upStmt: OpaquePointer?
             if sqlite3_prepare_v2(db, updateSQL, -1, &upStmt, nil) == SQLITE_OK {
                 sqlite3_bind_double(upStmt, 1, now)
-                sqlite3_bind_text(upStmt, 2, (playlistId as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(upStmt, 2, (playlistId as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_step(upStmt)
                 sqlite3_finalize(upStmt)
             }
@@ -572,7 +577,7 @@ public final class YouTubeDatabaseManager {
             let sql = "SELECT id, playlist_id, video_id, title, channel, artwork_url, duration, date_added FROM playlist_items WHERE playlist_id = ? ORDER BY date_added DESC;"
             var stmt: OpaquePointer?
             if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
-                sqlite3_bind_text(stmt, 1, (playlistId as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(stmt, 1, (playlistId as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 while sqlite3_step(stmt) == SQLITE_ROW {
                     let id = String(cString: sqlite3_column_text(stmt, 0))
                     let plId = String(cString: sqlite3_column_text(stmt, 1))
@@ -606,8 +611,8 @@ public final class YouTubeDatabaseManager {
             let sql = "DELETE FROM playlist_items WHERE playlist_id = ? AND video_id = ?;"
             var stmt: OpaquePointer?
             if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
-                sqlite3_bind_text(stmt, 1, (playlistId as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(stmt, 2, (videoId as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(stmt, 1, (playlistId as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 2, (videoId as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 sqlite3_step(stmt)
                 sqlite3_finalize(stmt)
             }

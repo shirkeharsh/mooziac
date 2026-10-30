@@ -18,6 +18,9 @@ public struct VideoPlaybackState: Equatable {
     public var isPictureInPicture: Bool = false
     public var isFullscreen: Bool = false
     public var isTheaterMode: Bool = false
+    public var isCaptionsActive: Bool = false
+    public var isCaptionsAvailable: Bool = false
+    public var liveCaptionText: String = ""
 
     public init() {}
 

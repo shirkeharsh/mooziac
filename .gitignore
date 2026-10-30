@@ -25,6 +25,8 @@ support_tickets.json
 backup/
 
 # Local dev tooling & artifacts (never published)
+dashboard/
+open_dashboard.sh
 dev/
 .mooziac-brain/
 mooziac_brain/

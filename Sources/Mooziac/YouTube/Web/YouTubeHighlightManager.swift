@@ -135,6 +135,7 @@ public enum YouTubeHighlightManager {
             }
 
             function fetchSponsorBlockPOI(videoId) {
+                if (window.__mooziacNoSponsorNetwork) return;
                 if (bestPartTime !== null || videoId !== currentVideoId) return;
                 var sbUrl = 'https://sponsor.ajay.app/api/skipSegments?videoID=' + encodeURIComponent(videoId) + '&categories=' + encodeURIComponent(JSON.stringify(['poi_highlight']));
                 fetch(sbUrl)
@@ -162,6 +163,7 @@ public enum YouTubeHighlightManager {
 
             // Monitor video changes via media events instead of a 500ms poll
             document.addEventListener('loadedmetadata', function() {
+                if (window.location.pathname.indexOf('/watch') !== 0) return;
                 var vid = getVideoId();
                 if (vid !== currentVideoId) {
                     checkHighlights(vid);
@@ -189,6 +191,14 @@ public enum YouTubeHighlightManager {
     )
 
     public static func configure(userContentController: WKUserContentController) {
+        if !AppSettings.shared.isSponsorBlockEnabled {
+            // SponsorBlock is switched off: never contact sponsor.ajay.app from the highlight code either
+            userContentController.addUserScript(WKUserScript(
+                source: "window.__mooziacNoSponsorNetwork = true;",
+                injectionTime: .atDocumentStart,
+                forMainFrameOnly: true
+            ))
+        }
         userContentController.addUserScript(highlightScript)
     }
 }

@@ -33,7 +33,7 @@ public final class YouTubeDownloadSheetController: NSViewController {
     private let progressIndicator = NSProgressIndicator()
     private let percentLabel = NSTextField(labelWithString: "0%")
     private let speedLabel = NSTextField(labelWithString: "")
-    private let destinationLabel = NSTextField(labelWithString: "Saving to ~/Downloads/")
+    private let destinationLabel = NSTextField(labelWithString: "Saving to ~/Downloads/MooziacTube")
     private let cancelDownloadButton = NSButton()
 
     // Completed View
@@ -480,7 +480,7 @@ public final class YouTubeDownloadSheetController: NSViewController {
             self.loadingContainer.isHidden = true
 
             if fetched.isEmpty {
-                self.errorMessageLabel.stringValue = "No download formats available. Ensure yt-dlp is installed:\nbrew install yt-dlp"
+                self.errorMessageLabel.stringValue = "The yt-dlp helper is not installed yet.\nDownload any song in Mooziac once (it installs automatically),\nor run: brew install yt-dlp"
                 self.errorContainer.isHidden = false
             } else {
                 self.populateFormatList(fetched)
@@ -536,12 +536,26 @@ public final class YouTubeDownloadSheetController: NSViewController {
 
     // MARK: - Actions
     @objc private func didTapClose() {
+        // Closing the sheet while a download runs must also stop the download
+        if !progressContainer.isHidden {
+            YouTubeDownloadService.shared.cancelDownload()
+        }
         onDismiss?()
     }
 
     @objc private func didTapCancelDownload() {
         YouTubeDownloadService.shared.cancelDownload()
-        fetchAvailableFormats()
+        // Go back to the format list we already have (no need to ask yt-dlp for the formats again)
+        if formats.isEmpty {
+            fetchAvailableFormats()
+        } else {
+            progressContainer.isHidden = true
+            errorContainer.isHidden = true
+            formatScrollView.isHidden = false
+            subtitlesCheckbox.isHidden = false
+            cancelButton.isHidden = false
+            downloadActionButton.isHidden = false
+        }
     }
 
     @objc private func didTapShowInFinder() {

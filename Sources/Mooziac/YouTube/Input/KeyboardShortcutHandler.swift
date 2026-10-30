@@ -43,16 +43,29 @@ public final class KeyboardShortcutHandler {
     }
 
     private func handleKeyDown(event: NSEvent) -> Bool {
-        // If an AppKit modal sheet is presented (e.g. Download sheet), don't intercept keys
-        if NSApp.keyWindow?.attachedSheet != nil {
+        // Crucial Focus Guard: ONLY intercept keystrokes when the YouTube window is active and key!
+        // Never steal keystrokes when user is typing in YouTube Music or another window.
+        guard let window = MainVideoWindowController.shared.window,
+              window.isKeyWindow,
+              MainVideoWindowController.isWindowVisible else {
             return false
         }
 
-        let isWindowFullscreen = MainVideoWindowController.shared.window?.styleMask.contains(.fullScreen) == true
+        // If focus is inside YouTube Music or an AppKit text field, never steal keys
+        if NowPlayingManager.shared.isWebTextFieldFocused {
+            return false
+        }
 
-        // When in fullscreen, the video takes over the entire display (no text inputs are visible).
-        // Only guard against text field typing when NOT in fullscreen mode.
-        if !isWindowFullscreen {
+        // If an AppKit modal sheet is presented (e.g. Download sheet), don't intercept keys
+        if window.attachedSheet != nil || NSApp.keyWindow?.attachedSheet != nil {
+            return false
+        }
+
+        let isPlayerFullscreen = MainVideoWindowController.shared.isPlayerFullscreen
+
+        // When in player fullscreen, the video takes over the entire display (no text inputs are visible).
+        // Only guard against text field typing when NOT in player fullscreen mode.
+        if !isPlayerFullscreen {
             // If the user is currently typing in an input field (like YouTube's search bar), do not steal keystrokes
             if VideoPlayerCoordinator.shared.isTypingInTextField {
                 if event.keyCode == 53 { // Escape: reset typing focus
@@ -71,6 +84,18 @@ public final class KeyboardShortcutHandler {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let isCmd = flags.contains(.command)
         let isShift = flags.contains(.shift)
+        let isCtrl = flags.contains(.control)
+
+        // Command + Control shortcuts
+        if isCmd && isCtrl {
+            switch event.keyCode {
+            case 3: // Ctrl + Cmd + F -> Toggle Window Full Screen
+                MainVideoWindowController.shared.toggleWindowFullscreen()
+                return true
+            default:
+                break
+            }
+        }
 
         // Command + Shift shortcuts
         if isCmd && isShift {
@@ -230,8 +255,12 @@ public final class KeyboardShortcutHandler {
                 return true
 
             case 53: // Escape -> Exit Fullscreen if active
-                if isWindowFullscreen {
-                    MainVideoWindowController.shared.handleBridgeFullscreenRequest(wantsFullscreen: false)
+                if MainVideoWindowController.shared.window?.styleMask.contains(.fullScreen) == true {
+                    if MainVideoWindowController.shared.isPlayerFullscreen {
+                        MainVideoWindowController.shared.handleBridgeFullscreenRequest(wantsFullscreen: false)
+                    } else {
+                        MainVideoWindowController.shared.toggleWindowFullscreen()
+                    }
                     return true
                 }
                 return false
