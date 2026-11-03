@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://mooziac.pages.dev">
-    <img src="Resources/banner5.svg" alt="Mooziac - Native YouTube and YouTube Music Player for Mac" width="100%">
+    <img src="Resources/banner5.png" alt="Mooziac - Native YouTube and YouTube Music Player for Mac" width="100%">
   </a>
 </p>
 <h1 align="center">Mooziac — The Native YouTube &amp; YouTube Music Player for Mac</h1>
