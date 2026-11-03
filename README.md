@@ -1,16 +1,14 @@
+<p align="center">
+  <a href="https://mooziac.pages.dev">
+    <img src="Resources/banner.svg" alt="Mooziac - Native YouTube and YouTube Music Player for Mac" width="100%">
+  </a>
+</p>
 <h1 align="center">Mooziac — The Native YouTube &amp; YouTube Music Player for Mac</h1>
 
 <p align="center">
   <b>The lightweight, native macOS desktop player for YouTube Videos, YouTube Music &amp; local audio.</b><br>
   Stream YouTube Music in your menu bar, watch 4K YouTube videos with Apple VideoToolbox GPU acceleration, skip sponsorships with SponsorBlock, and control volume with invisible trackpad edge gestures — with zero battery-draining Chromium bloat.
 </p>
-
-<p align="center">
-  <a href="https://mooziac.pages.dev">
-    <img src="Resources/banner.svg" alt="Mooziac - Native YouTube and YouTube Music Player for Mac" width="100%">
-  </a>
-</p>
-
 <p align="center">
   <a href="https://mooziac.pages.dev"><img src="https://img.shields.io/badge/YouTube_for_Mac-100%25_Native_Swift-FF0000?style=flat-square&logo=youtube&logoColor=white" alt="YouTube for Mac"></a>
   <a href="https://mooziac.pages.dev"><img src="https://img.shields.io/badge/YouTube_Music_for_Mac-Menu_Bar-FA4059?style=flat-square&logo=youtubemusic&logoColor=white" alt="YouTube Music for Mac"></a>
