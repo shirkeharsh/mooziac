@@ -132,6 +132,7 @@ extension DynamicIslandPlayerView {
 
         let themeRow = makeThemeFeatureRow()
         let progressRow = makeProgressStyleFeatureRow()
+        let accentColorRow = makeAccentColorFeatureRow()
 
         let loudnessRow = makeFeatureRow(
             icon: "speaker.wave.2.fill",
@@ -166,7 +167,7 @@ extension DynamicIslandPlayerView {
             onToggle: { DiscordRPCManager.shared.isEnabled = $0 }
         )
 
-        let featuresStack = NSStackView(views: [themeRow, progressRow, loudnessRow, gesturesRow, lyricsRow, discordRow])
+        let featuresStack = NSStackView(views: [themeRow, progressRow, accentColorRow, loudnessRow, gesturesRow, lyricsRow, discordRow])
         featuresStack.orientation = .vertical
         featuresStack.alignment = .leading
         featuresStack.spacing = 3

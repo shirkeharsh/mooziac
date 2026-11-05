@@ -11,6 +11,9 @@ class SettingsFlippedClipView: NSClipView {
 
 // MARK: - Color & Playing State Helpers
 func settingsAccentColor(tone: SettingsTone) -> NSColor {
+    if let custom = CustomAccentColorManager.customColor {
+        return custom
+    }
     if PlayerDesign.current == .glassMode {
         return NSColor.lightThemeSelector
     }
