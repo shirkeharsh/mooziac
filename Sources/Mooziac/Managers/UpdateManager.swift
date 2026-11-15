@@ -32,19 +32,10 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
         return URL(string: "https://api.github.com/repos/\(repositoryOwner)/\(repositoryName)/releases/latest")
     }
 
-    /// Check for updates from GitHub Releases
+    /// Check for updates from GitHub Releases (runs on every app launch and user request)
     /// - Parameter userInitiated: If true, shows alerts even if already up to date or on network failure.
     public func checkForUpdates(userInitiated: Bool = false) {
         guard !isChecking else { return }
-
-        // Throttle background checks to once every 24 hours
-        if !userInitiated {
-            let lastCheck = UserDefaults.standard.double(forKey: lastCheckKey)
-            let now = Date().timeIntervalSince1970
-            if lastCheck > 0 && (now - lastCheck) < 86400 {
-                return
-            }
-        }
 
         // Send a silent, non-blocking background ping to record DAU/MAU
         // (Fire-and-forget: completely independent of update logic, zero reliance)
