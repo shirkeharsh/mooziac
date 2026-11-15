@@ -7,10 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [1.2.2] - 2026-11-15
 
 ### Added
-- Wake Auto-Play Suppression: Added a setting to prevent playback from automatically starting when waking your Mac from sleep or unlocking after idle.
-- Discord Status Customization: Added options to hide Mooziac branding and interactive buttons in Discord Rich Presence.
+- Wake Auto-Play Suppression: Added an option to prevent playback from automatically starting when waking your Mac from sleep or unlocking after idle.
+- Discord Status Customization: Added settings to hide Mooziac branding and interactive buttons in Discord Rich Presence.
 - Community & Support Prompt: Added a native Bento Grid prompt to Star on GitHub, Buy Me a Coffee, or access the Support portal with a 14-day local snooze.
-- Accelerated Update Mirrors: Routed update checks through an edge-accelerated endpoint with automatic GitHub Releases fallback.
 
 ### Changed
 - Settings Control Styling: Modernized capsule toggles and step switches with improved theme baseline alignment and hover feedback.
