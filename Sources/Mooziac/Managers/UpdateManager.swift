@@ -188,7 +188,7 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
             return
         }
 
-        let releaseNotes = (json["releaseNotes"] as? String) ?? (json["body"] as? String) ?? "No release notes provided."
+        let releaseNotes = (json["body"] as? String) ?? (json["release_notes"] as? String) ?? (json["releaseNotes"] as? String) ?? "No release notes provided."
         let releasePageURL = (json["html_url"] as? String).flatMap { URL(string: $0) } ?? URL(string: "https://github.com/\(repositoryOwner)/\(repositoryName)/releases/latest")
 
         // Find direct ZIP and DMG download URLs
@@ -326,15 +326,18 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
             iconView?.isHidden = true
             iconView?.frame = .zero
 
+            let customWidth: CGFloat = 580.0
+            var winFrame = win.frame
+            winFrame.size.width = customWidth
             let margin: CGFloat = 28.0
-            let targetWidth = cv.bounds.width - (margin * 2)
+            let targetWidth = customWidth - (margin * 2)
 
             let pStyle = NSMutableParagraphStyle()
             pStyle.lineSpacing = 5.0
             let attrStr = NSMutableAttributedString(
                 string: infoField?.stringValue ?? alert.informativeText,
                 attributes: [
-                    .font: NSFont.systemFont(ofSize: 15.0, weight: .regular),
+                    .font: NSFont.systemFont(ofSize: 14.5, weight: .regular),
                     .foregroundColor: NSColor.labelColor,
                     .paragraphStyle: pStyle
                 ]
@@ -345,21 +348,49 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
                 with: NSSize(width: targetWidth, height: 2000),
                 options: [.usesLineFragmentOrigin, .usesFontLeading]
             ).size
-            let neededInfoHeight = ceil(neededTextSize.height) + 8
+            let neededInfoHeight = ceil(neededTextSize.height) + 12
             let titleHeight: CGFloat = 26.0
 
-            let neededTotalHeight: CGFloat = 28 + titleHeight + 14 + neededInfoHeight + 24 + 28 + 16
+            let neededTotalHeight: CGFloat = 28 + titleHeight + 14 + neededInfoHeight + 24 + 32 + 20
 
-            var winFrame = win.frame
             let heightDelta = neededTotalHeight - winFrame.size.height
             winFrame.size.height = neededTotalHeight
             winFrame.origin.y -= heightDelta
             win.setFrame(winFrame, display: true)
 
-            for button in alert.buttons {
-                var f = button.frame
-                f.origin.y = 16.0
-                button.frame = f
+            // Layout 4 buttons neatly across 580px:
+            // Left side: Support actions [⭐ Star on GitHub] [☕️ Buy Me a Coffee]
+            // Right side: Decision actions [Later] [Update Now (In-App)]
+            if alert.buttons.count >= 4 {
+                let btnUpdate = alert.buttons[0]
+                let btnCoffee = alert.buttons[1]
+                let btnStar = alert.buttons[2]
+                let btnLater = alert.buttons[3]
+
+                btnStar.sizeToFit()
+                var starFrame = btnStar.frame
+                starFrame.origin.x = margin
+                starFrame.origin.y = 18.0
+                btnStar.frame = starFrame
+
+                btnCoffee.sizeToFit()
+                var coffeeFrame = btnCoffee.frame
+                coffeeFrame.origin.x = starFrame.maxX + 10.0
+                coffeeFrame.origin.y = 18.0
+                btnCoffee.frame = coffeeFrame
+
+                btnUpdate.sizeToFit()
+                var updateFrame = btnUpdate.frame
+                updateFrame.size.width = max(updateFrame.size.width, 150.0)
+                updateFrame.origin.x = customWidth - margin - updateFrame.size.width
+                updateFrame.origin.y = 18.0
+                btnUpdate.frame = updateFrame
+
+                btnLater.sizeToFit()
+                var laterFrame = btnLater.frame
+                laterFrame.origin.x = updateFrame.minX - 12.0 - laterFrame.size.width
+                laterFrame.origin.y = 18.0
+                btnLater.frame = laterFrame
             }
 
             let totalH = cv.bounds.height
