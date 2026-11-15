@@ -208,41 +208,42 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
         return false
     }
 
-    private func formatFullReleaseNotes(_ raw: String) -> String {
+    private func formatCompactReleaseNotes(_ raw: String) -> String {
         let lines = raw.components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { line in
                 !line.isEmpty &&
+                !line.starts(with: "##") &&
+                !line.starts(with: "###") &&
                 !line.starts(with: "---") &&
                 !line.starts(with: "|") &&
                 !line.contains("Minimum System Requirements") &&
                 !line.lowercased().contains("buymeacoffee.com")
             }
-        let cleanLines = lines.map { line -> String in
+        let bulletLines = lines.map { line -> String in
             var l = line
-            if l.starts(with: "### ") {
-                l = "\n" + l.dropFirst(4) + ":"
-            } else if l.starts(with: "## ") {
-                l = l.dropFirst(3) + ":"
-            } else if l.starts(with: "- ") {
+            if l.starts(with: "- ") {
                 l = "• " + l.dropFirst(2)
             } else if l.starts(with: "* ") {
                 l = "• " + l.dropFirst(2)
+            } else if !l.starts(with: "•") {
+                l = "• " + l
             }
             return l
         }
-        let text = cleanLines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
-        if text.isEmpty {
+        if bulletLines.isEmpty {
             return "• Performance improvements and bug fixes."
         }
-        return text
+        return bulletLines.joined(separator: "\n")
     }
 
     private func showUpdateAvailableAlert(newVersion: String, releaseNotes: String, zipURL: URL?, dmgURL: URL?, webURL: URL?) {
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
-        alert.messageText = "New Update Available (\(newVersion))"
-        alert.informativeText = "Mooziac \(newVersion) is available (you are currently running \(currentVersion))."
+        alert.messageText = "🎉 New Update Available! (\(newVersion))"
+
+        let formattedNotes = formatCompactReleaseNotes(releaseNotes)
+        alert.informativeText = "You are currently running Mooziac \(currentVersion).\n\nHighlights:\n\(formattedNotes)"
         alert.alertStyle = .informational
         alert.icon = NSImage(size: NSSize(width: 0.1, height: 0.1))
 
@@ -258,76 +259,134 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
         starButton.target = self
         starButton.action = #selector(starOnGitHubClicked(_:))
 
-        let customWidth: CGFloat = 600.0
-        let margin: CGFloat = 24.0
-        let contentWidth = customWidth - (margin * 2)
-
-        let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: contentWidth, height: 180.0))
-        scrollView.hasVerticalScroller = true
-        scrollView.hasHorizontalScroller = false
-        scrollView.autohidesScrollers = false
-        scrollView.borderType = .bezelBorder
-
-        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: contentWidth - 16, height: 180.0))
-        textView.isEditable = false
-        textView.isSelectable = true
-        textView.drawsBackground = true
-        textView.backgroundColor = NSColor.textBackgroundColor
-        textView.textContainer?.widthTracksTextView = true
-        textView.textContainerInset = NSSize(width: 10, height: 10)
-
-        let pStyle = NSMutableParagraphStyle()
-        pStyle.lineSpacing = 4.0
-        let formattedNotes = formatFullReleaseNotes(releaseNotes)
-        let attrStr = NSAttributedString(
-            string: formattedNotes,
-            attributes: [
-                .font: NSFont.systemFont(ofSize: 12.5, weight: .regular),
-                .foregroundColor: NSColor.labelColor,
-                .paragraphStyle: pStyle
-            ]
-        )
-        textView.textStorage?.setAttributedString(attrStr)
-        scrollView.documentView = textView
-        alert.accessoryView = scrollView
-
         alert.layout()
 
         let win = alert.window
-        var winFrame = win.frame
-        winFrame.size.width = customWidth
-        win.setFrame(winFrame, display: true)
+        if let cv = win.contentView {
+            var iconView: NSView?
+            var titleField: NSTextField?
+            var infoField: NSTextField?
 
-        if alert.buttons.count >= 4 {
-            let btnUpdate = alert.buttons[0]
-            let btnCoffee = alert.buttons[1]
-            let btnStar = alert.buttons[2]
-            let btnLater = alert.buttons[3]
+            func findViews(_ v: NSView) {
+                for sub in v.subviews {
+                    if sub is NSImageView {
+                        iconView = sub
+                    } else if let tf = sub as? NSTextField {
+                        if tf.stringValue.contains("New Update Available") {
+                            titleField = tf
+                        } else if tf.stringValue.contains("Highlights") || tf.stringValue.contains("currently running") {
+                            infoField = tf
+                        }
+                    }
+                    findViews(sub)
+                }
+            }
+            findViews(cv)
 
-            btnStar.sizeToFit()
-            var starFrame = btnStar.frame
-            starFrame.origin.x = margin
-            starFrame.origin.y = 16.0
-            btnStar.frame = starFrame
+            iconView?.isHidden = true
+            iconView?.frame = .zero
 
-            btnCoffee.sizeToFit()
-            var coffeeFrame = btnCoffee.frame
-            coffeeFrame.origin.x = starFrame.maxX + 8.0
-            coffeeFrame.origin.y = 16.0
-            btnCoffee.frame = coffeeFrame
+            let margin: CGFloat = 28.0
 
-            btnUpdate.sizeToFit()
-            var updateFrame = btnUpdate.frame
-            updateFrame.size.width = max(updateFrame.size.width, 145.0)
-            updateFrame.origin.x = customWidth - margin - updateFrame.size.width
-            updateFrame.origin.y = 16.0
-            btnUpdate.frame = updateFrame
+            // Measure button intrinsic sizes to guarantee ample spacing with zero overlap
+            var btnStarWidth: CGFloat = 135.0
+            var btnCoffeeWidth: CGFloat = 160.0
+            var btnLaterWidth: CGFloat = 75.0
+            var btnUpdateWidth: CGFloat = 160.0
 
-            btnLater.sizeToFit()
-            var laterFrame = btnLater.frame
-            laterFrame.origin.x = updateFrame.minX - 10.0 - laterFrame.size.width
-            laterFrame.origin.y = 16.0
-            btnLater.frame = laterFrame
+            if alert.buttons.count >= 4 {
+                let btnUpdate = alert.buttons[0]
+                let btnCoffee = alert.buttons[1]
+                let btnStar = alert.buttons[2]
+                let btnLater = alert.buttons[3]
+
+                btnStar.sizeToFit()
+                btnCoffee.sizeToFit()
+                btnLater.sizeToFit()
+                btnUpdate.sizeToFit()
+
+                btnStarWidth = btnStar.frame.width
+                btnCoffeeWidth = btnCoffee.frame.width
+                btnLaterWidth = btnLater.frame.width
+                btnUpdateWidth = max(btnUpdate.frame.width, 150.0)
+            }
+
+            let minGapBetweenGroups: CGFloat = 40.0
+            let totalButtonsWidth = margin + btnStarWidth + 10.0 + btnCoffeeWidth + minGapBetweenGroups + btnLaterWidth + 12.0 + btnUpdateWidth + margin
+            let customWidth: CGFloat = max(660.0, ceil(totalButtonsWidth))
+            let targetWidth = customWidth - (margin * 2)
+
+            var winFrame = win.frame
+            winFrame.size.width = customWidth
+
+            let pStyle = NSMutableParagraphStyle()
+            pStyle.lineSpacing = 5.0
+            let attrStr = NSMutableAttributedString(
+                string: infoField?.stringValue ?? alert.informativeText,
+                attributes: [
+                    .font: NSFont.systemFont(ofSize: 14.0, weight: .regular),
+                    .foregroundColor: NSColor.labelColor,
+                    .paragraphStyle: pStyle
+                ]
+            )
+            infoField?.attributedStringValue = attrStr
+
+            let neededTextSize = attrStr.boundingRect(
+                with: NSSize(width: targetWidth, height: 2000),
+                options: [.usesLineFragmentOrigin, .usesFontLeading]
+            ).size
+            let neededInfoHeight = ceil(neededTextSize.height) + 12
+            let titleHeight: CGFloat = 26.0
+
+            let neededTotalHeight: CGFloat = 28 + titleHeight + 14 + neededInfoHeight + 24 + 32 + 20
+
+            let heightDelta = neededTotalHeight - winFrame.size.height
+            winFrame.size.height = neededTotalHeight
+            winFrame.origin.y -= heightDelta
+            win.setFrame(winFrame, display: true)
+
+            // Layout 4 buttons neatly across customWidth:
+            // Left side: Support actions [⭐ Star on GitHub] [☕️ Buy Me a Coffee]
+            // Right side: Decision actions [Later] [Update Now (In-App)]
+            if alert.buttons.count >= 4 {
+                let btnUpdate = alert.buttons[0]
+                let btnCoffee = alert.buttons[1]
+                let btnStar = alert.buttons[2]
+                let btnLater = alert.buttons[3]
+
+                var starFrame = btnStar.frame
+                starFrame.origin.x = margin
+                starFrame.origin.y = 18.0
+                btnStar.frame = starFrame
+
+                var coffeeFrame = btnCoffee.frame
+                coffeeFrame.origin.x = starFrame.maxX + 10.0
+                coffeeFrame.origin.y = 18.0
+                btnCoffee.frame = coffeeFrame
+
+                var updateFrame = btnUpdate.frame
+                updateFrame.size.width = btnUpdateWidth
+                updateFrame.origin.x = customWidth - margin - updateFrame.size.width
+                updateFrame.origin.y = 18.0
+                btnUpdate.frame = updateFrame
+
+                var laterFrame = btnLater.frame
+                laterFrame.origin.x = updateFrame.minX - 12.0 - laterFrame.size.width
+                laterFrame.origin.y = 18.0
+                btnLater.frame = laterFrame
+            }
+
+            let totalH = cv.bounds.height
+            if let title = titleField {
+                title.font = NSFont.systemFont(ofSize: 18, weight: .bold)
+                title.textColor = .labelColor
+                title.frame = NSRect(x: margin, y: totalH - 28 - titleHeight, width: targetWidth, height: titleHeight)
+            }
+
+            if let info = infoField {
+                let titleMinY = titleField?.frame.minY ?? (totalH - 28 - titleHeight)
+                info.frame = NSRect(x: margin, y: titleMinY - 14 - neededInfoHeight, width: targetWidth, height: neededInfoHeight)
+            }
         }
 
         win.center()
