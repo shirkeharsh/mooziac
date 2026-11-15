@@ -8,6 +8,7 @@ dev_server.js
 # Website & Edge Functions (Maintained in private repo shirkeharsh/mooziac-site)
 www/
 functions/
+mooziac-site/
 
 # OS cruft
 .DS_Store
