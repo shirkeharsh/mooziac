@@ -7,16 +7,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [1.2.2] - 2026-11-15
 
 ### Added
-- **Native Bento Grid Support Prompt**: Added a modern frosted-glass Bento Grid prompt highlighting community contribution avenues (Star on GitHub, Buy Me a Coffee, and Support portal) alongside a local-only 14-day snooze option.
-- **Zero-Telemetry Active User Counting**: Privacy-preserving daily update check via Cloudflare Pages edge (`version.json`) with Web Crypto SHA-256 anonymous hashing, enabling accurate DAU and MAU metrics without tracking user identity or IP addresses.
-- **Jasper Mission Control Telemetry Strip**: Real-time admin dashboard metrics displaying Daily Active Users (DAU), Monthly Active Users (MAU), and in-app prompt engagement.
+- Wake Auto-Play Suppression: Added a setting to prevent playback from automatically starting when waking your Mac from sleep or unlocking after idle.
+- Discord Status Customization: Added options to hide Mooziac branding and interactive buttons in Discord Rich Presence.
+- Community & Support Prompt: Added a native Bento Grid prompt to Star on GitHub, Buy Me a Coffee, or access the Support portal with a 14-day local snooze.
+- Accelerated Update Mirrors: Routed update checks through an edge-accelerated endpoint with automatic GitHub Releases fallback.
+
+### Changed
+- Settings Control Styling: Modernized capsule toggles and step switches with improved theme baseline alignment and hover feedback.
 
 ### Fixed
-- **Mini-Player Search & Track Selection**: Eliminated multi-track selection race conditions and timing conflicts during rapid song choices from the mini-player search dropdown.
-- **Audio Transition Blip**: Prevented milliseconds of brief audio overlap and crackle during track switches by optimizing WebKit DOM bridge click sequencing.
-- **Glass Search Field Focus**: Fixed focus stealing and Escape key dismissal behavior in the menu bar search input.
-- **Capsule Toggle Alignment**: Fixed state synchronization and hover highlight alignment in `NativeCapsuleToggleView` and `NativeCapsuleStepToggleView`.
-- **Artwork Cache Synchronization**: Synchronized the local artwork cache with the playback observer bridge to prevent missing artwork during fast track skips.
+- IME & Accent Popup Layering: Adjusted panel window ordering so Chinese and Japanese candidate lists and accent key hold popups appear above the search bar.
+- Search Shortcut Interception: Prevented global player hotkeys (such as "M" for mute) from firing while typing in the search field.
+- Mini-Player Track Selection: Resolved search dropdown click race conditions and eliminated millisecond audio overlap during track switches.
+- Artwork Cache Synchronization: Resolved an issue where album artwork could fail to load during rapid track navigation.
 
 ## [1.2.1] - 2026-10-30
 
