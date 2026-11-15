@@ -4,6 +4,20 @@ All notable changes to Mooziac are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.2.2] - 2026-11-15
+
+### Added
+- **Native Bento Grid Support Prompt**: Added a modern frosted-glass Bento Grid prompt highlighting community contribution avenues (Star on GitHub, Buy Me a Coffee, and Support portal) alongside a local-only 14-day snooze option.
+- **Zero-Telemetry Active User Counting**: Privacy-preserving daily update check via Cloudflare Pages edge (`version.json`) with Web Crypto SHA-256 anonymous hashing, enabling accurate DAU and MAU metrics without tracking user identity or IP addresses.
+- **Jasper Mission Control Telemetry Strip**: Real-time admin dashboard metrics displaying Daily Active Users (DAU), Monthly Active Users (MAU), and in-app prompt engagement.
+
+### Fixed
+- **Mini-Player Search & Track Selection**: Eliminated multi-track selection race conditions and timing conflicts during rapid song choices from the mini-player search dropdown.
+- **Audio Transition Blip**: Prevented milliseconds of brief audio overlap and crackle during track switches by optimizing WebKit DOM bridge click sequencing.
+- **Glass Search Field Focus**: Fixed focus stealing and Escape key dismissal behavior in the menu bar search input.
+- **Capsule Toggle Alignment**: Fixed state synchronization and hover highlight alignment in `NativeCapsuleToggleView` and `NativeCapsuleStepToggleView`.
+- **Artwork Cache Synchronization**: Synchronized the local artwork cache with the playback observer bridge to prevent missing artwork during fast track skips.
+
 ## [1.2.1] - 2026-10-30
 
 ### Added

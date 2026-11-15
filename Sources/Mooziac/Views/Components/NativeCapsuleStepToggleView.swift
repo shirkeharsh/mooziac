@@ -48,24 +48,25 @@ public final class NativeCapsuleStepToggleView: NSControl {
     }
     
     public func updateVisuals(animated: Bool = true) {
-        let isDark = (PlayerDesign.current == .darkMode)
-        let isLight = (PlayerDesign.current == .glassMode || (PlayerDesign.current == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
+        let isAdaptive = (PlayerDesign.current == .adaptive)
         
-        let activeColor: CGColor
-        if isLight {
-            activeColor = NSColor.lightThemeSelector.cgColor
-        } else if isDark {
-            activeColor = NSColor.darkThemeSelector.cgColor
+        let targetTrackColor: CGColor
+        let targetKnobColor: CGColor
+        
+        if isAdaptive {
+            // Adaptive theme: Signature Electric Cyan/Blue
+            targetTrackColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0).cgColor
+            targetKnobColor = NSColor.white.cgColor
         } else {
-            activeColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0).cgColor
+            // Other themes (OLED Dark Mode, Crystal Glass, Watery Transparent): Native Apple greyish-white
+            targetTrackColor = NSColor(hex: "E2E5EB").cgColor
+            targetKnobColor = NSColor(white: 0.12, alpha: 1.0).cgColor
         }
-        let targetTrackColor = activeColor
         
         let minX: CGFloat = 2.0
         let maxX: CGFloat = 16.0
         let effectiveSteps = max(1, totalSteps - 1)
         let targetKnobX: CGFloat = minX + (CGFloat(stepIndex) / CGFloat(effectiveSteps)) * (maxX - minX)
-        let targetKnobColor = isDark ? NSColor(white: 0.12, alpha: 1.0).cgColor : NSColor.white.cgColor
         
         if animated {
             CATransaction.begin()

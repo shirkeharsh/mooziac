@@ -85,6 +85,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         setupAutoSync()
 
+        // Track session for non-intrusive support prompt milestones
+        RatingPromptManager.shared.recordAppLaunch()
+
         // Check for updates in background (throttled to once every 24h)
         DispatchQueue.global().asyncAfter(deadline: .now() + 6.0) {
             UpdateManager.shared.checkForUpdates(userInitiated: false)

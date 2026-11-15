@@ -32,15 +32,26 @@ extension NowPlayingManager {
                     });
                 } catch (e) {}
             }
+            var mooziacIsComposing = false;
+            document.addEventListener('compositionstart', function() {
+                mooziacIsComposing = true;
+                mooziacReportFocus(true);
+            }, true);
+            document.addEventListener('compositionend', function() {
+                mooziacIsComposing = false;
+                mooziacReportFocus(mooziacIsEditable(document.activeElement));
+            }, true);
             document.addEventListener('focusin', function(e) {
                 if (mooziacIsEditable(e.target)) mooziacReportFocus(true);
             }, true);
             document.addEventListener('focusout', function(e) {
+                if (mooziacIsComposing) return;
                 // Only clear the flag if focus isn't landing on another editable
                 // element in the same tick (e.g. tabbing between fields).
                 setTimeout(function() {
+                    if (mooziacIsComposing) return;
                     mooziacReportFocus(mooziacIsEditable(document.activeElement));
-                }, 0);
+                }, 50);
             }, true);
             // Cover the case where focus was already on an editable element at
             // injection time (e.g. after a same-document SPA navigation).
@@ -785,6 +796,9 @@ extension NowPlayingManager {
         }
 
         lastTrackEndedTriggerTime = now
+
+        // Record completed song milestone for non-intrusive support prompt
+        RatingPromptManager.shared.recordSongCompleted()
 
         if repeatMode == .one {
             seek(to: 0.0)

@@ -240,6 +240,7 @@ public class GlassSearchField: NSSearchField {
         let ok = super.becomeFirstResponder()
         if ok && !isFocusedState {
             isFocusedState = true
+            StatusItemManager.shared?.setEditingMode(true)
             onFocusChange?(true)
             if let editor = currentEditor() as? NSTextView {
                 editor.drawsBackground = false
@@ -296,6 +297,9 @@ public class GlassSearchField: NSSearchField {
         let ok = super.resignFirstResponder()
         if ok && isFocusedState {
             isFocusedState = false
+            if stringValue.isEmpty {
+                StatusItemManager.shared?.setEditingMode(false)
+            }
             onFocusChange?(false)
             if !isHidden && alphaValue > 0.05 {
                 NSAnimationContext.runAnimationGroup { context in

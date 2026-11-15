@@ -18,6 +18,12 @@ class NowPlayingManager: NSObject, WKScriptMessageHandler {
     var lastTrackEndedTriggerTime: TimeInterval = 0
     
     var isSystemSleeping = false
+    var isScreenLocked = false
+    var lastWakeUnlockTimestamp: TimeInterval = 0
+    public var isPreventAutoplayOnWakeEnabled: Bool {
+        get { UserDefaults.standard.object(forKey: "YTM_preventAutoplayOnWake") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "YTM_preventAutoplayOnWake") }
+    }
     let domHealthMonitor = DOMHealthMonitor()
     let notificationManager = TrackNotificationManager()
 
@@ -106,7 +112,29 @@ class NowPlayingManager: NSObject, WKScriptMessageHandler {
             guard let self = self else { return }
             Log.playback.info("System did wake (lid opened / wake) - maintaining paused state")
             self.isSystemSleeping = false
-            self.enforcePausedStateOnWake()
+            self.lastWakeUnlockTimestamp = Date().timeIntervalSince1970
+            if self.isPreventAutoplayOnWakeEnabled {
+                self.enforcePausedStateOnWake()
+            }
+        }
+
+        let dnc = DistributedNotificationCenter.default()
+        dnc.addObserver(forName: NSNotification.Name("com.apple.screenIsLocked"), object: nil, queue: .main) { [weak self] _ in
+            guard let self = self else { return }
+            self.isScreenLocked = true
+            if self.isPreventAutoplayOnWakeEnabled && self.currentState.isPlaying {
+                Log.playback.info("Screen locked with wake protection enabled - pausing playback")
+                self.pause()
+            }
+        }
+        dnc.addObserver(forName: NSNotification.Name("com.apple.screenIsUnlocked"), object: nil, queue: .main) { [weak self] _ in
+            guard let self = self else { return }
+            self.isScreenLocked = false
+            self.lastWakeUnlockTimestamp = Date().timeIntervalSince1970
+            if self.isPreventAutoplayOnWakeEnabled {
+                Log.playback.info("Screen unlocked - enforcing paused state to prevent idle autoplay")
+                self.enforcePausedStateOnWake()
+            }
         }
     }
     
@@ -364,8 +392,16 @@ extension NowPlayingManager {
         let rcc = MPRemoteCommandCenter.shared()
 
         rcc.playCommand.addTarget { [weak self] _ in
+            guard let self = self else { return .commandFailed }
             guard StatusItemManager.shared?.currentMode != .youtube else { return .commandFailed }
-            self?.play()
+            if self.isPreventAutoplayOnWakeEnabled {
+                let elapsed = Date().timeIntervalSince1970 - self.lastWakeUnlockTimestamp
+                if elapsed < 4.0 {
+                    Log.playback.info("Suppressed spurious remote playCommand within 4s wake/unlock grace period (\(elapsed)s)")
+                    return .success
+                }
+            }
+            self.play()
             return .success
         }
 
@@ -376,8 +412,16 @@ extension NowPlayingManager {
         }
 
         rcc.togglePlayPauseCommand.addTarget { [weak self] _ in
+            guard let self = self else { return .commandFailed }
             guard StatusItemManager.shared?.currentMode != .youtube else { return .commandFailed }
-            self?.togglePlayPause()
+            if self.isPreventAutoplayOnWakeEnabled && !self.currentState.isPlaying {
+                let elapsed = Date().timeIntervalSince1970 - self.lastWakeUnlockTimestamp
+                if elapsed < 4.0 {
+                    Log.playback.info("Suppressed spurious remote togglePlayPauseCommand to play within 4s wake/unlock grace period (\(elapsed)s)")
+                    return .success
+                }
+            }
+            self.togglePlayPause()
             return .success
         }
 

@@ -421,6 +421,7 @@ extension DynamicIslandPlayerView {
         for chevron in featureChevronViews {
             chevron.contentTintColor = tone.secondaryText.withAlphaComponent(0.7)
         }
+        gestureMappingSectionLabel?.textColor = tone.primaryText
 
         let utilityMuted = tone.secondaryText.withAlphaComponent(0.6)
         settingsVersionLabel?.textColor = utilityMuted

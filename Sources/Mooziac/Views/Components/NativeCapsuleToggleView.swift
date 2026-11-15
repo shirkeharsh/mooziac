@@ -9,6 +9,13 @@ final class NativeCapsuleToggleView: NSControl {
     }
     var onToggle: ((Bool) -> Void)?
     
+    /// When true, renders with native macOS menu bar styling regardless of player theme
+    var isMenuContext: Bool = false {
+        didSet {
+            updateVisuals(animated: false)
+        }
+    }
+    
     private let trackLayer = CALayer()
     private let knobLayer = CALayer()
     
@@ -43,46 +50,62 @@ final class NativeCapsuleToggleView: NSControl {
     }
     
     public func updateVisuals(animated: Bool = true) {
-        let isDark = (PlayerDesign.current == .darkMode)
+        if isMenuContext {
+            let isDarkMenu = SystemAppearanceHelper.isDarkSystemAppearance
+            let targetTrackColor: CGColor
+            let targetKnobColor: CGColor
+            
+            if isOn {
+                targetTrackColor = NSColor(hex: "E5E5EA").cgColor
+                targetKnobColor = NSColor(white: 0.14, alpha: 1.0).cgColor
+            } else {
+                targetTrackColor = isDarkMenu
+                    ? NSColor(white: 1.0, alpha: 0.16).cgColor
+                    : NSColor(white: 0.0, alpha: 0.12).cgColor
+                targetKnobColor = NSColor.white.cgColor
+            }
+            
+            applyColors(trackColor: targetTrackColor, knobColor: targetKnobColor, knobX: isOn ? 16.0 : 2.0, animated: animated)
+            return
+        }
+        
+        let isAdaptive = (PlayerDesign.current == .adaptive)
         let isLight = (PlayerDesign.current == .glassMode || (PlayerDesign.current == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
         
-        let activeColor: CGColor
-        if isDark {
-            activeColor = NSColor.darkThemeSelector.cgColor
-        } else if isLight {
-            activeColor = NSColor.lightThemeSelector.cgColor
-        } else {
-            activeColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0).cgColor
-        }
-        
-        let inactiveTrackColor: CGColor
-        if isLight {
-            inactiveTrackColor = NSColor(white: 0.0, alpha: 0.14).cgColor
-        } else {
-            inactiveTrackColor = NSColor(white: 1.0, alpha: 0.14).cgColor
-        }
-        
-        let targetTrackColor = isOn ? activeColor : inactiveTrackColor
-        let targetKnobX: CGFloat = isOn ? 16.0 : 2.0
+        let targetTrackColor: CGColor
         let targetKnobColor: CGColor
-        if isOn && isDark {
-            targetKnobColor = NSColor(white: 0.12, alpha: 1.0).cgColor
-        } else {
+        
+        if isAdaptive {
+            // Adaptive theme: Signature Electric Cyan/Blue
+            targetTrackColor = isOn ? NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0).cgColor : (isLight ? NSColor(white: 0.0, alpha: 0.14).cgColor : NSColor(white: 1.0, alpha: 0.14).cgColor)
             targetKnobColor = NSColor.white.cgColor
+        } else {
+            // Other themes (OLED Dark Mode, Crystal Glass, Watery Transparent): Native Apple greyish-white
+            if isOn {
+                targetTrackColor = NSColor(hex: "E2E5EB").cgColor
+                targetKnobColor = NSColor(white: 0.12, alpha: 1.0).cgColor
+            } else {
+                targetTrackColor = isLight ? NSColor(white: 0.0, alpha: 0.14).cgColor : NSColor(white: 1.0, alpha: 0.14).cgColor
+                targetKnobColor = NSColor.white.cgColor
+            }
         }
         
+        applyColors(trackColor: targetTrackColor, knobColor: targetKnobColor, knobX: isOn ? 16.0 : 2.0, animated: animated)
+    }
+    
+    private func applyColors(trackColor: CGColor, knobColor: CGColor, knobX: CGFloat, animated: Bool) {
         if animated {
             CATransaction.begin()
             CATransaction.setAnimationDuration(0.18)
             CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeInEaseOut))
-            trackLayer.backgroundColor = targetTrackColor
-            knobLayer.backgroundColor = targetKnobColor
-            knobLayer.frame.origin.x = targetKnobX
+            trackLayer.backgroundColor = trackColor
+            knobLayer.backgroundColor = knobColor
+            knobLayer.frame.origin.x = knobX
             CATransaction.commit()
         } else {
-            trackLayer.backgroundColor = targetTrackColor
-            knobLayer.backgroundColor = targetKnobColor
-            knobLayer.frame.origin.x = targetKnobX
+            trackLayer.backgroundColor = trackColor
+            knobLayer.backgroundColor = knobColor
+            knobLayer.frame.origin.x = knobX
         }
     }
     

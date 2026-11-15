@@ -42,6 +42,37 @@ final class DiscordRPCManager {
             }
         }
     }
+
+    public var isBrandingHidden: Bool {
+        get { UserDefaults.standard.bool(forKey: "YTM_discord_hideBranding") }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "YTM_discord_hideBranding")
+            refreshPresence()
+        }
+    }
+
+    public var isListenButtonHidden: Bool {
+        get { UserDefaults.standard.bool(forKey: "YTM_discord_hideListenButton") }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "YTM_discord_hideListenButton")
+            refreshPresence()
+        }
+    }
+
+    public var isTimestampsHidden: Bool {
+        get { UserDefaults.standard.bool(forKey: "YTM_discord_hideTimestamps") }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "YTM_discord_hideTimestamps")
+            refreshPresence()
+        }
+    }
+
+    public func refreshPresence() {
+        queue.async { [weak self] in
+            guard let self = self, self.isEnabled else { return }
+            self.updatePresenceInternal(state: NowPlayingManager.shared.currentState)
+        }
+    }
     
     private init() {
         // Prevent process termination on SIGPIPE when socket writes fail (EPIPE)
@@ -358,18 +389,29 @@ final class DiscordRPCManager {
         let pid = ProcessInfo.processInfo.processIdentifier
         let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
         
+        let hideBranding = isBrandingHidden
+        let hideButton = isListenButtonHidden
+        let hideTimestamps = isTimestampsHidden
+
         let titleStr = String(state.title.prefix(128))
-        let artistStr = state.artist.isEmpty ? "Mooziac" : String("by \(state.artist) • Mooziac".prefix(128))
+        let artistStr: String
+        if hideBranding {
+            artistStr = state.artist.isEmpty ? "" : String("by \(state.artist)".prefix(128))
+        } else {
+            artistStr = state.artist.isEmpty ? "Mooziac" : String("by \(state.artist) • Mooziac".prefix(128))
+        }
         
         var assetsDict: [String: Any] = [
-            "small_image": "mooziac",
-            "large_text": titleStr,
-            "small_text": "Mooziac — Native YouTube Music for Mac"
+            "large_text": titleStr
         ]
+        if !hideBranding {
+            assetsDict["small_image"] = "mooziac"
+            assetsDict["small_text"] = "Mooziac — Native YouTube Music for Mac"
+        }
         
         if !state.artworkUrl.isEmpty && (state.artworkUrl.hasPrefix("http://") || state.artworkUrl.hasPrefix("https://")) {
             assetsDict["large_image"] = state.artworkUrl
-        } else {
+        } else if !hideBranding {
             assetsDict["large_image"] = "mooziac"
         }
         
@@ -380,20 +422,22 @@ final class DiscordRPCManager {
             "assets": assetsDict
         ]
         
-        let accurateTime = state.getAccurateTime()
-        if state.duration > 0 &&
-           !accurateTime.isNaN && !accurateTime.isInfinite &&
-           !state.duration.isNaN && !state.duration.isInfinite {
-            let validAccurate = max(0, accurateTime)
-            let validDuration = max(0, state.duration)
-            let remaining = max(0, validDuration - validAccurate)
-            let startTimeMs = nowMs - Int64(validAccurate * 1000)
-            let endTimeMs = nowMs + Int64(remaining * 1000)
-            if startTimeMs > 0 && endTimeMs >= startTimeMs {
-                activity["timestamps"] = [
-                    "start": startTimeMs,
-                    "end": endTimeMs
-                ]
+        if !hideTimestamps {
+            let accurateTime = state.getAccurateTime()
+            if state.duration > 0 &&
+               !accurateTime.isNaN && !accurateTime.isInfinite &&
+               !state.duration.isNaN && !state.duration.isInfinite {
+                let validAccurate = max(0, accurateTime)
+                let validDuration = max(0, state.duration)
+                let remaining = max(0, validDuration - validAccurate)
+                let startTimeMs = nowMs - Int64(validAccurate * 1000)
+                let endTimeMs = nowMs + Int64(remaining * 1000)
+                if startTimeMs > 0 && endTimeMs >= startTimeMs {
+                    activity["timestamps"] = [
+                        "start": startTimeMs,
+                        "end": endTimeMs
+                    ]
+                }
             }
         }
         
@@ -402,7 +446,7 @@ final class DiscordRPCManager {
             targetUrl = "https://music.youtube.com/watch?v=\(state.videoId)"
         }
         
-        if !targetUrl.isEmpty &&
+        if !hideButton && !targetUrl.isEmpty &&
             (targetUrl.hasPrefix("https://") || targetUrl.hasPrefix("http://")) &&
             targetUrl.contains("music.youtube.com") {
             let validUrl = String(targetUrl.prefix(512))

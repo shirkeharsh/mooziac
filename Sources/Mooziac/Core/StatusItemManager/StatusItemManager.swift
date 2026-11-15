@@ -157,7 +157,7 @@ class StatusItemManager: NSObject {
             guard let self = self else { return }
             self.isDraggedFromDock = false
             UserDefaults.standard.set(false, forKey: "YTM_isDraggedFromDock")
-            self.panel.level = .statusBar
+            self.panel.level = self.isTextEditing ? .floating : .statusBar
             let width = self.panel.frame.width
             let height = self.panel.frame.height
             self.positionPanel(width: width, height: height)
@@ -237,7 +237,7 @@ class StatusItemManager: NSObject {
         if isDragged != self.isDraggedFromDock {
             self.isDraggedFromDock = isDragged
             mainViewController.dynamicIslandPlayer.setResetPositionButtonHidden(!isDragged)
-            if isDragged {
+            if isDragged || isTextEditing {
                 panel.level = .floating
             } else {
                 panel.level = .statusBar
@@ -496,10 +496,26 @@ class StatusItemManager: NSObject {
         UserDefaults.standard.removeObject(forKey: "YTM_playerFrameX")
         UserDefaults.standard.removeObject(forKey: "YTM_playerFrameY")
         UserDefaults.standard.removeObject(forKey: "YTM_playerTopY")
-        panel.level = .statusBar
+        panel.level = isTextEditing ? .floating : .statusBar
         let size = mainViewController.view.frame.size
         positionCustomWindow(panel, width: size.width, height: size.height)
         mainViewController.dynamicIslandPlayer.setResetPositionButtonHidden(true)
+    }
+
+    private var isTextEditing = false
+
+    /// Dynamically lowers the panel level to .floating while editing text,
+    /// so the macOS Accent Picker and Chinese/Japanese IME candidate popups appear in front of the panel.
+    public func setEditingMode(_ isEditing: Bool) {
+        guard let panel = panel else { return }
+        guard isTextEditing != isEditing else { return }
+        isTextEditing = isEditing
+        if isEditing {
+            panel.level = .floating
+            NSApp.activate(ignoringOtherApps: true)
+        } else {
+            panel.level = isDraggedFromDock ? .floating : .statusBar
+        }
     }
 
     func togglePanel(_ sender: NSStatusBarButton) {
@@ -612,6 +628,11 @@ class StatusItemManager: NSObject {
             // firstResponder, not a text-field type, so the check above misses it.
             // NowPlayingManager tracks that case via a JS focusin/focusout bridge.
             if NowPlayingManager.shared.isWebTextFieldFocused {
+                return event
+            }
+
+            // 1c. If the mini-player's search field is currently active, pass through untouched
+            if self.mainViewController.dynamicIslandPlayer.isSearchFieldActive {
                 return event
             }
 

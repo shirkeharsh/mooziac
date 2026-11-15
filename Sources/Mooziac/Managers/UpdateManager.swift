@@ -25,14 +25,17 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
     }
 
     public var currentVersion: String {
-        return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.1"
+        return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.2"
     }
+
+    /// Primary privacy-preserving update & active user ping endpoint on Cloudflare Pages
+    private let cloudflareVersionURL = URL(string: "https://mooziac.pages.dev/version.json")
 
     private var releasesAPIURL: URL? {
         return URL(string: "https://api.github.com/repos/\(repositoryOwner)/\(repositoryName)/releases/latest")
     }
 
-    /// Check for updates from GitHub Releases
+    /// Check for updates from Cloudflare Pages (with automatic GitHub Releases fallback)
     /// - Parameter userInitiated: If true, shows alerts even if already up to date or on network failure.
     public func checkForUpdates(userInitiated: Bool = false) {
         guard !isChecking else { return }
@@ -46,9 +49,60 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
             }
         }
 
-        guard let url = releasesAPIURL else { return }
-
         isChecking = true
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: self.lastCheckKey)
+
+        // Step 1: Check Cloudflare endpoint (counts DAU/MAU on Cloudflare Pages without tracking)
+        fetchVersionFromCloudflare { [weak self] cfResult in
+            guard let self = self else { return }
+            switch cfResult {
+            case .success(let payload):
+                self.isChecking = false
+                self.processReleasePayload(json: payload, userInitiated: userInitiated)
+            case .failure:
+                // Step 2: Fallback to GitHub Releases API if Cloudflare is unreachable
+                self.fetchVersionFromGitHub(userInitiated: userInitiated)
+            }
+        }
+    }
+
+    private func fetchVersionFromCloudflare(completion: @escaping (Result<[String: Any], Error>) -> Void) {
+        guard let url = cloudflareVersionURL else {
+            completion(.failure(NSError(domain: "UpdateError", code: -1, userInfo: nil)))
+            return
+        }
+
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 8.0)
+        request.httpShouldHandleCookies = false // Strict zero-cookie, zero-tracking policy
+        request.setValue("Mooziac/\(currentVersion)", forHTTPHeaderField: "User-Agent")
+
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode), let data = data else {
+                completion(.failure(NSError(domain: "UpdateError", code: -2, userInfo: nil)))
+                return
+            }
+            do {
+                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    completion(.success(json))
+                } else {
+                    completion(.failure(NSError(domain: "UpdateError", code: -3, userInfo: nil)))
+                }
+            } catch {
+                completion(.failure(error))
+            }
+        }
+        task.resume()
+    }
+
+    private func fetchVersionFromGitHub(userInitiated: Bool) {
+        guard let url = releasesAPIURL else {
+            isChecking = false
+            return
+        }
 
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 10.0)
         request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
@@ -57,8 +111,6 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
         let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             guard let self = self else { return }
             defer { self.isChecking = false }
-
-            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: self.lastCheckKey)
 
             if let error = error {
                 if userInitiated {
@@ -86,12 +138,11 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
                 return
             }
 
-            let json: [String: Any]
             do {
-                guard let parsed = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                     throw NSError(domain: "UpdateError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Malformed response payload"])
                 }
-                json = parsed
+                self.processReleasePayload(json: json, userInitiated: userInitiated)
             } catch {
                 Log.general.error("Failed to parse GitHub update release payload: \(error.localizedDescription)")
                 if userInitiated {
@@ -103,68 +154,16 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
                         )
                     }
                 }
-                return
             }
+        }
+        task.resume()
+    }
 
-            // Check if GitHub returned a "Not Found" error
-            if let message = json["message"] as? String, message.lowercased().contains("not found") {
-                if userInitiated {
-                    DispatchQueue.main.async {
-                        self.showAlert(
-                            title: "You're up to date!",
-                            message: "Mooziac \(self.currentVersion) is currently the newest version available.",
-                            style: .informational
-                        )
-                    }
-                }
-                return
-            }
-
-            guard let tagName = json["tag_name"] as? String else {
-                if userInitiated {
-                    DispatchQueue.main.async {
-                        self.showAlert(
-                            title: "You're up to date!",
-                            message: "Mooziac \(self.currentVersion) is currently the newest version available.",
-                            style: .informational
-                        )
-                    }
-                }
-                return
-            }
-
-            let releaseNotes = json["body"] as? String ?? "No release notes provided."
-            let releasePageURL = (json["html_url"] as? String).flatMap { URL(string: $0) }
-
-            // Find direct ZIP and DMG download URLs
-            var zipDownloadURL: URL?
-            var dmgDownloadURL: URL?
-            if let assets = json["assets"] as? [[String: Any]] {
-                for asset in assets {
-                    if let name = asset["name"] as? String,
-                       let downloadStr = asset["browser_download_url"] as? String,
-                       let assetURL = URL(string: downloadStr) {
-                        if name.hasSuffix(".zip") {
-                            zipDownloadURL = assetURL
-                        } else if name.hasSuffix(".dmg") {
-                            dmgDownloadURL = assetURL
-                        }
-                    }
-                }
-            }
-
-            let isNewer = self.isVersion(tagName, newerThan: self.currentVersion)
-
-            DispatchQueue.main.async {
-                if isNewer {
-                    self.showUpdateAvailableAlert(
-                        newVersion: tagName,
-                        releaseNotes: releaseNotes,
-                        zipURL: zipDownloadURL,
-                        dmgURL: dmgDownloadURL ?? releasePageURL,
-                        webURL: releasePageURL
-                    )
-                } else if userInitiated {
+    private func processReleasePayload(json: [String: Any], userInitiated: Bool) {
+        // Check if error message returned
+        if let message = json["message"] as? String, message.lowercased().contains("not found") {
+            if userInitiated {
+                DispatchQueue.main.async {
                     self.showAlert(
                         title: "You're up to date!",
                         message: "Mooziac \(self.currentVersion) is currently the newest version available.",
@@ -172,9 +171,63 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
                     )
                 }
             }
+            return
         }
 
-        task.resume()
+        // Support both GitHub tag_name and Cloudflare version/tag_name
+        guard let tagName = (json["tag_name"] as? String) ?? (json["version"] as? String) else {
+            if userInitiated {
+                DispatchQueue.main.async {
+                    self.showAlert(
+                        title: "You're up to date!",
+                        message: "Mooziac \(self.currentVersion) is currently the newest version available.",
+                        style: .informational
+                    )
+                }
+            }
+            return
+        }
+
+        let releaseNotes = (json["releaseNotes"] as? String) ?? (json["body"] as? String) ?? "No release notes provided."
+        let releasePageURL = (json["html_url"] as? String).flatMap { URL(string: $0) } ?? URL(string: "https://github.com/\(repositoryOwner)/\(repositoryName)/releases/latest")
+
+        // Find direct ZIP and DMG download URLs
+        var zipDownloadURL: URL? = (json["zip_url"] as? String).flatMap { URL(string: $0) }
+        var dmgDownloadURL: URL? = (json["dmg_url"] as? String).flatMap { URL(string: $0) } ?? (json["downloadUrl"] as? String).flatMap { URL(string: $0) }
+
+        if let assets = json["assets"] as? [[String: Any]] {
+            for asset in assets {
+                if let name = asset["name"] as? String,
+                   let downloadStr = asset["browser_download_url"] as? String,
+                   let assetURL = URL(string: downloadStr) {
+                    if name.hasSuffix(".zip") {
+                        zipDownloadURL = assetURL
+                    } else if name.hasSuffix(".dmg") {
+                        dmgDownloadURL = assetURL
+                    }
+                }
+            }
+        }
+
+        let isNewer = self.isVersion(tagName, newerThan: self.currentVersion)
+
+        DispatchQueue.main.async {
+            if isNewer {
+                self.showUpdateAvailableAlert(
+                    newVersion: tagName,
+                    releaseNotes: releaseNotes,
+                    zipURL: zipDownloadURL,
+                    dmgURL: dmgDownloadURL ?? releasePageURL,
+                    webURL: releasePageURL
+                )
+            } else if userInitiated {
+                self.showAlert(
+                    title: "You're up to date!",
+                    message: "Mooziac \(self.currentVersion) is currently the newest version available.",
+                    style: .informational
+                )
+            }
+        }
     }
 
     /// Compare semantic versions (e.g. "v1.0.1" vs "1.0.0")

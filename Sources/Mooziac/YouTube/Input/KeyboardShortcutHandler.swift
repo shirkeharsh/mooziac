@@ -56,6 +56,12 @@ public final class KeyboardShortcutHandler {
             return false
         }
 
+        // If the mini-player's search field is active, never steal keys
+        if let mainVC = StatusItemManager.shared?.mainViewController,
+           mainVC.dynamicIslandPlayer.isSearchFieldActive {
+            return false
+        }
+
         // If an AppKit modal sheet is presented (e.g. Download sheet), don't intercept keys
         if window.attachedSheet != nil || NSApp.keyWindow?.attachedSheet != nil {
             return false
@@ -74,10 +80,11 @@ public final class KeyboardShortcutHandler {
                 return false
             }
 
-            // If a native AppKit field editor is currently focused, do not steal keystrokes
-            if let responder = NSApp.keyWindow?.firstResponder,
-               responder is NSTextView || responder is NSText || responder is NSTextField {
-                return false
+            // If a native AppKit field editor is currently focused or marked text is active, do not steal keystrokes
+            if let responder = NSApp.keyWindow?.firstResponder {
+                if responder is NSTextView || responder is NSText || responder is NSTextField || responder is NSSearchField {
+                    return false
+                }
             }
         }
 

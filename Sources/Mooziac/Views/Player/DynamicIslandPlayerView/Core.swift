@@ -512,9 +512,18 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         searchField.alphaValue = 0.0
         searchField.isHidden = true
         searchField.onFocusChange = { [weak self] isFocused in
-            if !isFocused {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            if isFocused {
+                StatusItemManager.shared?.setEditingMode(true)
+            } else {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
                     guard let self = self else { return }
+                    // NEVER collapse if the search field has text or if IME composition/marked text is active
+                    if !self.searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        return
+                    }
+                    if let editor = self.searchField.currentEditor() as? NSTextView, editor.hasMarkedText() {
+                        return
+                    }
                     if let firstResponder = self.window?.firstResponder as? NSView {
                         if firstResponder.isDescendant(of: self.searchField) || firstResponder == self.searchField {
                             return
@@ -971,8 +980,13 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         }
     }
     
+    public var isSearchFieldActive: Bool {
+        return !searchField.isHidden && searchField.alphaValue > 0.05
+    }
+
     func expandSearchField() {
         guard searchField.isHidden || searchField.alphaValue < 0.5 else { return }
+        StatusItemManager.shared?.setEditingMode(true)
         
         let xConfig = NSImage.SymbolConfiguration(pointSize: 14.3, weight: .bold)
         if let image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "Close Search")?.withSymbolConfiguration(xConfig) {
@@ -1016,6 +1030,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
            responder == searchField || responder.isDescendant(of: searchField) {
             window?.makeFirstResponder(nil)
         }
+        StatusItemManager.shared?.setEditingMode(false)
         
         // 2. Fade out searchField quickly (0.10s) so it dissolves BEFORE controlsStack moves
         NSAnimationContext.runAnimationGroup({ context in
@@ -1334,7 +1349,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         // Same as StatusItemManager's guard: focus on an editable element inside
         // the embedded YouTube Music WKWebView reports firstResponder as the
         // WKWebView itself, so check the JS-tracked flag too.
-        if NowPlayingManager.shared.isWebTextFieldFocused {
+        if NowPlayingManager.shared.isWebTextFieldFocused || isSearchFieldActive {
             super.keyDown(with: event)
             return
         }

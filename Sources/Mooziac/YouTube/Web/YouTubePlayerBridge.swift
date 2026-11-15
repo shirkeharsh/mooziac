@@ -72,6 +72,17 @@ public final class YouTubePlayerBridge: NSObject, WKScriptMessageHandler {
                 if (hookAttempts > 30) clearInterval(hookTimer);
             }, 1000);
 
+            var isComposing = false;
+            document.addEventListener('compositionstart', function() {
+                isComposing = true;
+                postBridge({ event: 'focusChanged', isEditable: true });
+            }, true);
+
+            document.addEventListener('compositionend', function() {
+                isComposing = false;
+                postBridge({ event: 'focusChanged', isEditable: isEditable(document.activeElement) });
+            }, true);
+
             document.addEventListener('focusin', function(e) {
                 if (isEditable(e.target)) {
                     postBridge({ event: 'focusChanged', isEditable: true });
@@ -79,9 +90,11 @@ public final class YouTubePlayerBridge: NSObject, WKScriptMessageHandler {
             }, true);
 
             document.addEventListener('focusout', function(e) {
+                if (isComposing) return;
                 setTimeout(function() {
+                    if (isComposing) return;
                     postBridge({ event: 'focusChanged', isEditable: isEditable(document.activeElement) });
-                }, 0);
+                }, 50);
             }, true);
 
             document.addEventListener('click', function(e) {

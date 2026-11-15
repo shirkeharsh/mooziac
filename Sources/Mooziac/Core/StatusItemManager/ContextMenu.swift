@@ -1,25 +1,139 @@
 import AppKit
 import UniformTypeIdentifiers
 
+final class MenuCapsuleToggleRowView: NSView {
+    let titleLabel: NSTextField
+    let toggle: NativeCapsuleToggleView
+    var onToggle: ((Bool) -> Void)?
+    private var trackingArea: NSTrackingArea?
+    
+    private(set) var isHighlighted: Bool = false {
+        didSet {
+            guard isHighlighted != oldValue else { return }
+            titleLabel.textColor = isHighlighted ? .selectedMenuItemTextColor : .labelColor
+            needsDisplay = true
+        }
+    }
+    
+    init(title: String, isOn: Bool, onToggle: @escaping (Bool) -> Void) {
+        self.onToggle = onToggle
+        self.toggle = NativeCapsuleToggleView(frame: NSRect(x: 236, y: 4, width: 32, height: 18))
+        self.toggle.isMenuContext = true
+        self.titleLabel = NSTextField(labelWithString: title)
+        
+        super.init(frame: NSRect(x: 0, y: 0, width: 280, height: 26))
+        
+        autoresizingMask = [.width]
+        
+        titleLabel.font = NSFont.menuFont(ofSize: 0)
+        titleLabel.textColor = .labelColor
+        titleLabel.isBezeled = false
+        titleLabel.isEditable = false
+        titleLabel.isSelectable = false
+        titleLabel.drawsBackground = false
+        titleLabel.lineBreakMode = .byTruncatingTail
+        
+        toggle.isOn = isOn
+        toggle.updateVisuals(animated: false)
+        toggle.onToggle = { [weak self] state in
+            self?.onToggle?(state)
+        }
+        
+        addSubview(titleLabel)
+        addSubview(toggle)
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    override func layout() {
+        super.layout()
+        // Standard macOS menu text margin is 21pt (aligned with checkmark column)
+        let leftMargin: CGFloat = 21.0
+        let rightMargin: CGFloat = 14.0
+        let toggleWidth: CGFloat = 32.0
+        let toggleHeight: CGFloat = 18.0
+        
+        let toggleX = bounds.width - rightMargin - toggleWidth
+        let toggleY = round((bounds.height - toggleHeight) / 2.0)
+        toggle.frame = NSRect(x: max(leftMargin + 60, toggleX), y: toggleY, width: toggleWidth, height: toggleHeight)
+        
+        let labelHeight: CGFloat = 18.0
+        let labelY = round((bounds.height - labelHeight) / 2.0)
+        let labelWidth = max(0, toggle.frame.minX - leftMargin - 10.0)
+        titleLabel.frame = NSRect(x: leftMargin, y: labelY, width: labelWidth, height: labelHeight)
+    }
+    
+    override var intrinsicContentSize: NSSize {
+        let textWidth = titleLabel.attributedStringValue.size().width
+        let minWidth: CGFloat = 21.0 + textWidth + 16.0 + 32.0 + 14.0
+        return NSSize(width: max(280, minWidth), height: 26)
+    }
+    
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let existing = trackingArea {
+            removeTrackingArea(existing)
+        }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        self.trackingArea = area
+    }
+    
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        isHighlighted = true
+    }
+    
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        isHighlighted = false
+    }
+    
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil {
+            isHighlighted = false
+        }
+    }
+    
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        if isHighlighted {
+            let highlightRect = NSRect(x: 5, y: 1, width: bounds.width - 10, height: bounds.height - 2)
+            let path = NSBezierPath(roundedRect: highlightRect, xRadius: 4.5, yRadius: 4.5)
+            NSColor.selectedContentBackgroundColor.setFill()
+            path.fill()
+        }
+    }
+    
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        if bounds.contains(point) {
+            return self
+        }
+        return nil
+    }
+    
+    override func mouseDown(with event: NSEvent) {
+        super.mouseDown(with: event)
+        toggle.isOn.toggle()
+        toggle.updateVisuals(animated: true)
+        onToggle?(toggle.isOn)
+    }
+}
+
 extension StatusItemManager {
     private func makeCapsuleToggleMenuItem(title: String, isOn: Bool, onToggle: @escaping (Bool) -> Void) -> (menuItem: NSMenuItem, toggleView: NativeCapsuleToggleView) {
+        let rowView = MenuCapsuleToggleRowView(title: title, isOn: isOn, onToggle: onToggle)
         let menuItem = NSMenuItem()
-        let containerView = NSView(frame: NSRect(x: 0, y: 0, width: 280, height: 26))
-        
-        let label = NSTextField(labelWithString: title)
-        label.frame = NSRect(x: 12, y: 3, width: 220, height: 20)
-        label.font = NSFont.systemFont(ofSize: 12.0, weight: .regular)
-        label.textColor = NSColor.labelColor
-        
-        let toggle = NativeCapsuleToggleView(frame: NSRect(x: 236, y: 4, width: 32, height: 18))
-        toggle.isOn = isOn
-        toggle.onToggle = onToggle
-        
-        containerView.addSubview(label)
-        containerView.addSubview(toggle)
-        
-        menuItem.view = containerView
-        return (menuItem, toggle)
+        menuItem.view = rowView
+        return (menuItem, rowView.toggle)
     }
     
     private func makeGestureMappingMenuItem(for gesture: GestureType) -> NSMenuItem {
@@ -142,7 +256,7 @@ extension StatusItemManager {
         let gestureParent = NSMenuItem(title: "Trackpad Gestures Settings", action: nil, keyEquivalent: "")
         gestureParent.submenu = gestureMenu
         menu.addItem(gestureParent)
-        
+
         menu.addItem(NSMenuItem.separator())
 
         let openYouTubeItem = NSMenuItem(title: "Open YouTube", action: #selector(openYouTubeFromMenu), keyEquivalent: "y")
@@ -152,8 +266,31 @@ extension StatusItemManager {
 
         let settingsParent = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
         let settingsMenu = NSMenu(title: "Settings")
-        let settingsOpenYouTubeItem = NSMenuItem(title: "Open YouTube", action: #selector(openYouTubeFromMenu), keyEquivalent: "")
-        settingsMenu.addItem(settingsOpenYouTubeItem)
+
+        let wakeRes = makeCapsuleToggleMenuItem(
+            title: "Prevent Wake Auto-Play",
+            isOn: NowPlayingManager.shared.isPreventAutoplayOnWakeEnabled,
+            onToggle: { enabled in
+                NowPlayingManager.shared.isPreventAutoplayOnWakeEnabled = enabled
+                CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(
+                    text: enabled ? "✓ Prevent Wake Auto-Play: Enabled" : "Prevent Wake Auto-Play: Disabled"
+                )
+            }
+        )
+        settingsMenu.addItem(wakeRes.menuItem)
+
+        let discordBrandingRes = makeCapsuleToggleMenuItem(
+            title: "Hide Mooziac Branding",
+            isOn: DiscordRPCManager.shared.isBrandingHidden,
+            onToggle: { enabled in
+                DiscordRPCManager.shared.isBrandingHidden = enabled
+                CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(
+                    text: enabled ? "✓ Mooziac Branding: Hidden" : "Mooziac Branding: Visible"
+                )
+            }
+        )
+        settingsMenu.addItem(discordBrandingRes.menuItem)
+
         settingsMenu.addItem(NSMenuItem.separator())
         settingsMenu.addItem(NSMenuItem(title: "Download Location", action: nil, keyEquivalent: ""))
         let downloadLocationItem = NSMenuItem(title: currentDownloadLocationTitle(), action: nil, keyEquivalent: "")

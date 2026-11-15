@@ -4,7 +4,7 @@ final class StatusItemPanel: NSPanel {
     init(contentViewController: NSViewController) {
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: 360, height: 120),
-            styleMask: [.borderless, .nonactivatingPanel],
+            styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )

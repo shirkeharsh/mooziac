@@ -799,6 +799,9 @@ extension DynamicIslandPlayerView {
         if let subView = settingsContainerView.subviews.first(where: { $0.identifier == NSUserInterfaceItemIdentifier("PlaylistSubView") }) {
             subView.isHidden = true
         }
+        if let gestureSubView = settingsContainerView.subviews.first(where: { $0.identifier == NSUserInterfaceItemIdentifier("GestureMappingSubView") }) {
+            gestureSubView.isHidden = true
+        }
         settingsHeaderLabel.isHidden = false
     }
 

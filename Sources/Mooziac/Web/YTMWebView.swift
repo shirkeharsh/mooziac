@@ -851,6 +851,9 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         recoveryVideoId = UserDefaults.standard.string(forKey: "YTM_lastVideoId") ?? ""
         recoveryTime = UserDefaults.standard.double(forKey: "YTM_lastTime")
         recoveryResumePlayback = NowPlayingManager.shared.currentState.isPlaying
+        if NowPlayingManager.shared.isPreventAutoplayOnWakeEnabled && (NowPlayingManager.shared.isSystemSleeping || NowPlayingManager.shared.isScreenLocked) {
+            recoveryResumePlayback = false
+        }
         Log.web.debug("Recovery snapshot: video=\(self.recoveryVideoId) time=\(self.recoveryTime)s wasPlaying=\(self.recoveryResumePlayback)")
         
         // Drop stale callbacks from the dying process and re-wire the message
