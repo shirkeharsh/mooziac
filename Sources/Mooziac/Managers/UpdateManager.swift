@@ -28,14 +28,11 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
         return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.2"
     }
 
-    /// Primary privacy-preserving update & active user ping endpoint on Cloudflare Pages
-    private let cloudflareVersionURL = URL(string: "https://mooziac.pages.dev/version.json")
-
     private var releasesAPIURL: URL? {
         return URL(string: "https://api.github.com/repos/\(repositoryOwner)/\(repositoryName)/releases/latest")
     }
 
-    /// Check for updates from Cloudflare Pages (with automatic GitHub Releases fallback)
+    /// Check for updates from GitHub Releases
     /// - Parameter userInitiated: If true, shows alerts even if already up to date or on network failure.
     public func checkForUpdates(userInitiated: Bool = false) {
         guard !isChecking else { return }
@@ -49,60 +46,10 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
             }
         }
 
+        guard let url = releasesAPIURL else { return }
+
         isChecking = true
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: self.lastCheckKey)
-
-        // Step 1: Check Cloudflare endpoint (counts DAU/MAU on Cloudflare Pages without tracking)
-        fetchVersionFromCloudflare { [weak self] cfResult in
-            guard let self = self else { return }
-            switch cfResult {
-            case .success(let payload):
-                self.isChecking = false
-                self.processReleasePayload(json: payload, userInitiated: userInitiated)
-            case .failure:
-                // Step 2: Fallback to GitHub Releases API if Cloudflare is unreachable
-                self.fetchVersionFromGitHub(userInitiated: userInitiated)
-            }
-        }
-    }
-
-    private func fetchVersionFromCloudflare(completion: @escaping (Result<[String: Any], Error>) -> Void) {
-        guard let url = cloudflareVersionURL else {
-            completion(.failure(NSError(domain: "UpdateError", code: -1, userInfo: nil)))
-            return
-        }
-
-        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 8.0)
-        request.httpShouldHandleCookies = false // Strict zero-cookie, zero-tracking policy
-        request.setValue("Mooziac/\(currentVersion)", forHTTPHeaderField: "User-Agent")
-
-        let task = URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                completion(.failure(error))
-                return
-            }
-            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode), let data = data else {
-                completion(.failure(NSError(domain: "UpdateError", code: -2, userInfo: nil)))
-                return
-            }
-            do {
-                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    completion(.success(json))
-                } else {
-                    completion(.failure(NSError(domain: "UpdateError", code: -3, userInfo: nil)))
-                }
-            } catch {
-                completion(.failure(error))
-            }
-        }
-        task.resume()
-    }
-
-    private func fetchVersionFromGitHub(userInitiated: Bool) {
-        guard let url = releasesAPIURL else {
-            isChecking = false
-            return
-        }
 
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 10.0)
         request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
