@@ -46,6 +46,10 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
             }
         }
 
+        // Send a silent, non-blocking background ping to record DAU/MAU
+        // (Fire-and-forget: completely independent of update logic, zero reliance)
+        sendSilentActivePing()
+
         guard let url = releasesAPIURL else { return }
 
         isChecking = true
@@ -104,6 +108,15 @@ public final class UpdateManager: NSObject, URLSessionDownloadDelegate {
             }
         }
         task.resume()
+    }
+
+    /// Silent fire-and-forget background ping for anonymous DAU/MAU counting
+    private func sendSilentActivePing() {
+        guard let pingURL = URL(string: "https://mooziac.pages.dev/api/track?event=ping") else { return }
+        var request = URLRequest(url: pingURL, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 4.0)
+        request.httpShouldHandleCookies = false
+        request.setValue("Mooziac/\(currentVersion)", forHTTPHeaderField: "User-Agent")
+        URLSession.shared.dataTask(with: request).resume()
     }
 
     private func processReleasePayload(json: [String: Any], userInitiated: Bool) {
