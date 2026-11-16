@@ -146,7 +146,7 @@ extension DynamicIslandPlayerView {
                         self.containerPill.layer?.backgroundColor = darkBg.cgColor
                         self.containerPill.layer?.borderWidth = 1.0
                         self.containerPill.layer?.borderColor = borderGlow.cgColor
-                        self.waveformProgressView.accentColor = dominantColor
+                        self.waveformProgressView.accentColor = CustomAccentColorManager.customColor ?? dominantColor
                     }
                 }
             }
@@ -170,7 +170,7 @@ extension DynamicIslandPlayerView {
                 containerPill.layer?.backgroundColor = bg
                 containerPill.layer?.borderWidth = 1.0
                 containerPill.layer?.borderColor = border
-                waveformProgressView.accentColor = lastAmbientAccentColor ?? NSColor(red: 0.40, green: 0.72, blue: 1.0, alpha: 1.0)
+                waveformProgressView.accentColor = CustomAccentColorManager.customColor ?? (lastAmbientAccentColor ?? NSColor(red: 0.40, green: 0.72, blue: 1.0, alpha: 1.0))
                 
                 titleLabel.font = NSFont.systemFont(ofSize: 13, weight: .bold)
                 artistLabel.font = NSFont.systemFont(ofSize: 11, weight: .medium)
@@ -200,7 +200,7 @@ extension DynamicIslandPlayerView {
                 containerPill.layer?.backgroundColor = SystemAppearanceHelper.darkModeBackingColor.cgColor
                 containerPill.layer?.borderWidth = 1.0
                 containerPill.layer?.borderColor = SystemAppearanceHelper.darkModeBorderColor.cgColor
-                waveformProgressView.accentColor = NSColor.white
+                waveformProgressView.accentColor = CustomAccentColorManager.customColor ?? NSColor.white
                 
                 titleLabel.font = NSFont.systemFont(ofSize: 13, weight: .bold)
                 artistLabel.font = NSFont.systemFont(ofSize: 11, weight: .medium)
@@ -239,7 +239,7 @@ extension DynamicIslandPlayerView {
                 let deepBlack = SystemAppearanceHelper.secondaryTextColor(for: .glassMode)
                 let tertiaryBlack = SystemAppearanceHelper.tertiaryTextColor(for: .glassMode)
                 
-                waveformProgressView.accentColor = pitchBlack
+                waveformProgressView.accentColor = CustomAccentColorManager.customColor ?? pitchBlack
                 
                 titleLabel.textColor = pitchBlack
                 artistLabel.textColor = deepBlack
@@ -330,7 +330,7 @@ extension DynamicIslandPlayerView {
                 artistLabel.textColor = secondaryColor
                 timeLabel.textColor = tertiaryColor
                 
-                waveformProgressView.accentColor = primaryColor
+                waveformProgressView.accentColor = CustomAccentColorManager.customColor ?? primaryColor
                 
                 playPauseButton.contentTintColor = primaryColor
                 previousButton.contentTintColor = fluidBtnTint
