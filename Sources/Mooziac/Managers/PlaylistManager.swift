@@ -1120,6 +1120,12 @@ public final class PlaylistManager: NSObject {
             }
 
         case .online(let videoId):
+            NowPlayingManager.shared.applyOptimisticTrackChange(
+                title: item.title,
+                artist: item.artist,
+                artworkUrl: item.artworkUrl,
+                videoId: videoId
+            )
             playOnlineVideo(videoId: videoId)
 
         case .unavailable:
@@ -1196,13 +1202,18 @@ public final class PlaylistManager: NSObject {
         return false
     }
 
+    private var pendingOnlinePlayWorkItem: DispatchWorkItem?
+
     public func playOnlineVideo(videoId: String) {
         guard !videoId.isEmpty else { return }
         NowPlayingManager.shared.switchToOnlineMode()
-        DispatchQueue.main.async {
+        pendingOnlinePlayWorkItem?.cancel()
+        let work = DispatchWorkItem {
             guard let mainVC = StatusItemManager.shared?.mainViewController else { return }
             mainVC.webViewContainer.navigateToVideo(videoId: videoId)
         }
+        pendingOnlinePlayWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.075, execute: work)
     }
 
     // MARK: - Infinite Flow (Never-Ending Autoplay)

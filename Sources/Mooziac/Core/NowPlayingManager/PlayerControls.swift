@@ -72,6 +72,8 @@ extension NowPlayingManager {
             }
         }
 
+        applyOptimisticPlayState(!currentState.isPlaying)
+
         let js = """
         (function() {
             var video = document.querySelector('video');
@@ -439,8 +441,14 @@ extension NowPlayingManager {
             NativeAudioPlayer.shared.nextTrack()
             return
         }
+        skipGeneration &+= 1
+        let currentSkipGen = skipGeneration
+        beginOptimisticSkip()
+
         let js = """
         (function() {
+            var skipGen = \(currentSkipGen);
+            window.__mooziacSkipGeneration = skipGen;
             window.__mooziacAutoplayPending = true;
             window.__mooziacPlaybackSuppressed = false;
             window.__mooziacBlockAutoplay = false;
@@ -469,9 +477,10 @@ extension NowPlayingManager {
             }
 
             function ensurePlayingSoon() {
-                [800, 1600].forEach(function(delay) {
+                [500, 1200].forEach(function(delay) {
                     setTimeout(function() {
                         try {
+                            if (window.__mooziacSkipGeneration !== skipGen) return;
                             if (window.__mooziacPlaybackSuppressed || window.__mooziacBlockAutoplay) return;
                             var v = document.querySelector('video');
                             if (v && !v.paused) return;
@@ -531,7 +540,7 @@ extension NowPlayingManager {
                 var queueResult = (typeof mooziacQuery === 'function') ? mooziacQuery(['ytmusic-player-queue #contents', '#queue #contents']) : null;
                 var container = queueResult ? queueResult.element : document;
                 var items = Array.from(container.querySelectorAll('ytmusic-player-queue-item')).filter(function(el) {
-                    return document.body.contains(el) && (el.offsetWidth > 0 || el.offsetHeight > 0 || el.offsetParent !== null);
+                    return document.body.contains(el);
                 });
                 if (items && items.length > 0) {
                     var currentIdx = items.findIndex(function(el) {
@@ -583,8 +592,14 @@ extension NowPlayingManager {
             NativeAudioPlayer.shared.previousTrack()
             return
         }
+        skipGeneration &+= 1
+        let currentSkipGen = skipGeneration
+        beginOptimisticSkip()
+
         let js = """
         (function() {
+            var skipGen = \(currentSkipGen);
+            window.__mooziacSkipGeneration = skipGen;
             window.__mooziacAutoplayPending = true;
             window.__mooziacPlaybackSuppressed = false;
             window.__mooziacBlockAutoplay = false;
@@ -613,9 +628,10 @@ extension NowPlayingManager {
             }
 
             function ensurePlayingSoon() {
-                [800, 1600].forEach(function(delay) {
+                [500, 1200].forEach(function(delay) {
                     setTimeout(function() {
                         try {
+                            if (window.__mooziacSkipGeneration !== skipGen) return;
                             if (window.__mooziacPlaybackSuppressed || window.__mooziacBlockAutoplay) return;
                             var v = document.querySelector('video');
                             if (v && !v.paused) return;
@@ -657,7 +673,7 @@ extension NowPlayingManager {
                 var queueResult = (typeof mooziacQuery === 'function') ? mooziacQuery(['ytmusic-player-queue #contents', '#queue #contents']) : null;
                 var container = queueResult ? queueResult.element : document;
                 var items = Array.from(container.querySelectorAll('ytmusic-player-queue-item')).filter(function(el) {
-                    return document.body.contains(el) && (el.offsetWidth > 0 || el.offsetHeight > 0 || el.offsetParent !== null);
+                    return document.body.contains(el);
                 });
                 if (items && items.length > 0) {
                     var currentIdx = items.findIndex(function(el) {
@@ -873,6 +889,7 @@ extension NowPlayingManager {
             NativeAudioPlayer.shared.seek(to: seconds)
             return
         }
+        applyOptimisticSeek(seconds)
         let js = """
         (function() {
             try {

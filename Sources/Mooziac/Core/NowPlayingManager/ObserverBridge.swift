@@ -168,7 +168,7 @@ extension NowPlayingManager {
                     var video = document.querySelector('video');
                     var isPlaying = false, currentTime = 0, duration = 0, playbackRate = 1.0;
                     if (video) {
-                        isPlaying = !video.paused && !video.ended && video.readyState > 2;
+                        isPlaying = !video.paused && !video.ended && (video.readyState > 2 || window.__mooziacAutoplayPending === true);
                         currentTime = video.currentTime || 0;
                         duration = video.duration || 0;
                         playbackRate = video.playbackRate || 1.0;
@@ -181,7 +181,10 @@ extension NowPlayingManager {
                     var now = Date.now();
                     var isSeek = Math.abs(currentTime - lastTime) > 1.2;
                     var playStateChanged = (lastIsPlaying !== isPlaying);
-                    if (isSeek || playStateChanged) {
+                    var quickTitleEl = document.querySelector('ytmusic-player-bar .title') || document.querySelector('.ytmusic-player-bar.title');
+                    var quickTitle = quickTitleEl ? (quickTitleEl.textContent || '').trim() : '';
+                    var trackLooksChanged = (quickTitle && quickTitle !== cachedTitle) || (currentTime < 1.5 && lastTime > 4.0);
+                    if (isSeek || playStateChanged || trackLooksChanged) {
                         force = true;
                     }
                     if (!force && !isPlaying && lastIsPlaying === false && Math.abs(currentTime - lastTime) < 0.1) {
@@ -646,12 +649,12 @@ extension NowPlayingManager {
                             window.__mooziacAutoplayAttempts = 0;
                         });
                         video.addEventListener('canplay', function() {
-                            // Give natural browser autoplay 800ms to begin smoothly before checking if a recovery nudge is needed
+                            // Give natural browser autoplay 250ms to begin smoothly before checking if a recovery nudge is needed
                             setTimeout(function() {
                                 if (window.__mooziacAutoplayPending) {
                                     recoverAutoplayIfNeeded();
                                 }
-                            }, 800);
+                            }, 250);
                         });
                         ['pause', 'ratechange', 'seeked'].forEach(function(evt) {
                             video.addEventListener(evt, function() {
@@ -669,7 +672,19 @@ extension NowPlayingManager {
                     }
                 }
 
-                // Hook YouTube Player API state changes (0 = ENDED)
+                // Observe player bar title text so track metadata updates push immediately on skip
+                try {
+                    var titleNode = document.querySelector('ytmusic-player-bar .title') || document.querySelector('.ytmusic-player-bar.title');
+                    if (titleNode && window.MutationObserver && !titleNode.__mooziacTitleObserved) {
+                        titleNode.__mooziacTitleObserved = true;
+                        var titleObserver = new MutationObserver(function() {
+                            updateNowPlaying(true);
+                        });
+                        titleObserver.observe(titleNode, { childList: true, characterData: true, subtree: true });
+                    }
+                } catch(e) {}
+
+                // Hook YouTube Player API state changes (0 = ENDED, 1 = PLAYING, 3 = BUFFERING)
                 try {
                     var playerApi = document.getElementById('movie_player') || (document.querySelector('ytmusic-player') && document.querySelector('ytmusic-player').playerApi);
                     if (playerApi && typeof playerApi.addEventListener === 'function' && !playerApi.__mooziacEndedHooked) {
@@ -677,6 +692,8 @@ extension NowPlayingManager {
                         playerApi.addEventListener('onStateChange', function(state) {
                             if (state === 0) {
                                 notifyTrackEnded('playerStateEnded');
+                            } else if (state === 1 || state === 3) {
+                                updateNowPlaying(true);
                             }
                         });
                     }

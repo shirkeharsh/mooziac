@@ -1014,8 +1014,20 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
                 }
             } catch(e) {}
 
-            // 3. Navigate page directly via window.location.replace
-            // Reinitializes the queue specifically for this video with zero queue conflict or song hopping
+            // 3. In-place SPA Router navigation via ytmusic-app.resolveCommand (avoids full page reload)
+            try {
+                var app = document.querySelector('ytmusic-app');
+                if (app && typeof app.resolveCommand === 'function') {
+                    app.resolveCommand({
+                        watchEndpoint: {
+                            videoId: videoId
+                        }
+                    });
+                    return { success: true, method: 'resolveCommand' };
+                }
+            } catch(e) {}
+
+            // 4. Fallback: Navigate page directly via window.location.replace
             var targetUrl = 'https://music.youtube.com/watch?v=' + videoId;
             window.location.replace(targetUrl);
             return { success: true, method: 'locationReplace' };
@@ -1031,6 +1043,21 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
                 if let url = URL(string: targetUrlStr) {
                     self.webView.load(URLRequest(url: url))
                 }
+                return
+            }
+
+            if let dict = result as? [String: Any], (dict["method"] as? String) == "resolveCommand" {
+                let watchdog = DispatchWorkItem { [weak self] in
+                    guard let self = self, self.navigationGeneration == currentGeneration else { return }
+                    if NowPlayingManager.shared.currentVideoId != videoId {
+                        let targetUrlStr = "https://music.youtube.com/watch?v=\(escapedVideoId)"
+                        if let url = URL(string: targetUrlStr) {
+                            self.webView.load(URLRequest(url: url))
+                        }
+                    }
+                }
+                self.routerWatchdogItem = watchdog
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.8, execute: watchdog)
             }
         }
     }

@@ -164,8 +164,68 @@ class NowPlayingManager: NSObject, WKScriptMessageHandler {
 
     var currentVideoId = ""
     var lastTrackChangeTime: CFTimeInterval = 0
+    var skipGeneration: UInt64 = 0
+    var lastOptimisticSkipTime: CFTimeInterval = 0
     var isRestoringAfterTermination = false
     var lastDiscordPresenceKey = ""
+
+    /// Immediately updates the UI with the target track's metadata when skipping inside a playlist
+    /// so the Dynamic Island responds in <16ms instead of waiting for WKWebView to finish loading.
+    func applyOptimisticTrackChange(
+        title: String,
+        artist: String,
+        album: String = "",
+        artworkUrl: String = "",
+        videoId: String,
+        duration: Double = 0.0
+    ) {
+        let resolvedArtwork = artworkUrl.isEmpty && !videoId.isEmpty
+            ? "https://i.ytimg.com/vi/\(videoId)/hqdefault.jpg"
+            : artworkUrl
+        var next = currentState
+        next.title = title
+        next.artist = artist
+        next.album = album
+        next.artworkUrl = resolvedArtwork
+        next.videoId = videoId
+        next.trackID = videoId.isEmpty ? "\(title)_\(artist)" : videoId
+        next.isPlaying = true
+        next.currentTime = 0.0
+        if duration > 0 {
+            next.duration = duration
+        }
+        next.hostTimestamp = CACurrentMediaTime()
+        next.isAd = false
+        currentState = next
+        lastOptimisticSkipTime = CACurrentMediaTime()
+        notifyObservers(next)
+    }
+
+    func beginOptimisticSkip() {
+        lastOptimisticSkipTime = CACurrentMediaTime()
+        var next = currentState
+        next.isPlaying = true
+        next.currentTime = 0.0
+        next.hostTimestamp = lastOptimisticSkipTime
+        currentState = next
+        notifyObservers(next)
+    }
+
+    func applyOptimisticPlayState(_ isPlaying: Bool) {
+        var next = currentState
+        next.isPlaying = isPlaying
+        next.hostTimestamp = CACurrentMediaTime()
+        currentState = next
+        notifyObservers(next)
+    }
+
+    func applyOptimisticSeek(_ seconds: Double) {
+        var next = currentState
+        next.currentTime = max(0.0, seconds)
+        next.hostTimestamp = CACurrentMediaTime()
+        currentState = next
+        notifyObservers(next)
+    }
 
     func addObserver(_ observer: @escaping (PlaybackState) -> Void) {
         observers.append(observer)
