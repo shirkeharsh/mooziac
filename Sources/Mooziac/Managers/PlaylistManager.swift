@@ -441,6 +441,34 @@ public final class PlaylistManager: NSObject {
         return (true, "Added \"\(record.title)\" to playlist")
     }
 
+    @discardableResult
+    public func appendYouTubeTrack(to playlistID: String, track: YTMClient.Track) -> (success: Bool, message: String) {
+        let existing = LocalDatabaseManager.shared.fetchPlaylistItems(playlistID: playlistID)
+        if existing.contains(where: {
+            (!track.videoId.isEmpty && ($0.refID == track.videoId || $0.ytVideoId == track.videoId)) ||
+            (!track.title.isEmpty && $0.title.lowercased() == track.title.lowercased() && $0.artist.lowercased() == track.artist.lowercased())
+        }) {
+            return (false, "Already in playlist")
+        }
+
+        let item = PlaylistItemRecord(
+            playlistID: playlistID,
+            sortOrder: existing.count,
+            refType: "yt",
+            refID: track.videoId,
+            ytVideoId: track.videoId.isEmpty ? nil : track.videoId,
+            title: track.title,
+            artist: track.artist,
+            artworkUrl: track.artworkUrl,
+            duration: track.duration,
+            isLiked: false
+        )
+        LocalDatabaseManager.shared.appendPlaylistItem(item)
+        markSyncedDirtyIfNeeded(playlistID: playlistID)
+        invalidateSummary(for: playlistID)
+        return (true, "Added \"\(track.title)\" to playlist")
+    }
+
     // MARK: - Capture Current Online Queue into a Playlist
 
     public func createPlaylistFromCurrentQueue(name: String, completion: @escaping (String?, Int) -> Void) {
@@ -898,6 +926,35 @@ public final class PlaylistManager: NSObject {
     public private(set) var currentAnchorTrackID: String?
     public private(set) var isAdvancingTrack: Bool = false
     private var advanceStartTime: TimeInterval = 0
+    private let searchQueueLock = NSLock()
+    private var searchQueue: [PlaylistItemRecord] = []
+
+    public var pendingSearchQueueCount: Int {
+        searchQueueLock.lock()
+        defer { searchQueueLock.unlock() }
+        return searchQueue.count
+    }
+
+    /// Search additions use a separate queue so they don't replace playlist playback context.
+    public func enqueueSearchResult(_ item: PlaylistItemRecord) {
+        guard let videoID = item.ytVideoId ?? (item.refType == "yt" ? item.refID : nil), !videoID.isEmpty else { return }
+        searchQueueLock.lock()
+        searchQueue.append(item)
+        searchQueueLock.unlock()
+    }
+
+    /// Removes and returns the next search addition, if one is waiting.
+    @discardableResult
+    public func playNextSearchQueuedTrack() -> Bool {
+        searchQueueLock.lock()
+        let item = searchQueue.isEmpty ? nil : searchQueue.removeFirst()
+        searchQueueLock.unlock()
+        guard let item,
+              let videoID = item.ytVideoId ?? (item.refType == "yt" ? item.refID : nil), !videoID.isEmpty else { return false }
+        NowPlayingManager.shared.switchToOnlineMode()
+        playOnlineVideo(videoId: videoID)
+        return true
+    }
 
     public var isAdvancing: Bool {
         if isAdvancingTrack && (CACurrentMediaTime() - advanceStartTime < 6.0) {

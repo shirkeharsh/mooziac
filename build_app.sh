@@ -9,8 +9,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-APP_VERSION="1.2.2"
-APP_BUILD="22"
+APP_VERSION="1.2.3"
+APP_BUILD="23"
 APP_NAME="Mooziac.app"
 APP_BUNDLE_ID="app.mooziac.mac"
 APP_COPYRIGHT="Copyright © 2026 ThreeTen. All rights reserved."
@@ -21,6 +21,7 @@ ZIP_NAME="Mooziac.zip"
 LAUNCH_AFTER_BUILD=true
 INSTALL_LOCALLY=true
 KILL_EXISTING=true
+REQUIRE_UNIVERSAL=false
 
 # Parse optional arguments
 while [[ "$#" -gt 0 ]]; do
@@ -29,6 +30,7 @@ while [[ "$#" -gt 0 ]]; do
         --no-install) INSTALL_LOCALLY=false; LAUNCH_AFTER_BUILD=false; shift ;;
         --no-kill) KILL_EXISTING=false; shift ;;
         --release-only) INSTALL_LOCALLY=false; LAUNCH_AFTER_BUILD=false; KILL_EXISTING=false; shift ;;
+        --require-universal) REQUIRE_UNIVERSAL=true; shift ;;
         --version) APP_VERSION="$2"; shift 2 ;;
         --build) APP_BUILD="$2"; shift 2 ;;
         *) echo "Unknown option: $1"; exit 1 ;;
@@ -109,25 +111,42 @@ if [ "$ARM_BUILD_OK" = true ] && [ "$INTEL_BUILD_OK" = true ]; then
     if lipo -create -output "$UNIVERSAL_BIN" "$ARM_BIN" "$INTEL_BIN"; then
         BIN_PATH="$UNIVERSAL_BIN"
     else
-        echo "    Lipo merge failed. Falling back to Apple Silicon binary..."
+        echo "Error: lipo merge failed."
+        if [ "$REQUIRE_UNIVERSAL" = true ]; then
+            exit 1
+        fi
+        echo "    Falling back to Apple Silicon binary..."
         BIN_PATH="$ARM_BIN"
     fi
-elif [ "$ARM_BUILD_OK" = true ]; then
-    echo "    Intel build unavailable. Using Apple Silicon (arm64) binary..."
-    BIN_PATH="$ARM_BIN"
-elif [ "$INTEL_BUILD_OK" = true ]; then
-    echo "    Apple Silicon build unavailable. Using Intel (x86_64) binary..."
-    BIN_PATH="$INTEL_BIN"
 else
-    echo "    Universal build failed. Compiling for native architecture..."
-    swift build -c release --product Mooziac
-    BIN_DIR=$(swift build -c release --show-bin-path)
-    BIN_PATH="$BIN_DIR/Mooziac"
+    if [ "$REQUIRE_UNIVERSAL" = true ]; then
+        echo "Error: Universal build required, but arm64 ($ARM_BUILD_OK) or x86_64 ($INTEL_BUILD_OK) failed."
+        exit 1
+    fi
+    if [ "$ARM_BUILD_OK" = true ]; then
+        echo "    Intel build unavailable. Using Apple Silicon (arm64) binary..."
+        BIN_PATH="$ARM_BIN"
+    elif [ "$INTEL_BUILD_OK" = true ]; then
+        echo "    Apple Silicon build unavailable. Using Intel (x86_64) binary..."
+        BIN_PATH="$INTEL_BIN"
+    else
+        echo "    Universal build failed. Compiling for native architecture..."
+        swift build -c release --product Mooziac
+        BIN_DIR=$(swift build -c release --show-bin-path)
+        BIN_PATH="$BIN_DIR/Mooziac"
+    fi
 fi
 
 if [ ! -f "$BIN_PATH" ]; then
     echo "Error: Mooziac binary not found at $BIN_PATH"
     exit 1
+fi
+
+echo "    Architectures in binary:"
+lipo -info "$BIN_PATH" || true
+if [ "$REQUIRE_UNIVERSAL" = true ]; then
+    lipo -verify_arch arm64 "$BIN_PATH"
+    lipo -verify_arch x86_64 "$BIN_PATH"
 fi
 
 echo "[3/7] Assembling $APP_NAME bundle..."
@@ -275,9 +294,10 @@ hdiutil detach "/Volumes/$VOLUME_NAME" -force 2>/dev/null || true
 DEVICE=$(hdiutil attach -readwrite -noverify -noautoopen "$TEMP_DMG" | grep -E '/Volumes/' | awk '{print $1}')
 sleep 1
 
-# Apply AppleScript Finder layout & styling
-echo "    Applying Finder window layout & background styling..."
-osascript << EOF || true
+# Apply AppleScript Finder layout & styling when GUI Finder is active
+if pgrep -x "Finder" >/dev/null 2>&1; then
+    echo "    Applying Finder window layout & background styling..."
+    osascript << EOF || true
 tell application "Finder"
     tell disk "$VOLUME_NAME"
         open
@@ -309,6 +329,9 @@ tell application "Finder"
     end tell
 end tell
 EOF
+else
+    echo "    Headless environment detected; skipping Finder AppleScript styling..."
+fi
 
 # Set volume icon and hidden attributes
 if [ -f "Resources/AppIcon.icns" ]; then
@@ -322,14 +345,20 @@ if [ -d "/Volumes/$VOLUME_NAME/.background" ]; then
     SetFile -a V "/Volumes/$VOLUME_NAME/.background" 2>/dev/null || true
 fi
 
-# Close window before unmounting so Finder writes .DS_Store cleanly
-osascript -e "tell application \"Finder\" to close (every window whose name is \"$VOLUME_NAME\")" 2>/dev/null || true
+if pgrep -x "Finder" >/dev/null 2>&1; then
+    # Close window before unmounting so Finder writes .DS_Store cleanly
+    osascript -e "tell application \"Finder\" to close (every window whose name is \"$VOLUME_NAME\")" 2>/dev/null || true
+fi
 
 sync
 sleep 2
 sync
 
-hdiutil detach "$DEVICE" -force > /dev/null 2>&1 || hdiutil detach "/Volumes/$VOLUME_NAME" -force > /dev/null 2>&1 || true
+if [ -n "$DEVICE" ]; then
+    hdiutil detach "$DEVICE" -force > /dev/null 2>&1 || hdiutil detach "/Volumes/$VOLUME_NAME" -force > /dev/null 2>&1 || true
+else
+    hdiutil detach "/Volumes/$VOLUME_NAME" -force > /dev/null 2>&1 || true
+fi
 sleep 1
 
 # Convert to final compressed read-only DMG

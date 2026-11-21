@@ -57,6 +57,34 @@ public final class YTMClient {
         case api(String)
     }
 
+    public final class RequestToken {
+        private let lock = NSLock()
+        private var task: URLSessionDataTask?
+        private var cancelled = false
+
+        fileprivate var isCancelled: Bool {
+            lock.lock(); defer { lock.unlock() }
+            return cancelled
+        }
+
+        fileprivate func attach(_ task: URLSessionDataTask) {
+            lock.lock()
+            let shouldCancel = cancelled
+            if !shouldCancel { self.task = task }
+            lock.unlock()
+            if shouldCancel { task.cancel() }
+        }
+
+        public func cancel() {
+            lock.lock()
+            cancelled = true
+            let task = self.task
+            self.task = nil
+            lock.unlock()
+            task?.cancel()
+        }
+    }
+
     private init() {}
 
     // MARK: - Auth (cookies + SAPISIDHASH)
@@ -109,10 +137,11 @@ public final class YTMClient {
         endpoint: String,
         payload: [String: Any],
         completion: @escaping (Result<[String: Any], Error>) -> Void
-    ) -> URLSessionDataTask? {
+    ) -> RequestToken {
+        let token = RequestToken()
         guard let url = URL(string: "\(Self.baseURL)/\(endpoint)?alt=json&key=\(Self.innerTubeAPIKey)") else {
             completion(.failure(YTMError.badResponse))
-            return nil
+            return token
         }
 
         var request = URLRequest(url: url)
@@ -126,6 +155,7 @@ public final class YTMClient {
         body["context"] = Self.clientContext
 
         authCredentials { result in
+            guard !token.isCancelled else { return }
             if case .success(let creds) = result {
                 request.setValue(creds.authorization, forHTTPHeaderField: "Authorization")
                 if !creds.cookie.isEmpty {
@@ -139,6 +169,7 @@ public final class YTMClient {
                 return
             }
             let task = URLSession.shared.dataTask(with: request) { data, response, error in
+                guard !token.isCancelled else { return }
                 if let error = error {
                     completion(.failure(YTMError.network(error.localizedDescription)))
                     return
@@ -160,9 +191,10 @@ public final class YTMClient {
                     completion(.failure(YTMError.badResponse))
                 }
             }
+            token.attach(task)
             task.resume()
         }
-        return nil
+        return token
     }
 
     // MARK: - Browse (lists + contents + continuations)
@@ -368,6 +400,89 @@ public final class YTMClient {
                 }
             }
         }
+    }
+
+    /// Searches song results for the live search dropdown. The returned token
+    /// cancels work that is no longer relevant to the current query.
+    @discardableResult
+    public func searchTracks(query: String, limit: Int = 8,
+                             completion: @escaping (Result<[Track], Error>) -> Void) -> RequestToken? {
+        let cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanQuery.isEmpty else {
+            completion(.success([]))
+            return nil
+        }
+        guard limit > 0 else {
+            completion(.success([]))
+            return nil
+        }
+        let payload: [String: Any] = [
+            "query": cleanQuery,
+            "params": "EgWKAQIIAWoSEAUQDhAJEAMQEBAKEAQQFRAR"
+        ]
+        return post(endpoint: "search", payload: payload) { result in
+            switch result {
+            case .failure(let error):
+                completion(.failure(error))
+            case .success(let page):
+                let tracks = Self.parseSearchTracks(from: page, limit: limit)
+                completion(.success(tracks))
+            }
+        }
+    }
+
+    private static func parseSearchTracks(from page: [String: Any], limit: Int) -> [Track] {
+        guard let contents = page["contents"] as? [String: Any],
+              let tabbed = contents["tabbedSearchResultsRenderer"] as? [String: Any],
+              let tabs = tabbed["tabs"] as? [[String: Any]],
+              let tab = tabs.first?["tabRenderer"] as? [String: Any],
+              let content = tab["content"] as? [String: Any],
+              let sectionList = content["sectionListRenderer"] as? [String: Any],
+              let sections = sectionList["contents"] as? [[String: Any]] else { return [] }
+
+        var results: [Track] = []
+        var seen = Set<String>()
+        for section in sections {
+            guard let shelf = section["musicShelfRenderer"] as? [String: Any],
+                  let items = shelf["contents"] as? [[String: Any]] else { continue }
+            for item in items {
+                guard let renderer = item["musicResponsiveListItemRenderer"] as? [String: Any],
+                      let videoId = extractVideoId(from: renderer),
+                      videoId.count == 11,
+                      videoId.range(of: "^[A-Za-z0-9_-]{11}$", options: .regularExpression) != nil,
+                      !seen.contains(videoId) else { continue }
+
+                // Only read the title column on the actual song row. Walking the whole
+                // response tree can mistake page labels such as “YT Music” for a track.
+                let columns = renderer["flexColumns"] as? [[String: Any]] ?? []
+                let firstColumn = columns.first?["musicResponsiveListItemFlexColumnRenderer"] as? [String: Any]
+                let title = textFrom(firstColumn?["text"] ?? renderer["title"]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let normalizedTitle = title.lowercased()
+                guard !title.isEmpty,
+                      normalizedTitle != "yt music",
+                      normalizedTitle != "youtube music" else { continue }
+
+                var artist = ""
+                var album = ""
+                if columns.count > 1,
+                   let secondColumn = columns[1]["musicResponsiveListItemFlexColumnRenderer"] as? [String: Any] {
+                    let parts = textFrom(secondColumn["text"]).components(separatedBy: " • ")
+                    artist = parts.first ?? ""
+                    if parts.count > 1 { album = parts.dropFirst().joined(separator: " • ") }
+                }
+
+                let artworkURL = "https://i.ytimg.com/vi/\(videoId)/hqdefault.jpg"
+                seen.insert(videoId)
+                results.append(Track(videoId: videoId,
+                                     title: title,
+                                     artist: artist,
+                                     album: album,
+                                     artworkUrl: artworkURL,
+                                     duration: ""))
+                if results.count >= limit { return results }
+            }
+        }
+        return results
     }
 
     /// Loops through `continuation` tokens until the response stops returning one
@@ -676,10 +791,18 @@ public final class YTMClient {
             }
 
             var artworkUrl = ""
-            if let thumbnail = dict["thumbnail"] as? [String: Any],
-               let thumbs = thumbnail["thumbnails"] as? [[String: Any]],
-               let last = thumbs.last, let url = last["url"] as? String {
-                artworkUrl = url
+            if let thumbnail = dict["thumbnail"] as? [String: Any] {
+                let direct = thumbnail["thumbnails"] as? [[String: Any]]
+                let musicRenderer = thumbnail["musicThumbnailRenderer"] as? [String: Any]
+                let nestedThumbnail = musicRenderer?["thumbnail"] as? [String: Any]
+                let nested = nestedThumbnail?["thumbnails"] as? [[String: Any]]
+                if let url = (direct ?? nested)?.last?["url"] as? String {
+                    artworkUrl = url
+                }
+            }
+
+            if artworkUrl.isEmpty {
+                artworkUrl = "https://i.ytimg.com/vi/\(videoId)/mqdefault.jpg"
             }
 
             seen.insert(videoId)

@@ -49,8 +49,8 @@ final class MenuCapsuleToggleRowView: NSView {
     
     override func layout() {
         super.layout()
-        // Standard macOS menu text margin is 21pt (aligned with checkmark column)
-        let leftMargin: CGFloat = 21.0
+        // Standard macOS menu text margin is 14pt (aligned with standard NSMenuItem)
+        let leftMargin: CGFloat = 14.0
         let rightMargin: CGFloat = 14.0
         let toggleWidth: CGFloat = 32.0
         let toggleHeight: CGFloat = 18.0
@@ -67,7 +67,7 @@ final class MenuCapsuleToggleRowView: NSView {
     
     override var intrinsicContentSize: NSSize {
         let textWidth = titleLabel.attributedStringValue.size().width
-        let minWidth: CGFloat = 21.0 + textWidth + 16.0 + 32.0 + 14.0
+        let minWidth: CGFloat = 14.0 + textWidth + 16.0 + 32.0 + 14.0
         return NSSize(width: max(280, minWidth), height: 26)
     }
     
@@ -194,15 +194,6 @@ extension StatusItemManager {
             }
         )
         gestureMenu.addItem(masterGestureRes.menuItem)
-
-        let focusAudioRes = makeCapsuleToggleMenuItem(
-            title: "Focus Audio",
-            isOn: AppVolumeManager.shared.isAppVolumeOnly,
-            onToggle: { enabled in
-                AppVolumeManager.shared.isAppVolumeOnly = enabled
-            }
-        )
-        gestureMenu.addItem(focusAudioRes.menuItem)
         
         gestureMenu.addItem(NSMenuItem.separator())
         
@@ -253,6 +244,50 @@ extension StatusItemManager {
         showTutorialItem.target = self
         gestureMenu.addItem(showTutorialItem)
         
+        let pinRes = makeCapsuleToggleMenuItem(
+            title: "Pin Player on Top",
+            isOn: isPinnedOnTop,
+            onToggle: { [weak self] enabled in
+                self?.setPinnedOnTop(enabled)
+            }
+        )
+        menu.addItem(pinRes.menuItem)
+
+        let focusAudioRes = makeCapsuleToggleMenuItem(
+            title: "Focus Audio",
+            isOn: AppVolumeManager.shared.isAppVolumeOnly,
+            onToggle: { enabled in
+                AppVolumeManager.shared.isAppVolumeOnly = enabled
+            }
+        )
+        menu.addItem(focusAudioRes.menuItem)
+
+        let wakeRes = makeCapsuleToggleMenuItem(
+            title: "Prevent Wake Auto-Play",
+            isOn: NowPlayingManager.shared.isPreventAutoplayOnWakeEnabled,
+            onToggle: { enabled in
+                NowPlayingManager.shared.isPreventAutoplayOnWakeEnabled = enabled
+                CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(
+                    text: enabled ? "✓ Prevent Wake Auto-Play: Enabled" : "Prevent Wake Auto-Play: Disabled"
+                )
+            }
+        )
+        menu.addItem(wakeRes.menuItem)
+
+        let discordBrandingRes = makeCapsuleToggleMenuItem(
+            title: "Hide Mooziac Branding",
+            isOn: DiscordRPCManager.shared.isBrandingHidden,
+            onToggle: { enabled in
+                DiscordRPCManager.shared.isBrandingHidden = enabled
+                CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(
+                    text: enabled ? "✓ Mooziac Branding: Hidden" : "Mooziac Branding: Visible"
+                )
+            }
+        )
+        menu.addItem(discordBrandingRes.menuItem)
+
+        menu.addItem(NSMenuItem.separator())
+
         let gestureParent = NSMenuItem(title: "Trackpad Gestures Settings", action: nil, keyEquivalent: "")
         gestureParent.submenu = gestureMenu
         menu.addItem(gestureParent)
@@ -267,31 +302,6 @@ extension StatusItemManager {
         let settingsParent = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
         let settingsMenu = NSMenu(title: "Settings")
 
-        let wakeRes = makeCapsuleToggleMenuItem(
-            title: "Prevent Wake Auto-Play",
-            isOn: NowPlayingManager.shared.isPreventAutoplayOnWakeEnabled,
-            onToggle: { enabled in
-                NowPlayingManager.shared.isPreventAutoplayOnWakeEnabled = enabled
-                CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(
-                    text: enabled ? "✓ Prevent Wake Auto-Play: Enabled" : "Prevent Wake Auto-Play: Disabled"
-                )
-            }
-        )
-        settingsMenu.addItem(wakeRes.menuItem)
-
-        let discordBrandingRes = makeCapsuleToggleMenuItem(
-            title: "Hide Mooziac Branding",
-            isOn: DiscordRPCManager.shared.isBrandingHidden,
-            onToggle: { enabled in
-                DiscordRPCManager.shared.isBrandingHidden = enabled
-                CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(
-                    text: enabled ? "✓ Mooziac Branding: Hidden" : "Mooziac Branding: Visible"
-                )
-            }
-        )
-        settingsMenu.addItem(discordBrandingRes.menuItem)
-
-        settingsMenu.addItem(NSMenuItem.separator())
         settingsMenu.addItem(NSMenuItem(title: "Download Location", action: nil, keyEquivalent: ""))
         let downloadLocationItem = NSMenuItem(title: currentDownloadLocationTitle(), action: nil, keyEquivalent: "")
         downloadLocationItem.isEnabled = false

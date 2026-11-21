@@ -9,8 +9,6 @@ public enum YouTubeAdBlocker {
         source: """
         (function() {
             var css = `
-                .video-ads,
-                .ytp-ad-module,
                 .ytp-ad-player-overlay,
                 .ytp-ad-player-overlay-layout,
                 #player-ads,
@@ -61,12 +59,8 @@ public enum YouTubeAdBlocker {
         forMainFrameOnly: true
     )
 
-    /// Safe ad skipper & interruption dialog auto-dismiss:
-    /// - Leaves JavaScript prototypes 100% pristine and un-tampered (so YouTube's iframe checks never detect an ad blocker).
-    /// - Mutes audio and fast-forwards ads at 16x speed so they complete in ~200ms naturally.
-    /// - Clicks YouTube's native skip buttons instantly.
-    /// - Automatically dismisses any "Experiencing interruptions" dialog and resumes playback.
-    /// - Never forcibly seeks currentTime, eliminating buffer starvation and repeated interruption popups.
+    /// Lets YouTube ads play at their normal speed and clicks only visible native skip controls.
+    /// Interruption messages are dismissed without forcing playback to resume.
     public static let instantSkipperScript = WKUserScript(
         source: """
         (function() {
@@ -78,8 +72,6 @@ public enum YouTubeAdBlocker {
                 if (!btn) return false;
                 try {
                     btn.click();
-                    var ev = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
-                    btn.dispatchEvent(ev);
                     return true;
                 } catch(e) { return false; }
             }
@@ -112,43 +104,35 @@ public enum YouTubeAdBlocker {
                     // Instantly mute ad audio so user never hears ad blip
                     video.muted = true;
 
-                    // Play ad at accelerated speed (8x) so it finishes in ~300ms naturally without decoder buffer starvation
-                    video.playbackRate = 8.0;
-
-                    // 1. Invoke native YouTube player skip method if available
-                    if (typeof player.skipAd === 'function') {
-                        try { player.skipAd(); } catch(e) {}
-                    }
-
-                    // 2. Click any skip button immediately
+                    // Respect YouTube's ad timing. Only use its own skip control once it is
+                    // visible and enabled; forced skips and accelerated playback can trigger
+                    // YouTube's "Experiencing interruptions" recovery flow.
                     var skipSelectors = [
                         '.ytp-ad-skip-button-modern',
                         '.ytp-skip-ad-button',
                         '.ytp-ad-skip-button',
                         '.ytp-ad-skip-button-slot button',
                         '.ytp-ad-overlay-close-button',
-                        '.ytp-ad-survey-close-button',
-                        'button[class*="skip"]'
+                        '.ytp-ad-survey-close-button'
                     ];
 
                     for (var i = 0; i < skipSelectors.length; i++) {
                         var btns = player.querySelectorAll(skipSelectors[i]);
                         for (var j = 0; j < btns.length; j++) {
-                            triggerClick(btns[j]);
+                            var btn = btns[j];
+                            var rect = btn.getBoundingClientRect();
+                            var visible = rect.width > 0 && rect.height > 0 &&
+                                          window.getComputedStyle(btn).visibility !== 'hidden' &&
+                                          window.getComputedStyle(btn).display !== 'none';
+                            if (visible && !btn.disabled && btn.getAttribute('aria-disabled') !== 'true') {
+                                if (triggerClick(btn)) return;
+                            }
                         }
                     }
                 } else if (wasAdPlaying) {
-                    // Ad concluded: cleanly restore user target speed, audio and playback
+                    // Ad ended: restore the prior mute state; YouTube controls resuming playback.
                     wasAdPlaying = false;
-                    var targetSpeed = window.__mooziacTargetSpeed || 1.0;
-                    if (typeof player.setPlaybackRate === 'function') {
-                        try { player.setPlaybackRate(targetSpeed); } catch(e) {}
-                    }
-                    video.playbackRate = targetSpeed;
                     video.muted = mutedBeforeAd;
-                    if (video.paused && !window.__mooziacUserPaused) {
-                        video.play().catch(function() {});
-                    }
                 }
             }
 
@@ -250,10 +234,6 @@ public enum YouTubeAdBlocker {
                         backdrops[b].remove();
                     }
 
-                    var v = document.querySelector('video');
-                    if (v && v.paused && !window.__mooziacUserPaused) {
-                        v.play().catch(function() {});
-                    }
                 }
             }
 
@@ -334,6 +314,10 @@ public enum YouTubeAdBlocker {
             } else {
                 attachPopupObserver();
             }
+
+            // Native skip controls can appear after the ad state is set, so poll only this
+            // small player subtree at a relaxed interval while retaining the class observer.
+            setInterval(handleAds, 750);
 
             // Lightweight periodic safety net: checks popup container and body only (never deep grid subtrees)
             setInterval(function() {

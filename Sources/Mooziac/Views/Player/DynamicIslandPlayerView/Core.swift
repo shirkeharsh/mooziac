@@ -4,6 +4,7 @@ import ImageIO
 
 protocol DynamicIslandPlayerViewDelegate: AnyObject {
     func dynamicIslandDidSearch(query: String)
+    func dynamicIslandDidSelectTrack(videoId: String, title: String, artist: String)
     func dynamicIslandDidTapPlayPause()
     func dynamicIslandDidTapNext()
     func dynamicIslandDidTapPrevious()
@@ -49,6 +50,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     public enum ActiveSettingsMode {
         case preferences
         case playlist
+        case search
     }
     public var activeSettingsMode: ActiveSettingsMode = .preferences
 
@@ -123,6 +125,11 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     var selectedPlaylistIDs: Set<String> = []
     var isPlaylistSearchActive: Bool = false
     var searchFieldStateToken: Int = 0
+    var searchDebounce: DispatchWorkItem?
+    var searchResultsToken = 0
+    var liveSearchRequest: YTMClient.RequestToken?
+    var searchResultsStack: NSStackView?
+    var searchResultsStatusLabel: NSTextField?
     var createFieldStateToken: Int = 0
     var playlistBuildToken = 0
     var pendingRowBuilders: [() -> NSView] = []
@@ -279,6 +286,10 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
             likeButton.image = image
         }
         updateLikeButtonColor()
+    }
+    
+    public func updatePinButtonState(isPinned: Bool) {
+        // Reserved for header pin button
     }
     
     func updateLikeButtonColor() {
@@ -513,10 +524,12 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         searchField.isHidden = true
         searchField.onFocusChange = { [weak self] isFocused in
             if isFocused {
+                self?.keepSearchFieldOpenAfterCancel = false
                 StatusItemManager.shared?.setEditingMode(true)
             } else {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
                     guard let self = self else { return }
+                    if self.keepSearchFieldOpenAfterCancel { return }
                     // NEVER collapse if the search field has text or if IME composition/marked text is active
                     if !self.searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         return
@@ -532,6 +545,18 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
                     self.collapseSearchField()
                 }
             }
+        }
+        searchField.onCancelButtonClick = { [weak self] in
+            guard let self = self else { return }
+            self.keepSearchFieldOpenAfterCancel = true
+            self.cancelLiveSearch()
+            self.hideSearchResultsPanel()
+            if self.isSettingsExpanded && self.activeSettingsMode == .search {
+                self.collapseSettings()
+            }
+            self.window?.makeFirstResponder(nil)
+            StatusItemManager.shared?.setEditingMode(false)
+            NSCursor.arrow.set()
         }
         
         waveformProgressView.translatesAutoresizingMaskIntoConstraints = false
@@ -685,6 +710,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     
     func controlTextDidChange(_ obj: Notification) {
         guard let field = obj.object as? NSSearchField, field == searchField else { return }
+        searchTextChanged()
     }
     
     private var lastPlayPauseIcon: String = ""
@@ -875,6 +901,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         updateAddToPlaylistButtonColor()
 
         settingsContainerView.isHidden = true
+        if activeSettingsMode == .search { hideSearchResultsPanel() }
         containerPillBottomSettingsConstraint?.isActive = false
         containerPillBottomCollapsedConstraint?.isActive = true
         delegate?.dynamicIslandDidToggleExpanded(expanded: false)
@@ -900,7 +927,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         expandSettingsPanel()
     }
 
-    private func expandSettingsPanel() {
+    func expandSettingsPanel() {
         if isSettingsExpanded {
             updateBrowserButtonColor()
             updateAddToPlaylistButtonColor()
@@ -1014,10 +1041,13 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     }
     
     var isCollapsingSearch = false
+    var keepSearchFieldOpenAfterCancel = false
     
     func collapseSearchField() {
         guard !isCollapsingSearch && (!searchField.isHidden || searchField.alphaValue > 0.05) else { return }
         isCollapsingSearch = true
+        cancelLiveSearch()
+        if isSettingsExpanded && activeSettingsMode == .search { collapseSettings() }
         
         let searchConfig = NSImage.SymbolConfiguration(pointSize: 16.0, weight: .semibold)
         if let image = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: "Search YouTube Music")?.withSymbolConfiguration(searchConfig) {
@@ -1025,10 +1055,14 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         }
         searchIconButton.toolTip = "Search YouTube Music"
         
-        // 1. Resign first responder cleanly if search field currently has focus
-        if let responder = window?.firstResponder as? NSView,
-           responder == searchField || responder.isDescendant(of: searchField) {
-            window?.makeFirstResponder(nil)
+        // AppKit may make the shared field editor, rather than the search field,
+        // first responder. Resign either one before hiding the field.
+        if let window = window {
+            let responder = window.firstResponder
+            let fieldEditor = searchField.currentEditor()
+            if responder === searchField || (fieldEditor != nil && responder === fieldEditor) {
+                window.makeFirstResponder(nil)
+            }
         }
         StatusItemManager.shared?.setEditingMode(false)
         
@@ -1040,6 +1074,8 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         }, completionHandler: { [weak self] in
             guard let self = self else { return }
             self.searchField.isHidden = true
+            self.window?.invalidateCursorRects(for: self.searchField)
+            NSCursor.arrow.set()
             
             // 3. Now animate controlsStack back to center smoothly without search field squishing
             NSAnimationContext.runAnimationGroup({ context in
@@ -1059,6 +1095,10 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     @objc func networkStatusChanged(_ note: Notification) {
         let isReachable = note.userInfo?["isReachable"] as? Bool ?? true
         if !isReachable {
+            if isSearchFieldActive && !searchField.stringValue.isEmpty {
+                cancelLiveSearch()
+                showSearchPanelStatus("You're offline. Connect to search YouTube Music.")
+            }
             showToastBanner(message: "⚡ Offline Mode - No Internet Connection", isWarning: true)
         } else {
             showToastBanner(message: "🟢 Internet Connection Restored!", isWarning: false)

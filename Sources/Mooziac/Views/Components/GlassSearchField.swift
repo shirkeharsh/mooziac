@@ -108,6 +108,7 @@ final class GlassSearchFieldCell: NSSearchFieldCell {
 
 public class GlassSearchField: NSSearchField {
     public var onFocusChange: ((_ isFocused: Bool) -> Void)?
+    public var onCancelButtonClick: (() -> Void)?
 
     public var customCornerRadius: CGFloat?
     public var customIdleBorderColor: CGColor?
@@ -132,6 +133,16 @@ public class GlassSearchField: NSSearchField {
     
     public override func draw(_ dirtyRect: NSRect) {
         cell?.drawInterior(withFrame: bounds, in: self)
+    }
+
+    public override func mouseDown(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        let cancelRect = (cell as? NSSearchFieldCell)?.cancelButtonRect(forBounds: bounds) ?? .zero
+        let clickedCancel = !stringValue.isEmpty && cancelRect.contains(point)
+        super.mouseDown(with: event)
+        if clickedCancel {
+            DispatchQueue.main.async { [weak self] in self?.onCancelButtonClick?() }
+        }
     }
     
     private func setupGlassStyle() {

@@ -33,9 +33,9 @@ public final class DisplayManager: NSObject {
     }
 
     /// Finds an active screen matching the saved display ID, or falls back to the screen containing the origin, or NSScreen.main.
-    public func findScreen(forSavedID savedID: CGDirectDisplayID?, fallbackOrigin: CGPoint? = nil) -> NSScreen {
+    public func findScreen(forSavedID savedID: CGDirectDisplayID?, fallbackOrigin: CGPoint? = nil) -> NSScreen? {
         let screens = NSScreen.screens
-        guard !screens.isEmpty else { return NSScreen.main ?? NSScreen.screens.first! }
+        guard let firstScreen = screens.first else { return NSScreen.main }
 
         if let savedID = savedID,
            let matched = screens.first(where: { displayID(for: $0) == savedID }) {
@@ -47,7 +47,7 @@ public final class DisplayManager: NSObject {
             return matched
         }
 
-        return NSScreen.main ?? screens.first!
+        return NSScreen.main ?? firstScreen
     }
 
     /// Clamps a target window frame strictly inside a screen's visibleFrame (excluding Dock & Menu Bar) with safe margin.

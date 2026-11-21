@@ -215,6 +215,14 @@ class MainViewController: NSViewController, DynamicIslandPlayerViewDelegate, Hea
         playSearchQuery(query)
     }
 
+    func dynamicIslandDidSelectTrack(videoId: String, title: String, artist: String) {
+        PlaylistManager.shared.clearActiveContext()
+        NowPlayingManager.shared.switchToOnlineMode()
+        let shownTitle = artist.isEmpty ? title : "\(title) - \(artist)"
+        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "▶ Playing: \"\(shownTitle)\"")
+        PlaylistManager.shared.playOnlineVideo(videoId: videoId)
+    }
+
     public func playSearchQuery(_ query: String) {
         let cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanQuery.isEmpty else { return }

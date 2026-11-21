@@ -39,6 +39,7 @@ Project Blueprint/
 __pycache__/
 
 # Internal dev & project documentation
+tickets.md
 AGY.md
 FILE_SUMMARIES.md
 SYSTEM_DESIGN.md

@@ -4,6 +4,22 @@ All notable changes to Mooziac are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.2.3] - 2026-11-21
+
+### Added
+- Mini-Player Live Search: Integrated live YouTube Music search results directly into the dynamic search field with debounced autocomplete and instant track playback.
+- Optimistic Track Updates: Dynamic Island mini-player UI updates metadata in under 16ms on skips without waiting for network buffering.
+
+### Changed
+- Context Menu Layout: Promoted "Pin Player on Top", "Focus Audio", "Prevent Wake Auto-Play", and "Hide Mooziac Branding" to the very top of the menu bar right-click menu.
+- Native Text Alignment: Adjusted capsule toggle label margins from 21pt to 14pt, achieving pixel-perfect alignment with standard macOS menu items.
+- Focus Audio Relocation: Extracted "Focus Audio" from the Trackpad Gestures submenu and placed it alongside primary player toggles.
+
+### Improved
+- In-Place SPA Navigation: Replaced full web page reloads with in-place client navigation (`resolveCommand`), eliminating queue conflicts and audio stuttering during track changes.
+- YouTube Ad Suppression: Updated ad element filtering and video preroll skipping rules.
+- Headless Build Pipeline: Added headless environment detection to `build_app.sh` and CI workflows to prevent Finder AppleScript freezes during DMG creation.
+
 ## [1.2.2] - 2026-11-15
 
 ### Added

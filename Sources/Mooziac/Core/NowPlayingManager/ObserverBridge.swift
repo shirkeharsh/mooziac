@@ -823,6 +823,11 @@ extension NowPlayingManager {
             return
         }
 
+        // Search additions are consumed before playlist continuation or YouTube autoplay.
+        if PlaylistManager.shared.playNextSearchQueuedTrack() {
+            return
+        }
+
         // Only advance Mooziac playlist if an active context exists
         if PlaylistManager.shared.hasActiveContext {
             if PlaylistManager.shared.playNextTrackInPlaylist() {

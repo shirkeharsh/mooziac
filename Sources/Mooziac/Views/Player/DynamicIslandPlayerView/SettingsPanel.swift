@@ -760,6 +760,7 @@ extension DynamicIslandPlayerView {
         settingsContainerView.addSubview(mainStack)
         settingsContainerView.addSubview(subView)
         setupGestureMappingSubView()
+        setupSearchResultsPanel()
 
         NSLayoutConstraint.activate([
             mainStack.topAnchor.constraint(equalTo: settingsContainerView.topAnchor, constant: 4),
@@ -793,6 +794,7 @@ extension DynamicIslandPlayerView {
     }
 
     @objc public func showMainSettingsView() {
+        hideSearchResultsPanel()
         if let mainStack = settingsContainerView.subviews.first(where: { $0.identifier == NSUserInterfaceItemIdentifier("MainSettingsStack") }) {
             mainStack.isHidden = false
         }
@@ -806,6 +808,7 @@ extension DynamicIslandPlayerView {
     }
 
     public func showAddToPlaylistSubView() {
+        hideSearchResultsPanel()
         if let mainStack = settingsContainerView.subviews.first(where: { $0.identifier == NSUserInterfaceItemIdentifier("MainSettingsStack") }) {
             mainStack.isHidden = true
         }

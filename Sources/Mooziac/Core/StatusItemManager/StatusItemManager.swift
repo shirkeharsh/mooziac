@@ -14,7 +14,10 @@ class StatusItemManager: NSObject {
     var panel: StatusItemPanel!
     let mainViewController = MainViewController()
     public private(set) var isDraggedFromDock: Bool = false
+    public private(set) var isPinnedOnTop: Bool = UserDefaults.standard.bool(forKey: "YTM_isPlayerPinnedOnTop")
     public private(set) var currentMode: AppPlaybackMode = .music
+    
+    private static let pinnedDefaultsKey = "YTM_isPlayerPinnedOnTop"
     
     private var globalEventMonitor: Any?
     private var localEventMonitor: Any?
@@ -145,8 +148,9 @@ class StatusItemManager: NSObject {
         // Always start docked directly under the status item on launch
         self.isDraggedFromDock = false
         UserDefaults.standard.set(false, forKey: "YTM_isDraggedFromDock")
-        panel.level = .statusBar
+        panel.level = preferredPanelLevel()
         mainViewController.dynamicIslandPlayer.setResetPositionButtonHidden(true)
+        mainViewController.dynamicIslandPlayer.updatePinButtonState(isPinned: isPinnedOnTop)
         
         mainViewController.onChangeSize = { [weak self] width, height in
             guard let self = self else { return }
@@ -157,7 +161,7 @@ class StatusItemManager: NSObject {
             guard let self = self else { return }
             self.isDraggedFromDock = false
             UserDefaults.standard.set(false, forKey: "YTM_isDraggedFromDock")
-            self.panel.level = self.isTextEditing ? .floating : .statusBar
+            self.panel.level = self.preferredPanelLevel()
             let width = self.panel.frame.width
             let height = self.panel.frame.height
             self.positionPanel(width: width, height: height)
@@ -182,7 +186,7 @@ class StatusItemManager: NSObject {
             let savedIDRaw = UserDefaults.standard.object(forKey: "YTM_savedDisplayID") as? UInt32
             let savedID = savedIDRaw != nil ? CGDirectDisplayID(savedIDRaw!) : nil
             
-            let targetScreen = displayManager.findScreen(forSavedID: savedID, fallbackOrigin: CGPoint(x: savedX, y: savedY))
+            guard let targetScreen = displayManager.findScreen(forSavedID: savedID, fallbackOrigin: CGPoint(x: savedX, y: savedY)) else { return }
             let unconstrainedFrame = NSRect(x: savedX, y: savedY, width: size.width, height: size.height)
             let clampedFrame = displayManager.clampFrameToVisibleBounds(unconstrainedFrame, on: targetScreen, margin: 12)
             
@@ -207,7 +211,7 @@ class StatusItemManager: NSObject {
         guard panel.frame.width <= 400.0 else { return }
         guard NSEvent.pressedMouseButtons & 1 != 0 || NSApp.currentEvent?.type == .leftMouseDragged else { return }
         
-        let screen = panel.screen ?? buttonWindow.screen ?? NSScreen.main ?? NSScreen.screens.first!
+        guard let screen = panel.screen ?? buttonWindow.screen ?? NSScreen.main ?? NSScreen.screens.first else { return }
         let screenFrame = screen.frame
         let buttonBoundsInWindow = button.convert(button.bounds, to: nil)
         let buttonScreenFrame = buttonWindow.convertToScreen(buttonBoundsInWindow)
@@ -237,11 +241,7 @@ class StatusItemManager: NSObject {
         if isDragged != self.isDraggedFromDock {
             self.isDraggedFromDock = isDragged
             mainViewController.dynamicIslandPlayer.setResetPositionButtonHidden(!isDragged)
-            if isDragged || isTextEditing {
-                panel.level = .floating
-            } else {
-                panel.level = .statusBar
-            }
+            panel.level = preferredPanelLevel()
         }
         
         dragDebounceTimer?.invalidate()
@@ -306,7 +306,7 @@ class StatusItemManager: NSObject {
             let savedIDRaw = UserDefaults.standard.object(forKey: "YTM_savedDisplayID") as? UInt32
             let savedID = savedIDRaw != nil ? CGDirectDisplayID(savedIDRaw!) : nil
             
-            let targetScreen = displayManager.findScreen(forSavedID: savedID, fallbackOrigin: CGPoint(x: desiredX, y: effectiveY))
+            guard let targetScreen = displayManager.findScreen(forSavedID: savedID, fallbackOrigin: CGPoint(x: desiredX, y: effectiveY)) else { return }
             let rawFrame = NSRect(x: desiredX, y: effectiveY, width: effectiveWidth, height: effectiveHeight)
             let clampedFrame = displayManager.clampFrameToVisibleBounds(rawFrame, on: targetScreen, margin: 8)
             
@@ -490,13 +490,44 @@ class StatusItemManager: NSObject {
         dockBackToMenuBar()
     }
     
+    private func preferredPanelLevel() -> NSWindow.Level {
+        if isTextEditing {
+            return .floating
+        }
+        if isPinnedOnTop {
+            return .statusBar
+        }
+        return isDraggedFromDock ? .normal : .statusBar
+    }
+
+    public func togglePinOnTop() {
+        setPinnedOnTop(!isPinnedOnTop)
+    }
+
+    public func setPinnedOnTop(_ pinned: Bool) {
+        isPinnedOnTop = pinned
+        UserDefaults.standard.set(pinned, forKey: Self.pinnedDefaultsKey)
+        if let panel = panel {
+            panel.level = preferredPanelLevel()
+            if pinned && !panel.isVisible, let button = statusItem?.button {
+                showPanel(button)
+            } else if pinned && panel.isVisible {
+                panel.orderFrontRegardless()
+            }
+        }
+        mainViewController.dynamicIslandPlayer.updatePinButtonState(isPinned: pinned)
+        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(
+            text: pinned ? "📌 Player Pinned on Top" : "Player Unpinned"
+        )
+    }
+
     public func dockBackToMenuBar() {
         isDraggedFromDock = false
         UserDefaults.standard.set(false, forKey: "YTM_isDraggedFromDock")
         UserDefaults.standard.removeObject(forKey: "YTM_playerFrameX")
         UserDefaults.standard.removeObject(forKey: "YTM_playerFrameY")
         UserDefaults.standard.removeObject(forKey: "YTM_playerTopY")
-        panel.level = isTextEditing ? .floating : .statusBar
+        panel.level = preferredPanelLevel()
         let size = mainViewController.view.frame.size
         positionCustomWindow(panel, width: size.width, height: size.height)
         mainViewController.dynamicIslandPlayer.setResetPositionButtonHidden(true)
@@ -510,11 +541,9 @@ class StatusItemManager: NSObject {
         guard let panel = panel else { return }
         guard isTextEditing != isEditing else { return }
         isTextEditing = isEditing
+        panel.level = preferredPanelLevel()
         if isEditing {
-            panel.level = .floating
             NSApp.activate(ignoringOtherApps: true)
-        } else {
-            panel.level = isDraggedFromDock ? .floating : .statusBar
         }
     }
 
@@ -533,6 +562,7 @@ class StatusItemManager: NSObject {
     func showPanel(_ sender: NSStatusBarButton) {
         let size = mainViewController.view.frame.size
         positionPanel(width: size.width, height: size.height)
+        panel.level = preferredPanelLevel()
         
         panel.alphaValue = 0.0
         panel.makeKeyAndOrderFront(nil)
@@ -601,7 +631,7 @@ class StatusItemManager: NSObject {
         
         localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
             guard let self = self, self.panel.isVisible else { return event }
-            if self.isDraggedFromDock { return event }
+            if self.isDraggedFromDock || self.isPinnedOnTop { return event }
             if NSApp.modalWindow != nil { return event }
             
             let mouseLoc = NSEvent.mouseLocation
@@ -649,7 +679,7 @@ class StatusItemManager: NSObject {
         
         globalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             guard let self = self, self.panel.isVisible else { return }
-            if self.isDraggedFromDock { return }
+            if self.isDraggedFromDock || self.isPinnedOnTop { return }
             if NSApp.modalWindow != nil { return }
             
             let mouseLoc = NSEvent.mouseLocation
@@ -793,7 +823,7 @@ class StatusItemManager: NSObject {
     }
     
     @objc private func appDidResignActive() {
-        guard panel.isVisible && !isDraggedFromDock else { return }
+        guard panel.isVisible && !isDraggedFromDock && !isPinnedOnTop else { return }
         if NSApp.modalWindow != nil { return }
         let mouseLoc = NSEvent.mouseLocation
         if isClickInsidePanelOrStatusButton(mouseLoc: mouseLoc) {

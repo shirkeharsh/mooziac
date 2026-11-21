@@ -342,6 +342,7 @@ extension DynamicIslandPlayerView {
                 fullScreenButton.contentTintColor = fluidBtnTint
                 browserButton.contentTintColor = fluidBtnTint
                 resetPositionButton.contentTintColor = fluidBtnTint
+
             }
         }
 
@@ -359,6 +360,7 @@ extension DynamicIslandPlayerView {
         updateBrowserButtonColor()
         updateAddToPlaylistButtonColor()
         updateRepeatButtonColor()
+        updateSearchResultsTheme()
     }
 
     func setupLiquidFluidLayer() {

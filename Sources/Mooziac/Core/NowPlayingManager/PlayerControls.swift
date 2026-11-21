@@ -426,6 +426,9 @@ extension NowPlayingManager {
     }
     
     func nextTrack() {
+        if PlaylistManager.shared.playNextSearchQueuedTrack() {
+            return
+        }
         guard StatusItemManager.shared?.currentMode != .youtube else { return }
         if PlaylistManager.shared.hasActiveContext {
             if PlaylistManager.shared.playNextTrackInPlaylist() {
