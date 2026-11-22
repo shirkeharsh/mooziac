@@ -5,7 +5,7 @@ final class MenuBarTruncationTests: XCTestCase {
     
     func testShortTitlesAreNotTruncated() {
         XCTAssertEqual(CenteredMenuBarLyricsWindowController.truncateTitle("Short Song"), "Short Song")
-        XCTAssertEqual(CenteredMenuBarLyricsWindowController.truncateTitle("Exactly 30 Characters Long Song"), "Exactly 30 Characters Long Song")
+        XCTAssertEqual(CenteredMenuBarLyricsWindowController.truncateTitle("123456789012345678901234567890"), "123456789012345678901234567890")
         XCTAssertEqual(CenteredMenuBarLyricsWindowController.truncateTitle(""), "")
     }
     

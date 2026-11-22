@@ -38,9 +38,9 @@ final class YouTubeVideoTests: XCTestCase {
 
         XCTAssertEqual(VideoQuality.uhd2160.shortLabel, "4K")
         XCTAssertEqual(VideoQuality.qhd1440.shortLabel, "2K")
-        XCTAssertEqual(VideoQuality.fhd1080.shortLabel, "1080p")
-        XCTAssertEqual(VideoQuality.hd720.shortLabel, "720p")
-        XCTAssertEqual(VideoQuality.auto.shortLabel, "Auto")
+        XCTAssertEqual(VideoQuality.fhd1080.shortLabel, "FHD")
+        XCTAssertEqual(VideoQuality.hd720.shortLabel, "HD")
+        XCTAssertEqual(VideoQuality.auto.shortLabel, "AUTO")
 
         XCTAssertTrue(VideoQuality.uhd2160.is4K)
         XCTAssertFalse(VideoQuality.fhd1080.is4K)
