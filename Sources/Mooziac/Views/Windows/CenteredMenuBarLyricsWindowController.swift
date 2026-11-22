@@ -341,6 +341,13 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
         showCustomTextOverlay(text: textToDisplay)
     }
 
+    public static func truncateTitle(_ text: String, maxLength: Int = 30) -> String {
+        if text.count > maxLength {
+            return String(text.prefix(max(0, maxLength - 3))).trimmingCharacters(in: .whitespacesAndNewlines) + "..."
+        }
+        return text
+    }
+
     public func showCustomTextOverlay(text: String, duration: TimeInterval = 1.5) {
         if !Thread.isMainThread {
             DispatchQueue.main.async { [weak self] in
@@ -357,12 +364,7 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
 
         if !wasAlreadyShowing || !sameText {
             showOverlay()
-            let formattedText: String
-            if text.count > 30 {
-                formattedText = String(text.prefix(27)).trimmingCharacters(in: .whitespacesAndNewlines) + "..."
-            } else {
-                formattedText = text
-            }
+            let formattedText = Self.truncateTitle(text)
             lyricsLabel.stringValue = formattedText
 
             let font = lyricsLabel.font ?? NSFont.systemFont(ofSize: 13, weight: .medium)
