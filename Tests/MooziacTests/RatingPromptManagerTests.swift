@@ -5,6 +5,10 @@ final class RatingPromptManagerTests: XCTestCase {
     
     override func setUp() {
         super.setUp()
+        let manager = RatingPromptManager.shared
+        manager.hasInteracted = false
+        manager.promptShownCount = 0
+        manager.lastPromptDate = 0
         UserDefaults.standard.removeObject(forKey: "YTM_rating_hasInteracted")
         UserDefaults.standard.removeObject(forKey: "YTM_rating_lastPromptDate")
         UserDefaults.standard.removeObject(forKey: "YTM_rating_promptShownCount")
@@ -14,6 +18,10 @@ final class RatingPromptManagerTests: XCTestCase {
     }
     
     override func tearDown() {
+        let manager = RatingPromptManager.shared
+        manager.hasInteracted = false
+        manager.promptShownCount = 0
+        manager.lastPromptDate = 0
         UserDefaults.standard.removeObject(forKey: "YTM_rating_hasInteracted")
         UserDefaults.standard.removeObject(forKey: "YTM_rating_lastPromptDate")
         UserDefaults.standard.removeObject(forKey: "YTM_rating_promptShownCount")
