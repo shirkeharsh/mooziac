@@ -9,6 +9,7 @@ public final class DependencyManager: NSObject, URLSessionDownloadDelegate {
     private var progressCallback: ((Double) -> Void)?
     private var completionCallback: ((Bool, String?) -> Void)?
     private var isInstalling: Bool = false
+    private let lastHelperUpdateCheckKey = "Mooziac_lastHelperUpdateCheckTimestamp"
 
     public override init() {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -29,6 +30,7 @@ public final class DependencyManager: NSObject, URLSessionDownloadDelegate {
     }
 
     public func installHelper(
+        force: Bool = false,
         progress: ((Double) -> Void)? = nil,
         completion: @escaping (Bool, String?) -> Void
     ) {
@@ -37,7 +39,7 @@ public final class DependencyManager: NSObject, URLSessionDownloadDelegate {
             return
         }
 
-        if isHelperInstalled {
+        if !force && isHelperInstalled {
             completion(true, nil)
             return
         }
@@ -62,6 +64,43 @@ public final class DependencyManager: NSObject, URLSessionDownloadDelegate {
         let task = session.downloadTask(with: url)
         self.currentDownloadTask = task
         task.resume()
+    }
+
+    public func forceUpdateHelper(
+        progress: ((Double) -> Void)? = nil,
+        completion: @escaping (Bool, String?) -> Void
+    ) {
+        installHelper(force: true, progress: progress, completion: completion)
+    }
+
+    /// Checks the helper binary age once on launch. If the binary is older than 7 days,
+    /// it refreshes to the latest release in the background. Strictly one-shot (no recurring timer).
+    public func updateHelperIfNeededOnLaunch() {
+        guard !isInstalling else { return }
+        guard isHelperInstalled else { return }
+
+        let lastCheck = UserDefaults.standard.double(forKey: lastHelperUpdateCheckKey)
+        let now = Date().timeIntervalSince1970
+
+        if lastCheck > 0 && (now - lastCheck) < (7 * 86400) {
+            if let attrs = try? FileManager.default.attributesOfItem(atPath: ytDlpExecutableURL.path),
+               let modDate = attrs[.modificationDate] as? Date,
+               Date().timeIntervalSince(modDate) < (7 * 86400) {
+                Log.download.debug("Helper binary is fresh (checked within 7 days).")
+                return
+            }
+        }
+
+        Log.download.info("Helper binary is older than 7 days; updating in background on launch...")
+        UserDefaults.standard.set(now, forKey: lastHelperUpdateCheckKey)
+
+        forceUpdateHelper { success, error in
+            if success {
+                Log.download.info("Helper binary successfully refreshed on launch.")
+            } else {
+                Log.download.warning("Helper binary background refresh on launch failed: \(error ?? "unknown error")")
+            }
+        }
     }
 
     // MARK: - URLSessionDownloadDelegate
@@ -106,6 +145,7 @@ public final class DependencyManager: NSObject, URLSessionDownloadDelegate {
             xattrProcess.waitUntilExit()
 
             self.isInstalling = false
+            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: self.lastHelperUpdateCheckKey)
             completionCallback?(true, nil)
         } catch {
             self.isInstalling = false

@@ -4,6 +4,23 @@ All notable changes to Mooziac are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.2.4] - 2026-11-23
+
+### Added
+- Resilient Song Downloader Auto-Healing: Automatically detects YouTube 403 Forbidden and bot-detection blocks, self-updates the `yt-dlp` helper binary to the latest release in the background, and seamlessly retries downloads without manual intervention.
+- Proactive Helper Refresh: Helper binary is checked once on application launch (if older than 7 days) and updated in the background without any recurring background timers.
+- Borderless Hero Player: Immersive borderless player mode with edge-to-edge album artwork presentation and auto-hiding controls during idle playback.
+- 3D Dynamic Lyrics Stage: Multi-layered perspective lyrics renderer with balanced Gaussian background blur and readable contrast.
+- Waveform Progress Theme Styling: Frosted glass theme now features refined greyish unplayed track bars and enhanced played contrast.
+- Automated Test Suite: Added automated unit tests for menu bar title truncation, hero player layout, artwork blur generation, and waveform theming.
+
+### Changed
+- Extractor Client Optimization: Upgraded yt-dlp extractor client configuration to `android,web,web_safari` to circumvent YouTube PO-token blocks.
+- Menu Bar Title Truncation: Long song titles exceeding 30 characters in the menu bar are truncated with `...` to avoid crowding the macOS status bar.
+
+### Fixed
+- 403 Forbidden Download Failures: Resolved persistent HTTP 403 errors caused by outdated extractor signatures and deprecated `tv_embedded` client parameters.
+
 ## [1.2.3] - 2026-11-21
 
 ### Added

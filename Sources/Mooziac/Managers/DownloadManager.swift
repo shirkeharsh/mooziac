@@ -38,6 +38,33 @@ public final class DownloadManager: NSObject {
         public var speed: String = ""
         public var status: DownloadStatus = .queued
         public var completion: ((Bool, String) -> Void)?
+        public var hasRetriedWithFreshHelper: Bool = false
+
+        public init(
+            id: String,
+            urlOrVideoId: String,
+            title: String,
+            artist: String,
+            artworkUrl: String,
+            progress: Double = 0.0,
+            eta: String = "",
+            speed: String = "",
+            status: DownloadStatus = .queued,
+            completion: ((Bool, String) -> Void)? = nil,
+            hasRetriedWithFreshHelper: Bool = false
+        ) {
+            self.id = id
+            self.urlOrVideoId = urlOrVideoId
+            self.title = title
+            self.artist = artist
+            self.artworkUrl = artworkUrl
+            self.progress = progress
+            self.eta = eta
+            self.speed = speed
+            self.status = status
+            self.completion = completion
+            self.hasRetriedWithFreshHelper = hasRetriedWithFreshHelper
+        }
     }
 
     public private(set) var isDownloading: Bool = false
@@ -103,13 +130,18 @@ public final class DownloadManager: NSObject {
         return folder
     }
 
-    private let dependencyManager: DependencyManager
+    public let dependencyManager: DependencyManager
 
     public init(dependencyManager: DependencyManager = DependencyManager()) {
         self.dependencyManager = dependencyManager
         super.init()
         cleanupStaleDownloads()
         observeQueueChanges()
+    }
+
+    /// Checks the helper binary age once on launch via DependencyManager (no recurring timer).
+    public func updateHelperIfNeededOnLaunch() {
+        dependencyManager.updateHelperIfNeededOnLaunch()
     }
 
     private func observeQueueChanges() {
@@ -607,7 +639,7 @@ public final class DownloadManager: NSObject {
         var arguments = [
             "--newline",
             "--no-update",
-            "--extractor-args", "youtube:player_client=mweb,web_safari,tv_embedded,web",
+            "--extractor-args", "youtube:player_client=android,web,web_safari",
             "--no-playlist"
         ]
         if let ffmpegLoc = resolveFFmpegLocation() {
@@ -684,12 +716,53 @@ public final class DownloadManager: NSObject {
 
             let success = (process.terminationStatus == 0)
             guard success else {
-                cleanupJobDir(jobDir)
                 let errorMsg = DownloadManager.extractErrorMessage(from: allOutputLines) ?? "Download failed. Check connection."
                 Log.download.error("yt-dlp failed (exit code \(process.terminationStatus)): \(errorMsg)")
                 for l in allOutputLines.suffix(15) {
                     Log.download.debug("yt-dlp: \(l)")
                 }
+
+                // Auto-healing: detect 403 Forbidden, bot detection, or stale client/cipher blocks
+                let isForbiddenOrStale = allOutputLines.contains { line in
+                    let lower = line.lowercased()
+                    return lower.contains("403: forbidden") ||
+                           lower.contains("http error 403") ||
+                           lower.contains("confirm you're not a bot") ||
+                           lower.contains("po token") ||
+                           (lower.contains("token") && lower.contains("bot"))
+                } || errorMsg.localizedCaseInsensitiveContains("forbidden") || errorMsg.contains("403")
+
+                if isForbiddenOrStale && !task.hasRetriedWithFreshHelper {
+                    Log.download.warning("yt-dlp encountered 403 Forbidden / bot detection. Auto-healing with latest helper...")
+                    DispatchQueue.main.async {
+                        self.onDownloadStatusChanged?(true, "Updating helper...")
+                        self.broadcastProgress(id: task.id, videoId: videoId, title: cleanT, progress: 0.1, eta: "", speed: "Updating helper...", status: .downloading(progress: 0.1, eta: "", speed: "Updating helper..."))
+                    }
+
+                    var retryingTask = task
+                    retryingTask.hasRetriedWithFreshHelper = true
+
+                    self.dependencyManager.forceUpdateHelper(progress: { [weak self] pct in
+                        self?.broadcastProgress(id: task.id, videoId: videoId, title: cleanT, progress: pct, eta: "", speed: "\(Int(pct * 100))%", status: .downloading(progress: pct, eta: "", speed: "Updating helper"))
+                    }) { [weak self] updateSuccess, updateErr in
+                        guard let self = self else { return }
+                        if updateSuccess {
+                            Log.download.info("Helper updated successfully to latest release. Retrying download for \(cleanT)...")
+                            try? FileManager.default.removeItem(at: jobDir)
+                            try? FileManager.default.createDirectory(at: jobDir, withIntermediateDirectories: true)
+                            self.workQueue.async {
+                                self.executeYtDlpDownloadTask(task: retryingTask, jobDir: jobDir, safeFilename: safeFilename, videoId: videoId)
+                            }
+                        } else {
+                            Log.download.error("Helper auto-update failed: \(updateErr ?? "unknown error")")
+                            self.cleanupJobDir(jobDir)
+                            self.finishTask(task: task, success: false, message: errorMsg)
+                        }
+                    }
+                    return
+                }
+
+                cleanupJobDir(jobDir)
                 finishTask(task: task, success: false, message: errorMsg)
                 return
             }

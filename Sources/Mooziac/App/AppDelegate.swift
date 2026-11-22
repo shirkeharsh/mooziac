@@ -95,6 +95,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.global().asyncAfter(deadline: .now() + 6.0) {
             UpdateManager.shared.checkForUpdates(userInitiated: false)
         }
+
+        // Check helper binary once on launch (if older than 7 days, no recurring timer)
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 10.0) {
+            DownloadManager.shared.updateHelperIfNeededOnLaunch()
+        }
     }
 
     /// Auto-sync the library with the YouTube Music account once the session is
