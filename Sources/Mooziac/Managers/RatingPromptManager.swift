@@ -120,6 +120,11 @@ public final class RatingPromptManager {
         
         return true
     }
+
+    /// Alias for shouldPresentPromptNow
+    public func shouldShowPrompt() -> Bool {
+        return shouldPresentPromptNow()
+    }
     
     // MARK: - Presentation & User Actions
     

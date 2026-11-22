@@ -5,21 +5,21 @@ final class RatingPromptManagerTests: XCTestCase {
     
     override func setUp() {
         super.setUp()
-        UserDefaults.standard.removeObject(forKey: "mzc_has_interacted_prompt")
-        UserDefaults.standard.removeObject(forKey: "mzc_prompt_snooze_until")
-        UserDefaults.standard.removeObject(forKey: "mzc_prompt_shown_count")
-        UserDefaults.standard.removeObject(forKey: "mzc_app_launch_count")
-        UserDefaults.standard.removeObject(forKey: "mzc_songs_completed_count")
-        UserDefaults.standard.removeObject(forKey: "mzc_first_launch_date")
+        UserDefaults.standard.removeObject(forKey: "YTM_rating_hasInteracted")
+        UserDefaults.standard.removeObject(forKey: "YTM_rating_lastPromptDate")
+        UserDefaults.standard.removeObject(forKey: "YTM_rating_promptShownCount")
+        UserDefaults.standard.removeObject(forKey: "YTM_rating_launchCount")
+        UserDefaults.standard.removeObject(forKey: "YTM_rating_songsCompletedCount")
+        UserDefaults.standard.removeObject(forKey: "YTM_rating_firstLaunchDate")
     }
     
     override func tearDown() {
-        UserDefaults.standard.removeObject(forKey: "mzc_has_interacted_prompt")
-        UserDefaults.standard.removeObject(forKey: "mzc_prompt_snooze_until")
-        UserDefaults.standard.removeObject(forKey: "mzc_prompt_shown_count")
-        UserDefaults.standard.removeObject(forKey: "mzc_app_launch_count")
-        UserDefaults.standard.removeObject(forKey: "mzc_songs_completed_count")
-        UserDefaults.standard.removeObject(forKey: "mzc_first_launch_date")
+        UserDefaults.standard.removeObject(forKey: "YTM_rating_hasInteracted")
+        UserDefaults.standard.removeObject(forKey: "YTM_rating_lastPromptDate")
+        UserDefaults.standard.removeObject(forKey: "YTM_rating_promptShownCount")
+        UserDefaults.standard.removeObject(forKey: "YTM_rating_launchCount")
+        UserDefaults.standard.removeObject(forKey: "YTM_rating_songsCompletedCount")
+        UserDefaults.standard.removeObject(forKey: "YTM_rating_firstLaunchDate")
         super.tearDown()
     }
     
@@ -31,22 +31,24 @@ final class RatingPromptManagerTests: XCTestCase {
     
     func testSnoozeSetsDate() {
         let manager = RatingPromptManager.shared
+        let before = Date().timeIntervalSince1970 - 1.0
         manager.snooze()
-        let snoozeDate = UserDefaults.standard.double(forKey: "mzc_prompt_snooze_until")
-        XCTAssertGreaterThan(snoozeDate, Date().timeIntervalSince1970)
+        let snoozeDate = manager.lastPromptDate
+        XCTAssertGreaterThan(snoozeDate, before)
     }
     
     func testMarkInteracted() {
         let manager = RatingPromptManager.shared
         manager.markInteracted()
         XCTAssertTrue(manager.hasInteracted)
+        XCTAssertFalse(manager.isEligibleForPrompt)
         XCTAssertFalse(manager.shouldShowPrompt())
     }
     
     func testIncrementSongCompletion() {
-        let initial = UserDefaults.standard.integer(forKey: "mzc_songs_completed_count")
+        let initial = UserDefaults.standard.integer(forKey: "YTM_rating_songsCompletedCount")
         RatingPromptManager.shared.recordSongCompleted()
-        let updated = UserDefaults.standard.integer(forKey: "mzc_songs_completed_count")
+        let updated = UserDefaults.standard.integer(forKey: "YTM_rating_songsCompletedCount")
         XCTAssertEqual(updated, initial + 1)
     }
 }
