@@ -22,6 +22,7 @@ LAUNCH_AFTER_BUILD=true
 INSTALL_LOCALLY=true
 KILL_EXISTING=true
 REQUIRE_UNIVERSAL=false
+FORCE_ADHOC=false
 
 # Parse optional arguments
 while [[ "$#" -gt 0 ]]; do
@@ -31,6 +32,7 @@ while [[ "$#" -gt 0 ]]; do
         --no-kill) KILL_EXISTING=false; shift ;;
         --release-only) INSTALL_LOCALLY=false; LAUNCH_AFTER_BUILD=false; KILL_EXISTING=false; shift ;;
         --require-universal) REQUIRE_UNIVERSAL=true; shift ;;
+        --ad-hoc|--no-cert) FORCE_ADHOC=true; shift ;;
         --version) APP_VERSION="$2"; shift 2 ;;
         --build) APP_BUILD="$2"; shift 2 ;;
         *) echo "Unknown option: $1"; exit 1 ;;
@@ -247,15 +249,19 @@ if [ -f "Mooziac.entitlements" ]; then
 fi
 
 SIGN_STATUS="Ad-hoc signed (Hardened Runtime)"
-SIGN_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | awk '/Apple Development|Developer ID Application/ {print $2}' | head -1)
 SIGNED_WITH_CERT=false
-if [ -n "$SIGN_IDENTITY" ]; then
-    echo "    Attempting to sign with certificate: $SIGN_IDENTITY"
-    if codesign --force --deep --options runtime $ENTITLEMENTS_FLAG --sign "$SIGN_IDENTITY" --identifier "$APP_BUNDLE_ID" "$TARGET_APP" 2>/dev/null; then
-        SIGN_STATUS="Valid signature ($SIGN_IDENTITY)"
-        SIGNED_WITH_CERT=true
-    else
-        echo "    Certificate signing failed or requires keychain authorization, falling back to ad-hoc..."
+
+if [ "$FORCE_ADHOC" = false ]; then
+    # Only use Developer ID Application for public releases (Apple Development breaks on other users' machines)
+    SIGN_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | awk '/Developer ID Application/ {print $2}' | head -1)
+    if [ -n "$SIGN_IDENTITY" ]; then
+        echo "    Attempting to sign with certificate: $SIGN_IDENTITY"
+        if codesign --force --deep --options runtime $ENTITLEMENTS_FLAG --sign "$SIGN_IDENTITY" --identifier "$APP_BUNDLE_ID" "$TARGET_APP" 2>/dev/null; then
+            SIGN_STATUS="Valid signature ($SIGN_IDENTITY)"
+            SIGNED_WITH_CERT=true
+        else
+            echo "    Certificate signing failed or requires keychain authorization, falling back to ad-hoc..."
+        fi
     fi
 fi
 
