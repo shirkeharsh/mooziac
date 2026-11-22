@@ -9,7 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 - Borderless Hero Player: Immersive borderless player mode with edge-to-edge album artwork presentation and auto-hiding playback controls during idle listening.
 - Interactive Artwork Toggle: Click directly on the album artwork in the player to effortlessly expand and collapse the Hero Player visual stage.
-- Instant Video Search (`/`): Prefix any search query with `/` (e.g. `/ Starboy` or `/ Bohemian Rhapsody`) to instantly search and play the official video directly in the video window.
+- Up Next Queue & Alerts: Live interactive Up Next queue management with drag reordering, track removal, playlist saving, and menu bar alerts for upcoming songs.
+- Instant Video Search (/): Prefix any search query with / (e.g. / Starboy or / Bohemian Rhapsody) to instantly search and play the official video directly in the video window.
 - 3D Dynamic Lyrics Stage: Multi-layered perspective lyrics experience with tuned Gaussian background blur and crystal-clear text contrast.
 - Automated Test Suite: Added automated unit tests for menu bar title truncation, hero player layout, artwork blur caching, and waveform theming.
 
