@@ -17,6 +17,7 @@ final class StatusItemPanel: NSPanel {
         self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         self.isMovableByWindowBackground = true
         self.hidesOnDeactivate = false
+        self.acceptsMouseMovedEvents = true
     }
     
     override var canBecomeKey: Bool {

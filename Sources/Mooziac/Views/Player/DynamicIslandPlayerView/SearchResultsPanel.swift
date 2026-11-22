@@ -7,6 +7,7 @@ private final class SearchResultRow: NSView {
     var onAddToPlaylist: ((String) -> Void)?
     private let track: YTMClient.Track
     private let artwork = NSImageView()
+    private let videoBadge = NSTextField(labelWithString: "VIDEO")
     private let titleLabel = NSTextField(labelWithString: "")
     private let detailLabel = NSTextField(labelWithString: "")
     private let playIndicator = NSImageView()
@@ -30,7 +31,7 @@ private final class SearchResultRow: NSView {
         artwork.layer?.masksToBounds = true
         artwork.image = AppArtworkHelper.defaultArtwork
         playIndicator.translatesAutoresizingMaskIntoConstraints = false
-        playIndicator.image = NSImage(systemSymbolName: "play.fill", accessibilityDescription: "Play")
+        playIndicator.image = NSImage(systemSymbolName: track.isVideo ? "video.fill" : "play.fill", accessibilityDescription: track.isVideo ? "Video" : "Play")
         playIndicator.alphaValue = 0.8
         configureActionButton(queueButton, symbol: "text.badge.plus", tooltip: "Add to Queue", action: #selector(queuePressed))
         configureActionButton(likeButton, symbol: isLiked ? "heart.fill" : "heart", tooltip: isLiked ? "Remove from Liked Songs" : "Add to Liked Songs", action: #selector(likePressed))
@@ -53,6 +54,31 @@ private final class SearchResultRow: NSView {
         addSubview(queueButton)
         addSubview(likeButton)
         addSubview(moreButton)
+
+        var titleLeadingAnchor = artwork.trailingAnchor
+        var titleLeadingOffset: CGFloat = 8
+
+        if track.isVideo {
+            videoBadge.translatesAutoresizingMaskIntoConstraints = false
+            videoBadge.font = .systemFont(ofSize: 8, weight: .bold)
+            videoBadge.textColor = .white
+            videoBadge.alignment = .center
+            videoBadge.wantsLayer = true
+            videoBadge.layer?.cornerRadius = 3
+            videoBadge.layer?.masksToBounds = true
+            videoBadge.layer?.backgroundColor = NSColor.systemRed.withAlphaComponent(0.85).cgColor
+            addSubview(videoBadge)
+
+            NSLayoutConstraint.activate([
+                videoBadge.leadingAnchor.constraint(equalTo: artwork.trailingAnchor, constant: 7),
+                videoBadge.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
+                videoBadge.widthAnchor.constraint(equalToConstant: 32),
+                videoBadge.heightAnchor.constraint(equalToConstant: 13)
+            ])
+            titleLeadingAnchor = videoBadge.trailingAnchor
+            titleLeadingOffset = 4
+        }
+
         NSLayoutConstraint.activate([
             heightAnchor.constraint(equalToConstant: 42),
             artwork.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 5),
@@ -70,10 +96,10 @@ private final class SearchResultRow: NSView {
             playIndicator.trailingAnchor.constraint(equalTo: queueButton.leadingAnchor, constant: -5),
             playIndicator.centerYAnchor.constraint(equalTo: centerYAnchor),
             playIndicator.widthAnchor.constraint(equalToConstant: 12), playIndicator.heightAnchor.constraint(equalToConstant: 12),
-            titleLabel.leadingAnchor.constraint(equalTo: artwork.trailingAnchor, constant: 8),
+            titleLabel.leadingAnchor.constraint(equalTo: titleLeadingAnchor, constant: titleLeadingOffset),
             titleLabel.trailingAnchor.constraint(equalTo: playIndicator.leadingAnchor, constant: -5),
             titleLabel.bottomAnchor.constraint(equalTo: centerYAnchor, constant: -1),
-            detailLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+            detailLabel.leadingAnchor.constraint(equalTo: artwork.trailingAnchor, constant: 8),
             detailLabel.trailingAnchor.constraint(equalTo: titleLabel.trailingAnchor),
             detailLabel.topAnchor.constraint(equalTo: centerYAnchor, constant: 1)
         ])
@@ -174,9 +200,19 @@ private final class SearchResultRow: NSView {
             guard index < urls.count else { return }
             URLSession.shared.dataTask(with: urls[index]) { [weak self] data, response, _ in
                 let succeeded = (response as? HTTPURLResponse).map { (200..<300).contains($0.statusCode) } ?? false
-                if succeeded, let data, let image = NSImage(data: data) {
-                    cache.setMemoryCachedImage(image, forKey: cacheKey)
-                    DispatchQueue.main.async { self?.artwork.image = image }
+                if succeeded, let data {
+                    let thumb: NSImage
+                    if let source = CGImageSourceCreateWithData(data as CFData, nil),
+                       let rawCG = CGImageSourceCreateThumbnailAtIndex(source, 0, [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceThumbnailMaxPixelSize: 128] as CFDictionary) {
+                        let squareCG = AppArtworkHelper.cropToCenterSquare(cgImage: rawCG)
+                        thumb = NSImage(cgImage: squareCG, size: NSSize(width: 44, height: 44))
+                    } else if let img = NSImage(data: data) {
+                        thumb = img
+                    } else {
+                        thumb = AppArtworkHelper.defaultArtwork
+                    }
+                    cache.setMemoryCachedImage(thumb, forKey: cacheKey)
+                    DispatchQueue.main.async { self?.artwork.image = thumb }
                 } else {
                     loadNext(index + 1)
                 }
@@ -251,13 +287,31 @@ extension DynamicIslandPlayerView {
 
     func searchTextChanged() {
         cancelLiveSearch()
-        let query = searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else {
-            hideSearchResultsPanel()
-            if isSettingsExpanded && activeSettingsMode == .search { collapseSettings() }
+        let rawQuery = searchField.stringValue
+        let isVideoSearch = rawQuery.hasPrefix("/")
+        let cleanQuery: String = {
+            if rawQuery.hasPrefix("/video ") {
+                return String(rawQuery.dropFirst(7)).trimmingCharacters(in: .whitespacesAndNewlines)
+            } else if rawQuery.hasPrefix("/v ") {
+                return String(rawQuery.dropFirst(3)).trimmingCharacters(in: .whitespacesAndNewlines)
+            } else if rawQuery.hasPrefix("/ ") {
+                return String(rawQuery.dropFirst(2)).trimmingCharacters(in: .whitespacesAndNewlines)
+            } else if rawQuery.hasPrefix("/") {
+                return String(rawQuery.dropFirst(1)).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            return rawQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        }()
+
+        guard !cleanQuery.isEmpty else {
+            if isVideoSearch {
+                showSearchPanelStatus("🎬 Type song name to search videos (e.g. /songname)")
+            } else {
+                hideSearchResultsPanel()
+                if isSettingsExpanded && activeSettingsMode == .search { collapseSettings() }
+            }
             return
         }
-        guard !URLFilter.containsLink(query) else {
+        guard !URLFilter.containsLink(cleanQuery) else {
             showSearchPanelStatus("Search with a song title or artist")
             return
         }
@@ -265,8 +319,8 @@ extension DynamicIslandPlayerView {
             showSearchPanelStatus("You're offline. Connect to search YouTube Music.")
             return
         }
-        showSearchPanelStatus("Searching YouTube Music…")
-        let work = DispatchWorkItem { [weak self] in self?.runLiveSearch(query) }
+        showSearchPanelStatus(isVideoSearch ? "Searching YouTube Music Videos…" : "Searching YouTube Music…")
+        let work = DispatchWorkItem { [weak self] in self?.runLiveSearch(cleanQuery, isVideo: isVideoSearch) }
         searchDebounce = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: work)
     }
@@ -279,19 +333,20 @@ extension DynamicIslandPlayerView {
         searchResultsToken += 1
     }
 
-    private func runLiveSearch(_ query: String) {
+    private func runLiveSearch(_ query: String, isVideo: Bool = false) {
         guard isSearchFieldActive, NetworkMonitor.shared.isReachable else { return }
         let token = searchResultsToken
-        liveSearchRequest = YTMClient.shared.searchTracks(query: query) { [weak self] result in
+        let filter: YTMClient.SearchFilter = isVideo ? .videos : .songs
+        liveSearchRequest = YTMClient.shared.searchTracks(query: query, filter: filter) { [weak self] result in
             DispatchQueue.main.async {
                 guard let self, token == self.searchResultsToken, self.isSearchFieldActive else { return }
                 self.liveSearchRequest = nil
                 switch result {
                 case .success(let tracks):
                     if tracks.isEmpty {
-                        self.showSearchPanelStatus("No songs found. Try another search.")
+                        self.showSearchPanelStatus(isVideo ? "No video songs found. Try another search." : "No songs found. Try another search.")
                     } else {
-                        self.showSearchResults(tracks)
+                        self.showSearchResults(tracks, isVideo: isVideo)
                     }
                 case .failure(let error):
                     if let error = error as? YTMClient.YTMError, case .notSignedIn = error {
@@ -316,10 +371,10 @@ extension DynamicIslandPlayerView {
         presentSearchPanel()
     }
 
-    private func showSearchResults(_ tracks: [YTMClient.Track]) {
+    private func showSearchResults(_ tracks: [YTMClient.Track], isVideo: Bool = false) {
         guard let stack = searchResultsStack, let status = searchResultsStatusLabel else { return }
         stack.arrangedSubviews.forEach { stack.removeArrangedSubview($0); $0.removeFromSuperview() }
-        status.stringValue = "SONGS"
+        status.stringValue = isVideo ? "VIDEOS ONLY" : "SONGS"
         status.isHidden = false
         for track in tracks {
             let row = SearchResultRow(track: track, isLiked: LikedSongsManager.shared.isLiked(videoId: track.videoId))
@@ -338,9 +393,13 @@ extension DynamicIslandPlayerView {
     }
 
     private func presentSearchPanel() {
-        for identifier in ["MainSettingsStack", "PlaylistSubView", "GestureMappingSubView"] {
+        if activeSettingsMode == .visual {
+            delegate?.dynamicIslandDidToggleVisualStage(isActive: false, hostView: nil)
+        }
+        for identifier in ["MainSettingsStack", "PlaylistSubView", "GestureMappingSubView", "VisualStageSubView"] {
             settingsContainerView.subviews.first(where: { $0.identifier == NSUserInterfaceItemIdentifier(identifier) })?.isHidden = true
         }
+        updateArtworkHighlight()
         settingsContainerView.subviews.first(where: { $0.identifier == NSUserInterfaceItemIdentifier("SearchResultsPanel") })?.isHidden = false
         settingsHeaderLabel.isHidden = true
         activeSettingsMode = .search

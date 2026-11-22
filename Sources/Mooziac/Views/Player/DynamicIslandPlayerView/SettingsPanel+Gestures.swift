@@ -11,6 +11,9 @@ extension DynamicIslandPlayerView {
         if let gestureSubView = settingsContainerView.subviews.first(where: { $0.identifier == NSUserInterfaceItemIdentifier("GestureMappingSubView") }) {
             gestureSubView.isHidden = false
         }
+        if let visualView = settingsContainerView.subviews.first(where: { $0.identifier == NSUserInterfaceItemIdentifier("VisualStageSubView") }) {
+            visualView.isHidden = true
+        }
         settingsHeaderLabel.isHidden = true
         refreshGestureMappingRows()
         updateSettingsThemeHighlight()

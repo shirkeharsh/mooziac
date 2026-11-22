@@ -167,11 +167,34 @@ extension NowPlayingManager {
                 try {
                     var video = document.querySelector('video');
                     var isPlaying = false, currentTime = 0, duration = 0, playbackRate = 1.0;
+                    var hasVideo = false;
                     if (video) {
                         isPlaying = !video.paused && !video.ended && (video.readyState > 2 || window.__mooziacAutoplayPending === true);
                         currentTime = video.currentTime || 0;
                         duration = video.duration || 0;
                         playbackRate = video.playbackRate || 1.0;
+                        
+                        var isRawVideoActive = (video.videoWidth > 0 && video.videoHeight > 0);
+                        var avToggle = document.querySelector('ytmusic-av-toggle');
+                        var isExplicitSongMode = false;
+                        var isExplicitVideoMode = false;
+                        if (avToggle) {
+                            var songBtn = avToggle.querySelector('.song-button, [aria-label*="Song"], yt-button-renderer:first-child');
+                            if (songBtn && (songBtn.classList.contains('selected') || songBtn.getAttribute('aria-selected') === 'true')) {
+                                isExplicitSongMode = true;
+                            }
+                            var videoBtn = avToggle.querySelector('.video-button, [aria-label*="Video"], yt-button-renderer:last-child');
+                            if (videoBtn && (videoBtn.classList.contains('selected') || videoBtn.getAttribute('aria-selected') === 'true')) {
+                                isExplicitVideoMode = true;
+                            }
+                        }
+                        var isDrawerVideoActive = document.documentElement.classList.contains('mooziac-drawer-has-video');
+                        
+                        if (!isExplicitSongMode && (isRawVideoActive || isExplicitVideoMode || isDrawerVideoActive)) {
+                            hasVideo = true;
+                        } else {
+                            hasVideo = false;
+                        }
                     }
                     
                     if (video && duration > 5.0 && currentTime >= (duration - 0.65)) {
@@ -219,7 +242,8 @@ extension NowPlayingManager {
                             isRepeat: false,
                             audioItag: "",
                             audioCodecs: "",
-                            audioBitrate: ""
+                            audioBitrate: "",
+                            hasVideo: hasVideo
                         });
                         return;
                     }
@@ -255,7 +279,8 @@ extension NowPlayingManager {
                                 isRepeat: cachedRepeat,
                                 audioItag: "",
                                 audioCodecs: "",
-                                audioBitrate: ""
+                                audioBitrate: "",
+                                hasVideo: hasVideo
                             });
                             return;
                         }
@@ -320,24 +345,39 @@ extension NowPlayingManager {
                         if (resolvedVideoId) cachedVideoId = resolvedVideoId;
                     }
 
-                    // Only trust liveMediaArtwork if mediaSession metadata matches the current track
                     var mediaSessionMatches = liveMediaTitle && cachedTitle &&
                         (liveMediaTitle.toLowerCase() === cachedTitle.toLowerCase() ||
                          cachedTitle.toLowerCase().indexOf(liveMediaTitle.toLowerCase()) !== -1 ||
                          liveMediaTitle.toLowerCase().indexOf(cachedTitle.toLowerCase()) !== -1);
 
-                    if (mediaSessionMatches && liveMediaArtwork && liveMediaArtwork.indexOf('data:') !== 0) {
-                        cachedArtwork = liveMediaArtwork;
-                    } else if (!cachedArtwork || cachedArtwork.indexOf('data:') === 0 || isNewTrack) {
-                        var artElem = document.querySelector('ytmusic-player-bar .image') ||
-                                      document.querySelector('ytmusic-player-bar img#img') ||
-                                      document.querySelector('ytmusic-player-bar #thumbnail img') ||
-                                      document.querySelector('ytmusic-player-bar .thumbnail-image_wrapper img') ||
-                                      document.querySelector('ytmusic-player-bar img') ||
-                                      document.querySelector('img.ytmusic-player-bar');
-                        if (artElem && artElem.src && artElem.src.indexOf('data:') !== 0 && !isNewTrack) {
-                            cachedArtwork = artElem.src;
-                        } else if (cachedVideoId) {
+                    function normalizeArtwork(u) {
+                        if (!u || typeof u !== 'string' || u.indexOf('data:') === 0) return '';
+                        if (u.indexOf('googleusercontent.com') !== -1 || u.indexOf('ggpht.com') !== -1) {
+                            return u.replace(/=w\\d+-h\\d+[^"]*/, '=w544-h544-l90-rj').replace(/=s\\d+[^"]*/, '=s544-c-k');
+                        }
+                        return u;
+                    }
+
+                    var domArtwork = '';
+                    var artElem = document.querySelector('ytmusic-player-bar .image') ||
+                                  document.querySelector('ytmusic-player-bar img#img') ||
+                                  document.querySelector('ytmusic-player-bar #thumbnail img') ||
+                                  document.querySelector('ytmusic-player-bar .thumbnail-image_wrapper img') ||
+                                  document.querySelector('#song-image img') ||
+                                  document.querySelector('ytmusic-player-bar img') ||
+                                  document.querySelector('img.ytmusic-player-bar');
+                    if (artElem && artElem.src && artElem.src.indexOf('data:') !== 0 && artElem.src.indexOf('http') === 0) {
+                        domArtwork = normalizeArtwork(artElem.src);
+                    }
+
+                    var mediaArtwork = normalizeArtwork(liveMediaArtwork);
+
+                    if (mediaSessionMatches && mediaArtwork) {
+                        cachedArtwork = mediaArtwork;
+                    } else if (domArtwork) {
+                        cachedArtwork = domArtwork;
+                    } else if (!cachedArtwork || cachedArtwork.indexOf('data:') === 0 || cachedArtwork.indexOf('hqdefault.jpg') !== -1 || isNewTrack) {
+                        if (cachedVideoId) {
                             cachedArtwork = "https://i.ytimg.com/vi/" + cachedVideoId + "/hqdefault.jpg";
                         }
                     }
@@ -450,7 +490,8 @@ extension NowPlayingManager {
                         audioItag: audioDiag.itag,
                         audioCodecs: audioDiag.codecs,
                         audioBitrate: audioDiag.bitrate,
-                        loudnessDb: liveLoudnessDb
+                        loudnessDb: liveLoudnessDb,
+                        hasVideo: hasVideo
                     });
                 } catch(e) {}
             }
@@ -637,7 +678,7 @@ extension NowPlayingManager {
                 if (video) {
                     if (!video.ytmBound) {
                         video.ytmBound = true;
-                        ['play', 'playing', 'ended', 'loadedmetadata'].forEach(function(evt) {
+                        ['play', 'playing', 'ended', 'loadedmetadata', 'loadeddata', 'canplay'].forEach(function(evt) {
                             video.addEventListener(evt, function() {
                                 optimizePlaybackStreams();
                                 enforceSongMode();
@@ -1058,6 +1099,7 @@ extension NowPlayingManager {
         }
         let effectiveHQ = isHighQuality || (!trackChanged && currentState.isHighQualityStream && itag.isEmpty)
         let effectiveItag = !itag.isEmpty ? itag : (!trackChanged ? currentState.audioItag : "")
+        let hasVideo = (dict["hasVideo"] as? Bool) ?? false
 
         let newState = PlaybackState(
             title: title,
@@ -1080,7 +1122,8 @@ extension NowPlayingManager {
             currentAudioQuality: qualityDescription,
             isHighQualityStream: effectiveHQ,
             audioItag: effectiveItag,
-            isAd: false
+            isAd: false,
+            hasVideo: hasVideo
         )
         
         currentState = newState

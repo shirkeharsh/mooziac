@@ -16,6 +16,8 @@ extension NowPlayingManager {
                         var m = a.getAttribute('href').match(/[?&]v=([A-Za-z0-9_-]{11})/);
                         if (m) return m[1];
                     }
+                    var tm = (node.innerHTML || '').match(/\\/vi\\/([A-Za-z0-9_-]{11})\\//);
+                    if (tm) return tm[1];
                     var rli = node.querySelector('ytmusic-responsive-list-item-renderer');
                     if (rli) {
                         var rid = rli.getAttribute('data-id') || rli.getAttribute('data-video-id');
@@ -147,26 +149,6 @@ extension NowPlayingManager {
                     }
                 }
 
-                // If queue has 1 or 0 items, trigger YouTube Music Radio mix / Automix to populate Up Next autoplay tracks!
-                if (res.length <= 1) {
-                    try {
-                        var autoToggle = document.querySelector('ytmusic-player-queue #automix-toggle tp-yt-paper-toggle-button') ||
-                                         document.querySelector('ytmusic-player-queue tp-yt-paper-toggle-button') ||
-                                         document.querySelector('#automix-toggle') ||
-                                         document.querySelector('tp-yt-paper-toggle-button[aria-label*="Autoplay"]');
-                        if (autoToggle && (!autoToggle.checked && !autoToggle.hasAttribute('checked') && autoToggle.getAttribute('aria-pressed') !== 'true')) {
-                            autoToggle.click();
-                        }
-                        
-                        var radioBtn = document.querySelector('ytmusic-player-bar .radio-button') ||
-                                       document.querySelector('button[aria-label*="Radio"]') ||
-                                       document.querySelector('button[aria-label*="Start radio"]') ||
-                                       document.querySelector('ytmusic-player-queue #automix-contents button') ||
-                                       document.querySelector('ytmusic-automix-preview-video-renderer button');
-                        if (radioBtn) radioBtn.click();
-                    } catch(e) {}
-                }
-
                 return res;
             } catch(e) { return []; }
         })();
@@ -214,7 +196,13 @@ extension NowPlayingManager {
                               node.querySelector('#thumbnail img') ||
                               node.querySelector('.thumbnail img') ||
                               node.querySelector('img');
-                    if (img) return (img.currentSrc || img.src || '');
+                    if (img) {
+                        var src = (img.currentSrc || img.src || '');
+                        if (src.indexOf('googleusercontent.com') !== -1 || src.indexOf('ggpht.com') !== -1) {
+                            return src.replace(/=w\\d+-h\\d+[^"]*/, '=w120-h120-l90-rj');
+                        }
+                        return src;
+                    }
                 } catch(e) {}
                 return '';
             }
@@ -238,6 +226,8 @@ extension NowPlayingManager {
                         var m = a.getAttribute('href').match(/[?&]v=([A-Za-z0-9_-]{11})/);
                         if (m) return m[1];
                     }
+                    var tm = (node.innerHTML || '').match(/\\/vi\\/([A-Za-z0-9_-]{11})\\//);
+                    if (tm) return tm[1];
                     var rli = node.querySelector('ytmusic-responsive-list-item-renderer');
                     if (rli) {
                         var rid = rli.getAttribute('data-id') || rli.getAttribute('data-video-id');
@@ -251,6 +241,7 @@ extension NowPlayingManager {
                 } catch(e) {}
                 return '';
             }
+            \(NowPlayingManager.queueNodesHelperJS)
             var res = [];
             try {
                 var rawItems = [];
@@ -264,18 +255,30 @@ extension NowPlayingManager {
                     rawItems = Array.from(document.querySelectorAll('ytmusic-player-queue-item'));
                 }
 
+                rawItems = mooziacQueueNodes();
                 var idx = 0;
                 for (var i = 0; i < rawItems.length; i++) {
                     var item = rawItems[i];
-                    if (!visible(item)) continue;
+                    if (!document.body.contains(item)) continue;
                     var t = item.querySelector('.song-title, .title, [class*="title"]');
                     var a = item.querySelector('.byline, .artist, [class*="byline"]');
-                    if (!t) continue;
-                    var titleVal = t.textContent.trim();
+                    var dd = null;
+                    try {
+                        dd = item.data ? (item.data.playlistPanelVideoRenderer || item.data) : null;
+                        if (!dd && item.__data) dd = item.__data.data ? (item.__data.data.playlistPanelVideoRenderer || item.__data.data) : item.__data;
+                    } catch(e) {}
+                    var titleVal = t ? t.textContent.trim() : '';
+                    if (!titleVal && dd && dd.title) {
+                        titleVal = (dd.title.runs && dd.title.runs.length > 0) ? dd.title.runs[0].text : (dd.title.simpleText || '');
+                    }
                     if (!titleVal) continue;
                     var artistVal = a ? a.textContent.trim() : '';
-                    var sel = item.hasAttribute('selected') || item.classList.contains('selected') || item.getAttribute('play-button-state') === 'playing';
-                    res.push({ index: idx, title: titleVal, artist: artistVal, isSelected: !!sel, artworkUrl: extractThumb(item), duration: extractDuration(item), videoId: extractVideoId(item) });
+                    if (!artistVal && dd) {
+                        var bl = dd.longBylineText || dd.shortBylineText;
+                        if (bl && bl.runs && bl.runs.length > 0) artistVal = bl.runs[0].text;
+                    }
+                    var sel = item.hasAttribute('selected') || item.classList.contains('selected') || item.getAttribute('play-button-state') === 'playing' || !!(dd && dd.selected);
+                    res.push({ index: idx, title: titleVal, artist: artistVal, isSelected: !!sel, artworkUrl: extractThumb(item), duration: extractDuration(item), videoId: ((dd && (dd.videoId || (dd.navigationEndpoint && dd.navigationEndpoint.watchEndpoint && dd.navigationEndpoint.watchEndpoint.videoId))) || extractVideoId(item)) });
                     idx++;
                 }
 
@@ -351,11 +354,13 @@ extension NowPlayingManager {
             var automix = [];
             try {
                 var amNodes = Array.from(document.querySelectorAll('ytmusic-automix-preview-video-renderer'));
+                var amVisible = amNodes.filter(visible);
+                if (amVisible.length > 0) amNodes = amVisible;
                 var amIdx = 0;
                 var seenAuto = {};
                 for (var n = 0; n < amNodes.length; n++) {
                     var node = amNodes[n];
-                    if (!visible(node)) continue;
+                    if (!document.body.contains(node)) continue;
                     var amTitle = extractText(node, ['.title', '.song-title', 'yt-formatted-string.title', '[class*="title"]']);
                     var amArtist = extractText(node, ['.byline', '.artist', 'yt-formatted-string.byline', '[class*="byline"]']);
                     if (!amTitle) continue;
@@ -447,7 +452,7 @@ extension NowPlayingManager {
             try {
                 var targetIdx = \(index);
                 var nodes = Array.from(document.querySelectorAll('ytmusic-automix-preview-video-renderer')).filter(function(el) {
-                    return document.body.contains(el) && (el.offsetWidth > 0 || el.offsetHeight > 0 || el.offsetParent !== null);
+                    return document.body.contains(el);
                 });
                 if (nodes && nodes.length > targetIdx) {
                     var node = nodes[targetIdx];
@@ -481,6 +486,7 @@ extension NowPlayingManager {
     public func playQueueItem(at index: Int) {
         let js = """
         (function() {
+            \(NowPlayingManager.queueNodesHelperJS)
             window.__mooziacAutoplayPending = true;
             window.__mooziacPlaybackSuppressed = false;
             window.__mooziacBlockAutoplay = false;
@@ -518,9 +524,7 @@ extension NowPlayingManager {
                 }
 
                 var container = document.querySelector('ytmusic-player-queue #contents') || document.querySelector('#queue #contents') || document;
-                var rawItems = Array.from(container.querySelectorAll('ytmusic-player-queue-item')).filter(function(el) {
-                    return document.body.contains(el) && (el.offsetWidth > 0 || el.offsetHeight > 0 || el.offsetParent !== null);
-                });
+                var rawItems = mooziacQueueNodes();
                 
                 if (rawItems && rawItems.length > targetIdx) {
                     simulateClick(rawItems[targetIdx]);
@@ -534,12 +538,11 @@ extension NowPlayingManager {
     public func removeQueueItem(at index: Int) {
         let js = """
         (function() {
+            \(NowPlayingManager.queueNodesHelperJS)
             try {
                 var targetIdx = \(index);
                 var container = document.querySelector('ytmusic-player-queue #contents') || document.querySelector('#queue #contents') || document;
-                var rawItems = Array.from(container.querySelectorAll('ytmusic-player-queue-item')).filter(function(el) {
-                    return document.body.contains(el) && (el.offsetWidth > 0 || el.offsetHeight > 0 || el.offsetParent !== null);
-                });
+                var rawItems = mooziacQueueNodes();
                 
                 if (rawItems && rawItems.length > targetIdx) {
                     var targetItem = rawItems[targetIdx];
@@ -603,15 +606,14 @@ extension NowPlayingManager {
     public func moveQueueItem(from fromIndex: Int, to toIndex: Int) {
         let js = """
         (function() {
+            \(NowPlayingManager.queueNodesHelperJS)
             try {
                 var fromIdx = \(fromIndex);
                 var toIdx = \(toIndex);
                 if (fromIdx === toIdx || fromIdx < 0 || toIdx < 0) return;
 
                 var container = document.querySelector('ytmusic-player-queue #contents') || document.querySelector('#queue #contents') || document;
-                var items = Array.from(container.querySelectorAll('ytmusic-player-queue-item')).filter(function(el) {
-                    return document.body.contains(el) && (el.offsetWidth > 0 || el.offsetHeight > 0 || el.offsetParent !== null);
-                });
+                var items = mooziacQueueNodes();
                 if (items && items.length > fromIdx && items.length > toIdx) {
                     var movedNode = items[fromIdx];
                     var targetNode = items[toIdx];

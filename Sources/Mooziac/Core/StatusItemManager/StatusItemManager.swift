@@ -154,7 +154,12 @@ class StatusItemManager: NSObject {
         
         mainViewController.onChangeSize = { [weak self] width, height in
             guard let self = self else { return }
-            self.positionPanel(width: width, height: height)
+            self.positionPanel(width: width, height: height, animated: false)
+        }
+        
+        mainViewController.onChangeSizeAnimated = { [weak self] width, height, animated in
+            guard let self = self else { return }
+            self.positionPanel(width: width, height: height, animated: animated)
         }
         
         mainViewController.onResetPosition = { [weak self] in
@@ -260,17 +265,18 @@ class StatusItemManager: NSObject {
             UserDefaults.standard.set(Double(clampedFrame.origin.x), forKey: "YTM_playerFrameX")
             UserDefaults.standard.set(Double(clampedFrame.origin.y), forKey: "YTM_playerFrameY")
             UserDefaults.standard.set(Double(topY), forKey: "YTM_playerTopY")
+            UserDefaults.standard.set(Double(clampedFrame.midX), forKey: "YTM_playerMidX")
             if let displayID = self.displayManager.displayID(for: screen) {
                 UserDefaults.standard.set(displayID, forKey: "YTM_savedDisplayID")
             }
         }
     }
     
-    func positionPanel(width: CGFloat, height: CGFloat) {
-        positionCustomWindow(panel, width: width, height: height)
+    func positionPanel(width: CGFloat, height: CGFloat, animated: Bool = false) {
+        positionCustomWindow(panel, width: width, height: height, animated: animated)
     }
     
-    func positionCustomWindow(_ targetWindow: NSWindow, width: CGFloat, height: CGFloat) {
+    func positionCustomWindow(_ targetWindow: NSWindow, width: CGFloat, height: CGFloat, animated: Bool = false) {
         guard let button = statusItem.button,
               let buttonWindow = button.window else { return }
         
@@ -291,17 +297,22 @@ class StatusItemManager: NSObject {
             buttonScreenFrame = buttonWindow.convertToScreen(buttonBoundsInWindow)
         }
         
-        // If in dragged/floating player mode and NOT in full-screen or offline library mode
-        if isDraggedFromDock && width <= 360 && !mainViewController.isBrowserMode && !mainViewController.isOfflineLibraryMode,
+        // Floating (dragged / pinned) player: every view (player, browser, libraries) opens and closes
+        // in place around the spot the user left it, instead of snapping back under the menu bar icon.
+        if isDraggedFromDock,
            UserDefaults.standard.object(forKey: "YTM_playerFrameX") != nil {
             let savedX = CGFloat(UserDefaults.standard.double(forKey: "YTM_playerFrameX"))
             let savedTopY = CGFloat(UserDefaults.standard.double(forKey: "YTM_playerTopY"))
             let effectiveWidth = width
             let effectiveHeight = height
             
-            let playerMidX = savedX + (360.0 / 2.0)
+            let playerMidX: CGFloat = (UserDefaults.standard.object(forKey: "YTM_playerMidX") != nil)
+                ? CGFloat(UserDefaults.standard.double(forKey: "YTM_playerMidX"))
+                : savedX + (360.0 / 2.0)
             let desiredX = playerMidX - (effectiveWidth / 2.0)
-            let effectiveY = savedTopY > 0 ? (savedTopY - effectiveHeight) : CGFloat(UserDefaults.standard.double(forKey: "YTM_playerFrameY"))
+            let currentTopY = targetWindow.frame.origin.y + targetWindow.frame.height
+            let effectiveTopY = savedTopY > 0 ? savedTopY : (currentTopY > 0 ? currentTopY : CGFloat(UserDefaults.standard.double(forKey: "YTM_playerFrameY")) + height)
+            let effectiveY = effectiveTopY - effectiveHeight
             
             let savedIDRaw = UserDefaults.standard.object(forKey: "YTM_savedDisplayID") as? UInt32
             let savedID = savedIDRaw != nil ? CGDirectDisplayID(savedIDRaw!) : nil
@@ -310,7 +321,7 @@ class StatusItemManager: NSObject {
             let rawFrame = NSRect(x: desiredX, y: effectiveY, width: effectiveWidth, height: effectiveHeight)
             let clampedFrame = displayManager.clampFrameToVisibleBounds(rawFrame, on: targetScreen, margin: 8)
             
-            targetWindow.setFrame(clampedFrame, display: true)
+            targetWindow.setFrame(clampedFrame, display: true, animate: animated)
             return
         }
         
@@ -333,7 +344,7 @@ class StatusItemManager: NSObject {
         
         let rawFrame = NSRect(x: targetX, y: targetY, width: width, height: height)
         let clampedFrame = displayManager.clampFrameToVisibleBounds(rawFrame, on: screen, margin: 0)
-        targetWindow.setFrame(clampedFrame, display: true)
+        targetWindow.setFrame(clampedFrame, display: true, animate: animated)
     }
     
     @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
@@ -364,11 +375,11 @@ class StatusItemManager: NSObject {
 
         if event?.type == .rightMouseUp || event?.type == .rightMouseDown {
             showContextMenu(sender)
-        } else if isDraggedFromDock {
-            dockBackToMenuBar()
-        } else if event?.clickCount == 2 {
-            showPanel(sender)
         } else {
+            // NSStatusBarButton sends a second action for a double-click. Treat
+            // that as part of the first click so a double-click can't undo the
+            // hide/show toggle.
+            if event?.clickCount == 2 { return }
             togglePanel(sender)
         }
     }
@@ -527,6 +538,7 @@ class StatusItemManager: NSObject {
         UserDefaults.standard.removeObject(forKey: "YTM_playerFrameX")
         UserDefaults.standard.removeObject(forKey: "YTM_playerFrameY")
         UserDefaults.standard.removeObject(forKey: "YTM_playerTopY")
+        UserDefaults.standard.removeObject(forKey: "YTM_playerMidX")
         panel.level = preferredPanelLevel()
         let size = mainViewController.view.frame.size
         positionCustomWindow(panel, width: size.width, height: size.height)
@@ -548,10 +560,6 @@ class StatusItemManager: NSObject {
     }
 
     func togglePanel(_ sender: NSStatusBarButton) {
-        if isDraggedFromDock {
-            dockBackToMenuBar()
-            return
-        }
         if panel.isVisible && panel.alphaValue > 0.5 {
             closePanel()
         } else {

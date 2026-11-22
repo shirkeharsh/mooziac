@@ -80,16 +80,21 @@ public class FloatingHUDWindowController: NSWindowController {
             guard let self = self, let window = self.window else { return }
 
             self.dismissTimer?.invalidate()
-            self.textLabel.stringValue = text
+            let wasVisible = window.isVisible && window.alphaValue > 0.0
+            let sameText = self.textLabel.stringValue == text
 
-            let font = self.textLabel.font ?? NSFont.systemFont(ofSize: 12.5, weight: .semibold)
-            let fontAttributes = [NSAttributedString.Key.font: font]
-            let textWidth = (text as NSString).size(withAttributes: fontAttributes).width
-            let targetWidth = min(max(ceil(textWidth) + 36.0, 150), 320)
+            if !wasVisible || !sameText {
+                self.textLabel.stringValue = text
 
-            self.reposition(width: targetWidth)
+                let font = self.textLabel.font ?? NSFont.systemFont(ofSize: 12.5, weight: .semibold)
+                let fontAttributes = [NSAttributedString.Key.font: font]
+                let textWidth = (text as NSString).size(withAttributes: fontAttributes).width
+                let targetWidth = min(max(ceil(textWidth) + 36.0, 150), 320)
 
-            if !window.isVisible {
+                self.reposition(width: targetWidth)
+            }
+
+            if !wasVisible {
                 window.alphaValue = 0.0
                 window.orderFront(nil)
                 NSAnimationContext.runAnimationGroup { ctx in

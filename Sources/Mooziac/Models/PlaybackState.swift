@@ -23,6 +23,7 @@ struct PlaybackState {
     var isHighQualityStream: Bool = false
     var audioItag: String = ""
     var isAd: Bool = false
+    var hasVideo: Bool = false
     
     // Sub-millisecond exact audio time extrapolator
     func getAccurateTime() -> Double {

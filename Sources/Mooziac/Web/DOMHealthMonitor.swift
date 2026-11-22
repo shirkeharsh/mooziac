@@ -6,6 +6,7 @@ final class DOMHealthMonitor {
     private let missThreshold = 3
     private let expectedUpdateInterval: TimeInterval = 10.0
     private var monitorTimer: Timer?
+    private var hasAlertedForCurrentDegradation = false
 
     init() {}
 
@@ -31,12 +32,14 @@ final class DOMHealthMonitor {
     func recordSuccessfulUpdate() {
         consecutiveMisses = 0
         lastUpdateReceived = Date()
+        hasAlertedForCurrentDegradation = false
     }
 
     func recordMissedUpdate() {
         consecutiveMisses += 1
 
-        if consecutiveMisses >= missThreshold {
+        if consecutiveMisses >= missThreshold && !hasAlertedForCurrentDegradation {
+            hasAlertedForCurrentDegradation = true
             NotificationCenter.default.post(
                 name: Notification.Name("Mooziac_DOMHealthDegraded"),
                 object: nil,

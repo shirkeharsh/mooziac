@@ -3,9 +3,13 @@ import Foundation
 import ImageIO
 import AVFoundation
 import CryptoKit
+import CoreImage
 
 public final class AppArtworkHelper {
     public static let shared = AppArtworkHelper()
+
+    private static let ciContext = CIContext(options: [.useSoftwareRenderer: false])
+    private let blurredArtworkCache = NSCache<NSString, NSImage>()
 
     private var cachedCompressedArtwork: NSImage?
     private let memoryCache = NSCache<NSString, NSImage>()
@@ -21,6 +25,7 @@ public final class AppArtworkHelper {
         let source = DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical], queue: .main)
         source.setEventHandler { [weak self] in
             self?.memoryCache.removeAllObjects()
+            self?.blurredArtworkCache.removeAllObjects()
             self?.cachedCompressedArtwork = nil
         }
         source.resume()
@@ -226,6 +231,35 @@ public final class AppArtworkHelper {
     }
 
     // MARK: - Downsampling via ImageIO
+    public static func cropToCenterSquare(cgImage: CGImage) -> CGImage {
+        let width = cgImage.width
+        let height = cgImage.height
+        guard width > 0, height > 0 else { return cgImage }
+
+        // If already square (within 2px tolerance), keep as-is
+        if abs(width - height) <= 2 {
+            return cgImage
+        }
+
+        let ratio = CGFloat(width) / CGFloat(height)
+        var activeRect = CGRect(x: 0, y: 0, width: width, height: height)
+
+        // Detect YouTube's 4:3 letterbox format (e.g. 480x360 with black bars on top & bottom)
+        if ratio >= 1.30 && ratio <= 1.36 {
+            let activeHeight = CGFloat(width) * 9.0 / 16.0
+            let topBar = (CGFloat(height) - activeHeight) / 2.0
+            activeRect = CGRect(x: 0, y: topBar, width: CGFloat(width), height: activeHeight)
+        }
+
+        // Crop to center square within the active rect
+        let squareSide = min(activeRect.width, activeRect.height)
+        let cropX = activeRect.origin.x + (activeRect.width - squareSide) / 2.0
+        let cropY = activeRect.origin.y + (activeRect.height - squareSide) / 2.0
+        let cropRect = CGRect(x: cropX, y: cropY, width: squareSide, height: squareSide)
+
+        return cgImage.cropping(to: cropRect) ?? cgImage
+    }
+
     public func downsample(data: Data, targetSize: CGFloat = 128) -> NSImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
         return createThumbnail(from: source, targetSize: targetSize)
@@ -244,9 +278,10 @@ public final class AppArtworkHelper {
             kCGImageSourceShouldCacheImmediately: true,
             kCGImageSourceThumbnailMaxPixelSize: maxPixel
         ]
-        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+        guard let rawCG = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
             return nil
         }
+        let cgImage = AppArtworkHelper.cropToCenterSquare(cgImage: rawCG)
         return NSImage(cgImage: cgImage, size: NSSize(width: targetSize, height: targetSize))
     }
 
@@ -319,5 +354,53 @@ public final class AppArtworkHelper {
         } catch {
             Log.general.warning("Failed to write thumbnail to disk: \(error.localizedDescription)")
         }
+    }
+
+    // MARK: - Ambient Gaussian Blurred Artwork
+    public func getBlurredArtwork(from image: NSImage, key: String, radius: CGFloat = 3.5) -> NSImage {
+        // If image is default placeholder, return it directly without caching so real artwork isn't shadowed
+        if image === cachedCompressedArtwork || image === AppArtworkHelper.defaultArtwork {
+            return image
+        }
+
+        let cacheKey = "\(key)_\(Int(radius * 10))" as NSString
+        if let cached = blurredArtworkCache.object(forKey: cacheKey) {
+            return cached
+        }
+
+        var proposedRect = NSRect(origin: .zero, size: image.size)
+        let cgImg = image.cgImage(forProposedRect: &proposedRect, context: nil, hints: nil)
+
+        let ciImg: CIImage
+        if let cgImg = cgImg {
+            ciImg = CIImage(cgImage: cgImg)
+        } else if let tiff = image.tiffRepresentation,
+                  let bitmap = NSBitmapImageRep(data: tiff),
+                  let fromBitmap = CIImage(bitmapImageRep: bitmap) {
+            ciImg = fromBitmap
+        } else {
+            return image
+        }
+
+        // Clamp extent so Gaussian blur does not produce darkened or transparent border bleed
+        let clamped = ciImg.clampedToExtent()
+        guard let filter = CIFilter(name: "CIGaussianBlur") else { return image }
+        filter.setValue(clamped, forKey: kCIInputImageKey)
+        filter.setValue(radius, forKey: kCIInputRadiusKey)
+
+        guard let output = filter.outputImage else { return image }
+        let cropped = output.cropped(to: ciImg.extent)
+
+        if let blurredCG = AppArtworkHelper.ciContext.createCGImage(cropped, from: ciImg.extent) {
+            let blurred = NSImage(cgImage: blurredCG, size: NSSize(width: 360, height: 202))
+            blurredArtworkCache.setObject(blurred, forKey: cacheKey)
+            return blurred
+        }
+
+        let rep = NSCIImageRep(ciImage: cropped)
+        let blurred = NSImage(size: NSSize(width: 360, height: 202))
+        blurred.addRepresentation(rep)
+        blurredArtworkCache.setObject(blurred, forKey: cacheKey)
+        return blurred
     }
 }

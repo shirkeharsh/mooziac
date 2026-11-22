@@ -36,7 +36,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "YTM_isEdgeEngineEnabled", "YTM_isCenteredLyricsEnabled",
             "YTM_isRightEdgeVolumeEnabled", "YTM_isRightCornerTapsEnabled",
             "YTM_isLeftCornerTapsEnabled", "YTM_hasInitializedDefaultSettingsV2",
-            "YTM_isDraggedFromDock", "YTM_playerFrameX", "YTM_playerFrameY", "YTM_playerTopY",
+            "YTM_isDraggedFromDock", "YTM_playerFrameX", "YTM_playerFrameY", "YTM_playerTopY", "YTM_playerMidX",
             "MooziacVoiceAssistantEnabled", "Mooziac_AI_enabled"
         ]
         for key in legacyKeys {
@@ -48,6 +48,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Initialize Trackpad Right-Edge Volume Control (0.01mm edge)
         EdgeVolumeEngine.shared.start()
+
+        // Start "Up Next" menu bar alerts (shown shortly before a song ends)
+        UpNextAlertManager.shared.start()
 
         // Start Audio Route & Lock Auto-Pause Monitor
         AudioRouteMonitor.shared.startMonitoring()

@@ -21,6 +21,7 @@ public final class AppVolumeManager {
     public private(set) var currentTrackID: String? = nil
 
     private var loudnessCache: [String: Double] = [:]
+    private var lastReportedPercent: Int = -1
 
     public var isAppVolumeOnly: Bool {
         get {
@@ -134,19 +135,28 @@ public final class AppVolumeManager {
 
     public func setEffectiveVolume(_ vol: Float) {
         let clamped = max(0.0, min(1.0, vol))
+        let percent = Int(round(clamped * 100))
         if isAppVolumeOnly {
             self.mediaVolume = clamped
-            let percent = Int(round(clamped * 100))
-            DispatchQueue.main.async {
-                CenteredMenuBarLyricsWindowController.shared.showVolumeOverlay(volumePercent: percent, isAppOnly: true)
+            if percent != lastReportedPercent {
+                lastReportedPercent = percent
+                DispatchQueue.main.async {
+                    CenteredMenuBarLyricsWindowController.shared.showVolumeOverlay(volumePercent: percent, isAppOnly: true)
+                }
             }
         } else {
             VolumeController.shared.setVolume(clamped)
-            let percent = Int(round(clamped * 100))
-            DispatchQueue.main.async {
-                CenteredMenuBarLyricsWindowController.shared.showVolumeOverlay(volumePercent: percent, isAppOnly: false)
+            if percent != lastReportedPercent {
+                lastReportedPercent = percent
+                DispatchQueue.main.async {
+                    CenteredMenuBarLyricsWindowController.shared.showVolumeOverlay(volumePercent: percent, isAppOnly: false)
+                }
             }
         }
+    }
+
+    public func resetVolumeOverlayTracking() {
+        lastReportedPercent = -1
     }
 
     public func applyMediaVolume(_ vol: Float, smooth: Bool = false) {

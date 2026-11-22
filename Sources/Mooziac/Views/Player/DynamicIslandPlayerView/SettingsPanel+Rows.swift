@@ -338,6 +338,11 @@ class LibraryNavButton: NSControl {
         isHovered = false
     }
 
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let localPoint = convert(point, from: superview)
+        return bounds.contains(localPoint) ? self : nil
+    }
+
     override func mouseDown(with event: NSEvent) {
         sendAction(action, to: target)
     }

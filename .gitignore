@@ -63,3 +63,5 @@ scripts/
 webplayer/
 .agent-sandbox/
 README.old.md
+
+.working_state_backup/

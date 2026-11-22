@@ -358,6 +358,28 @@ extension DynamicIslandPlayerView {
         historyShuffleButton.widthAnchor.constraint(equalToConstant: 22).isActive = true
         historyShuffleButton.heightAnchor.constraint(equalToConstant: 22).isActive = true
 
+        upNextSaveButton.translatesAutoresizingMaskIntoConstraints = false
+        let upNextSaveConfig = NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
+        upNextSaveButton.image = NSImage(systemSymbolName: "square.and.arrow.down", accessibilityDescription: "Save queue as playlist")?.withSymbolConfiguration(upNextSaveConfig)
+        upNextSaveButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+        upNextSaveButton.toolTip = "Save Queue as Playlist"
+        upNextSaveButton.target = self
+        upNextSaveButton.action = #selector(handleUpNextSaveTapped)
+        upNextSaveButton.isHidden = true
+        upNextSaveButton.widthAnchor.constraint(equalToConstant: 22).isActive = true
+        upNextSaveButton.heightAnchor.constraint(equalToConstant: 22).isActive = true
+
+        upNextRadioButton.translatesAutoresizingMaskIntoConstraints = false
+        let upNextRadioConfig = NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
+        upNextRadioButton.image = NSImage(systemSymbolName: "dot.radiowaves.left.and.right", accessibilityDescription: "Autoplay radio")?.withSymbolConfiguration(upNextRadioConfig)
+        upNextRadioButton.contentTintColor = NSColor(red: 0.0, green: 0.85, blue: 1.0, alpha: 1.0)
+        upNextRadioButton.toolTip = "Keep Playing Similar Songs (Autoplay Radio)"
+        upNextRadioButton.target = self
+        upNextRadioButton.action = #selector(handleUpNextRadioTapped)
+        upNextRadioButton.isHidden = true
+        upNextRadioButton.widthAnchor.constraint(equalToConstant: 22).isActive = true
+        upNextRadioButton.heightAnchor.constraint(equalToConstant: 22).isActive = true
+
         playlistDetailBackButton.translatesAutoresizingMaskIntoConstraints = false
         let backConfig = NSImage.SymbolConfiguration(pointSize: 12, weight: .bold)
         playlistDetailBackButton.image = NSImage(systemSymbolName: "chevron.backward", accessibilityDescription: "Back")?.withSymbolConfiguration(backConfig)
@@ -537,6 +559,8 @@ extension DynamicIslandPlayerView {
             likedShuffleButton,
             historyPlayAllButton,
             historyShuffleButton,
+            upNextRadioButton,
+            upNextSaveButton,
             playlistBulkDeleteButton,
             playlistSelectionDoneButton,
             playlistDetailPlayAllButton,
@@ -804,6 +828,9 @@ extension DynamicIslandPlayerView {
         if let gestureSubView = settingsContainerView.subviews.first(where: { $0.identifier == NSUserInterfaceItemIdentifier("GestureMappingSubView") }) {
             gestureSubView.isHidden = true
         }
+        if let visualView = settingsContainerView.subviews.first(where: { $0.identifier == NSUserInterfaceItemIdentifier("VisualStageSubView") }) {
+            visualView.isHidden = true
+        }
         settingsHeaderLabel.isHidden = false
     }
 
@@ -814,6 +841,9 @@ extension DynamicIslandPlayerView {
         }
         if let subView = settingsContainerView.subviews.first(where: { $0.identifier == NSUserInterfaceItemIdentifier("PlaylistSubView") }) {
             subView.isHidden = false
+        }
+        if let visualView = settingsContainerView.subviews.first(where: { $0.identifier == NSUserInterfaceItemIdentifier("VisualStageSubView") }) {
+            visualView.isHidden = true
         }
         settingsHeaderLabel.isHidden = true
         playlistDetailMode = nil

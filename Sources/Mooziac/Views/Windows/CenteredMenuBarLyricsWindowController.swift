@@ -350,17 +350,28 @@ public class CenteredMenuBarLyricsWindowController: NSWindowController {
         }
         guard StatusItemManager.shared?.currentMode != .youtube else { return }
         volumeOverlayTimer?.invalidate()
+
+        let wasAlreadyShowing = isShowingVolumeOverlay
+        let sameText = lyricsLabel.stringValue == text
         isShowingVolumeOverlay = true
-        showOverlay()
 
-        lyricsLabel.stringValue = text
+        if !wasAlreadyShowing || !sameText {
+            showOverlay()
+            let formattedText: String
+            if text.count > 30 {
+                formattedText = String(text.prefix(27)).trimmingCharacters(in: .whitespacesAndNewlines) + "..."
+            } else {
+                formattedText = text
+            }
+            lyricsLabel.stringValue = formattedText
 
-        let font = lyricsLabel.font ?? NSFont.systemFont(ofSize: 13, weight: .medium)
-        let fontAttributes = [NSAttributedString.Key.font: font]
-        let textWidth = (text as NSString).size(withAttributes: fontAttributes).width
-        let targetWidth = min(max(ceil(textWidth / 30.0) * 30.0 + 30.0, 180), 300)
+            let font = lyricsLabel.font ?? NSFont.systemFont(ofSize: 13, weight: .medium)
+            let fontAttributes = [NSAttributedString.Key.font: font]
+            let textWidth = (formattedText as NSString).size(withAttributes: fontAttributes).width
+            let targetWidth = min(max(ceil(textWidth / 20.0) * 20.0 + 24.0, 140), 240)
 
-        repositionInCenter(contentWidth: targetWidth)
+            repositionInCenter(contentWidth: targetWidth)
+        }
 
         volumeOverlayTimer = Timer(timeInterval: duration, repeats: false) { [weak self] _ in
             self?.completeOverlayDismissal()

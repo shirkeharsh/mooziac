@@ -17,8 +17,10 @@ class MainViewController: NSViewController, DynamicIslandPlayerViewDelegate, Hea
     let offlineLibraryView = OfflineLibraryView()
     let playlistLibraryView = PlaylistLibraryView()
     private let browserContainerView = PassthroughBrowserContainerView()
+    private var webViewPlacementConstraints: [NSLayoutConstraint] = []
     
     var onChangeSize: ((CGFloat, CGFloat) -> Void)?
+    var onChangeSizeAnimated: ((CGFloat, CGFloat, Bool) -> Void)?
     var onResetPosition: (() -> Void)?
     public var isBrowserMode: Bool = false
     public var isOfflineLibraryMode: Bool = false
@@ -90,11 +92,6 @@ class MainViewController: NSViewController, DynamicIslandPlayerViewDelegate, Hea
             headerView.trailingAnchor.constraint(equalTo: browserContainerView.trailingAnchor),
             headerView.heightAnchor.constraint(equalToConstant: 36),
             
-            webViewContainer.topAnchor.constraint(equalTo: headerView.bottomAnchor),
-            webViewContainer.bottomAnchor.constraint(equalTo: browserContainerView.bottomAnchor),
-            webViewContainer.leadingAnchor.constraint(equalTo: browserContainerView.leadingAnchor),
-            webViewContainer.trailingAnchor.constraint(equalTo: browserContainerView.trailingAnchor),
-            
             offlineLibraryView.topAnchor.constraint(equalTo: view.topAnchor),
             offlineLibraryView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             offlineLibraryView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -110,6 +107,40 @@ class MainViewController: NSViewController, DynamicIslandPlayerViewDelegate, Hea
             dynamicIslandPlayer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             dynamicIslandPlayer.trailingAnchor.constraint(equalTo: view.trailingAnchor)
         ])
+
+        webViewPlacementConstraints = browserWebViewConstraints()
+        NSLayoutConstraint.activate(webViewPlacementConstraints)
+    }
+
+    private func browserWebViewConstraints() -> [NSLayoutConstraint] {
+        [
+            webViewContainer.topAnchor.constraint(equalTo: headerView.bottomAnchor),
+            webViewContainer.bottomAnchor.constraint(equalTo: browserContainerView.bottomAnchor),
+            webViewContainer.leadingAnchor.constraint(equalTo: browserContainerView.leadingAnchor),
+            webViewContainer.trailingAnchor.constraint(equalTo: browserContainerView.trailingAnchor),
+        ]
+    }
+
+    private func moveWebViewContainer(to host: NSView, constraints: [NSLayoutConstraint]) {
+        if webViewContainer.superview === host && !webViewPlacementConstraints.isEmpty {
+            if webViewContainer.isHidden {
+                webViewContainer.isHidden = false
+                webViewContainer.alphaValue = 1
+            }
+            return
+        }
+        NSLayoutConstraint.deactivate(webViewPlacementConstraints)
+        if webViewContainer.superview !== host {
+            webViewContainer.removeFromSuperview()
+            host.addSubview(webViewContainer)
+        }
+        webViewContainer.translatesAutoresizingMaskIntoConstraints = false
+        webViewPlacementConstraints = constraints
+        NSLayoutConstraint.activate(webViewPlacementConstraints)
+        webViewContainer.isHidden = false
+        webViewContainer.alphaValue = 1
+        host.layoutSubtreeIfNeeded()
+        webViewContainer.layoutSubtreeIfNeeded()
     }
     
     private func setupObservers() {
@@ -215,10 +246,39 @@ class MainViewController: NSViewController, DynamicIslandPlayerViewDelegate, Hea
         playSearchQuery(query)
     }
 
+    private func formatMenuBarTitle(title: String, artist: String = "", maxTotalLength: Int = 26) -> String {
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanArtist = artist.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let combined: String
+        if cleanArtist.isEmpty || cleanArtist == "Unknown Artist" {
+            combined = cleanTitle
+        } else if cleanTitle.count > 18 {
+            combined = cleanTitle
+        } else {
+            combined = "\(cleanTitle) - \(cleanArtist)"
+        }
+
+        if combined.count > maxTotalLength {
+            let truncateIndex = max(1, maxTotalLength - 3)
+            return String(combined.prefix(truncateIndex)).trimmingCharacters(in: .whitespacesAndNewlines) + "..."
+        }
+        return combined
+    }
+
+    private func formatMenuBarQuery(_ query: String, maxLength: Int = 22) -> String {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.count > maxLength {
+            let truncateIndex = max(1, maxLength - 3)
+            return String(trimmed.prefix(truncateIndex)).trimmingCharacters(in: .whitespacesAndNewlines) + "..."
+        }
+        return trimmed
+    }
+
     func dynamicIslandDidSelectTrack(videoId: String, title: String, artist: String) {
         PlaylistManager.shared.clearActiveContext()
         NowPlayingManager.shared.switchToOnlineMode()
-        let shownTitle = artist.isEmpty ? title : "\(title) - \(artist)"
+        let shownTitle = formatMenuBarTitle(title: title, artist: artist, maxTotalLength: 24)
         CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "▶ Playing: \"\(shownTitle)\"")
         PlaylistManager.shared.playOnlineVideo(videoId: videoId)
     }
@@ -227,19 +287,36 @@ class MainViewController: NSViewController, DynamicIslandPlayerViewDelegate, Hea
         let cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanQuery.isEmpty else { return }
 
+        let isVideo = cleanQuery.hasPrefix("/")
+        let targetQuery: String = {
+            if cleanQuery.hasPrefix("/video ") {
+                return String(cleanQuery.dropFirst(7)).trimmingCharacters(in: .whitespacesAndNewlines)
+            } else if cleanQuery.hasPrefix("/v ") {
+                return String(cleanQuery.dropFirst(3)).trimmingCharacters(in: .whitespacesAndNewlines)
+            } else if cleanQuery.hasPrefix("/ ") {
+                return String(cleanQuery.dropFirst(2)).trimmingCharacters(in: .whitespacesAndNewlines)
+            } else if cleanQuery.hasPrefix("/") {
+                return String(cleanQuery.dropFirst(1)).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            return cleanQuery
+        }()
+        guard !targetQuery.isEmpty else { return }
+
         // Mood change / search: explicitly release any active playlist context
         PlaylistManager.shared.clearActiveContext()
 
         // 1. Offline Mode Search & Local Fallback
         if NowPlayingManager.shared.engineMode == .offline || !NetworkMonitor.shared.isReachable {
-            if let result = findBestLocalTrack(for: cleanQuery) {
+            if let result = findBestLocalTrack(for: targetQuery) {
                 NowPlayingManager.shared.playOfflineTrack(result.best, in: result.matches)
-                CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "▶ Playing: \"\(result.best.title)\"")
+                let shownOffline = formatMenuBarTitle(title: result.best.title, maxTotalLength: 24)
+                CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "▶ Playing: \"\(shownOffline)\"")
                 setBrowserVisible(false)
                 setOfflineLibraryVisible(false)
                 return
             } else if !NetworkMonitor.shared.isReachable {
-                CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "⚠️ Offline: No local song matches \"\(cleanQuery)\"")
+                let shownQuery = formatMenuBarQuery(targetQuery, maxLength: 18)
+                CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "⚠️ Offline: No match for \"\(shownQuery)\"")
                 return
             }
         }
@@ -249,22 +326,24 @@ class MainViewController: NSViewController, DynamicIslandPlayerViewDelegate, Hea
         setBrowserVisible(false)
         setOfflineLibraryVisible(false)
 
-        Log.playback.debug("Searching and auto-playing '\(cleanQuery)'")
-        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "🔍 Searching: \"\(cleanQuery)\"")
+        Log.playback.debug("Searching and auto-playing '\(targetQuery)' (video: \(isVideo))")
+        let shownQuery = formatMenuBarQuery(targetQuery, maxLength: 20)
+        let prompt = isVideo ? "🎬 Video: \"\(shownQuery)\"" : "🔍 Searching: \"\(shownQuery)\""
+        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: prompt)
 
         // Fast Path: Resolve exact top matching song via InnerTube API without webView reload
-        YTMClient.shared.searchTopTrack(query: cleanQuery) { [weak self] result in
+        YTMClient.shared.searchTopTrack(query: targetQuery, filter: isVideo ? .videos : .songs) { [weak self] result in
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 switch result {
                 case .success(let track):
                     Log.playback.info("Direct search resolved track '\(track.title)' by '\(track.artist)' (videoId: \(track.videoId))")
-                    let displayTitle = track.artist.isEmpty ? track.title : "\(track.title) - \(track.artist)"
+                    let displayTitle = self.formatMenuBarTitle(title: track.title, artist: track.artist, maxTotalLength: 24)
                     CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "▶ Playing: \"\(displayTitle)\"")
                     self.webViewContainer.navigateToVideo(videoId: track.videoId)
                 case .failure(let error):
                     Log.playback.warning("InnerTube search fallback to webView search page: \(error.localizedDescription)")
-                    self.performWebViewSearchFallback(query: cleanQuery)
+                    self.performWebViewSearchFallback(query: targetQuery)
                 }
             }
         }
@@ -275,7 +354,8 @@ class MainViewController: NSViewController, DynamicIslandPlayerViewDelegate, Hea
               let url = URL(string: "https://music.youtube.com/search?q=\(encoded)") else { return }
 
         webViewContainer.webView.load(URLRequest(url: url))
-        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "🔍 Playing: \"\(query)\"")
+        let shownQuery = formatMenuBarQuery(query, maxLength: 20)
+        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "🔍 Playing: \"\(shownQuery)\"")
 
         // Evaluate safe autoplay script after page has had time to load
         for delay in [1.2, 2.0, 3.0] {
@@ -479,9 +559,61 @@ class MainViewController: NSViewController, DynamicIslandPlayerViewDelegate, Hea
     
     func dynamicIslandDidToggleExpanded(expanded: Bool) {
         if expanded {
-            onChangeSize?(360, 480)
+            if dynamicIslandPlayer.isHeroArtworkExpanded {
+                if dynamicIslandPlayer.isHeroControlsHidden {
+                    onChangeSize?(360, 202)
+                } else {
+                    onChangeSize?(360, 330)
+                }
+            } else {
+                switch dynamicIslandPlayer.activeSettingsMode {
+                case .visual:
+                    onChangeSize?(360, 330)
+                case .preferences:
+                    onChangeSize?(360, 420)
+                case .playlist:
+                    onChangeSize?(360, 450)
+                case .search:
+                    onChangeSize?(360, 420)
+                }
+            }
         } else {
             onChangeSize?(360, 120)
+        }
+    }
+
+    func dynamicIslandDidToggleHeroIdle(isIdle: Bool) {
+        if isIdle {
+            if let onChangeSizeAnimated = onChangeSizeAnimated {
+                onChangeSizeAnimated(360, 202, true)
+            } else {
+                onChangeSize?(360, 202)
+            }
+        } else {
+            if let onChangeSizeAnimated = onChangeSizeAnimated {
+                onChangeSizeAnimated(360, 330, true)
+            } else {
+                onChangeSize?(360, 330)
+            }
+        }
+    }
+
+    func dynamicIslandDidToggleVisualStage(isActive: Bool, hostView: NSView?) {
+        if isActive, let host = hostView {
+            moveWebViewContainer(
+                to: host,
+                constraints: [
+                    webViewContainer.topAnchor.constraint(equalTo: host.topAnchor),
+                    webViewContainer.bottomAnchor.constraint(equalTo: host.bottomAnchor),
+                    webViewContainer.leadingAnchor.constraint(equalTo: host.leadingAnchor),
+                    webViewContainer.trailingAnchor.constraint(equalTo: host.trailingAnchor),
+                ]
+            )
+            webViewContainer.setVisualDrawerModeEnabled(true)
+        } else {
+            moveWebViewContainer(to: browserContainerView, constraints: browserWebViewConstraints())
+            webViewContainer.setVisualDrawerModeEnabled(false)
+            webViewContainer.setCompactModeEnabled(true)
         }
     }
     
@@ -492,9 +624,6 @@ class MainViewController: NSViewController, DynamicIslandPlayerViewDelegate, Hea
     func dynamicIslandDidTapWebBrowser() {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            if StatusItemManager.shared?.isDraggedFromDock == true {
-                StatusItemManager.shared?.dockBackToMenuBar()
-            }
             self.setBrowserVisible(!self.isBrowserMode)
         }
     }

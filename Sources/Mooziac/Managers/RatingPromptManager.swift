@@ -142,12 +142,16 @@ public final class RatingPromptManager {
     /// Called when the user clicks Star, Coffee, or Write Us.
     public func markInteracted() {
         hasInteracted = true
-        RatingPromptWindowController.shared.close()
+        if Thread.isMainThread && NSApp != nil {
+            RatingPromptWindowController.shared.close()
+        }
     }
     
     /// Called when the user clicks "Maybe Later" or closes the window without acting.
     public func snooze() {
         lastPromptDate = Date().timeIntervalSince1970
-        RatingPromptWindowController.shared.close()
+        if Thread.isMainThread && NSApp != nil {
+            RatingPromptWindowController.shared.close()
+        }
     }
 }

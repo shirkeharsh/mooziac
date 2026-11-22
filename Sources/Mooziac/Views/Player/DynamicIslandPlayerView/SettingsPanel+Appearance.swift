@@ -463,6 +463,9 @@ extension DynamicIslandPlayerView {
         historyPlayAllButton.contentTintColor = cyan
         historyShuffleButton.contentTintColor = cyan
 
+        upNextSaveButton.contentTintColor = cyan
+        upNextRadioButton.contentTintColor = cyan
+
         playlistDetailBackButton.contentTintColor = cyan
         playlistDetailPlayAllButton.contentTintColor = cyan
         playlistDetailShuffleButton.contentTintColor = cyan

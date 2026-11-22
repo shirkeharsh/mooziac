@@ -168,13 +168,6 @@ extension StatusItemManager {
     }
 
     func showContextMenu(_ sender: NSStatusBarButton) {
-        if panel.isVisible {
-            mainViewController.dynamicIslandPlayer.collapseSettings()
-            panel.alphaValue = 0.0
-            panel.orderOut(nil)
-            stopEventMonitors()
-        }
-        
         let menu = NSMenu()
         
         let gestureMenu = NSMenu()
@@ -244,6 +237,15 @@ extension StatusItemManager {
         showTutorialItem.target = self
         gestureMenu.addItem(showTutorialItem)
         
+        let quickMenu = NSMenu(title: "Quick Controls")
+        let playbackMenu = NSMenu(title: "Playback & Options")
+        let accountMenu = NSMenu(title: "Account & Sync")
+        let playerMenu = NSMenu(title: "Player")
+
+        let openYouTubeItem = NSMenuItem(title: "Open YouTube", action: #selector(openYouTubeFromMenu), keyEquivalent: "y")
+        openYouTubeItem.target = self
+        menu.addItem(openYouTubeItem)
+
         let pinRes = makeCapsuleToggleMenuItem(
             title: "Pin Player on Top",
             isOn: isPinnedOnTop,
@@ -251,7 +253,7 @@ extension StatusItemManager {
                 self?.setPinnedOnTop(enabled)
             }
         )
-        menu.addItem(pinRes.menuItem)
+        quickMenu.addItem(pinRes.menuItem)
 
         let focusAudioRes = makeCapsuleToggleMenuItem(
             title: "Focus Audio",
@@ -260,7 +262,7 @@ extension StatusItemManager {
                 AppVolumeManager.shared.isAppVolumeOnly = enabled
             }
         )
-        menu.addItem(focusAudioRes.menuItem)
+        quickMenu.addItem(focusAudioRes.menuItem)
 
         let wakeRes = makeCapsuleToggleMenuItem(
             title: "Prevent Wake Auto-Play",
@@ -272,7 +274,7 @@ extension StatusItemManager {
                 )
             }
         )
-        menu.addItem(wakeRes.menuItem)
+        playbackMenu.addItem(wakeRes.menuItem)
 
         let discordBrandingRes = makeCapsuleToggleMenuItem(
             title: "Hide Mooziac Branding",
@@ -284,23 +286,33 @@ extension StatusItemManager {
                 )
             }
         )
-        menu.addItem(discordBrandingRes.menuItem)
+        playbackMenu.addItem(discordBrandingRes.menuItem)
+
+        let upNextRes = makeCapsuleToggleMenuItem(
+            title: "Up Next Alerts",
+            isOn: UpNextAlertManager.shared.isEnabled,
+            onToggle: { enabled in UpNextAlertManager.shared.isEnabled = enabled }
+        )
+        playbackMenu.addItem(upNextRes.menuItem)
+        let playbackParent = NSMenuItem(title: "Playback & Options", action: nil, keyEquivalent: "")
+        playbackParent.submenu = playbackMenu
+        quickMenu.addItem(playbackParent)
+        let quickParent = NSMenuItem(title: "Quick Controls", action: nil, keyEquivalent: "")
+        quickParent.submenu = quickMenu
+        menu.addItem(quickParent)
 
         menu.addItem(NSMenuItem.separator())
 
-        let gestureParent = NSMenuItem(title: "Trackpad Gestures Settings", action: nil, keyEquivalent: "")
+        let gestureParent = NSMenuItem(title: "Trackpad Gestures", action: nil, keyEquivalent: "")
         gestureParent.submenu = gestureMenu
         menu.addItem(gestureParent)
 
         menu.addItem(NSMenuItem.separator())
 
-        let openYouTubeItem = NSMenuItem(title: "Open YouTube", action: #selector(openYouTubeFromMenu), keyEquivalent: "y")
-        menu.addItem(openYouTubeItem)
-
         menu.addItem(NSMenuItem.separator())
 
-        let settingsParent = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
-        let settingsMenu = NSMenu(title: "Settings")
+        let settingsParent = NSMenuItem(title: "Library & Downloads", action: nil, keyEquivalent: "")
+        let settingsMenu = NSMenu(title: "Library & Downloads")
 
         settingsMenu.addItem(NSMenuItem(title: "Download Location", action: nil, keyEquivalent: ""))
         let downloadLocationItem = NSMenuItem(title: currentDownloadLocationTitle(), action: nil, keyEquivalent: "")
@@ -333,15 +345,28 @@ extension StatusItemManager {
         let settingsSupportItem = NSMenuItem(title: "Help & Support", action: #selector(openSupportFromMenu), keyEquivalent: "")
         settingsSupportItem.target = self
         settingsMenu.addItem(settingsSupportItem)
+        settingsMenu.removeItem(settingsUpdateItem)
+        settingsMenu.removeItem(settingsSupportItem)
         settingsParent.submenu = settingsMenu
         menu.addItem(settingsParent)
 
-        menu.addItem(NSMenuItem(title: "Reset Login (Fresh Start)", action: #selector(resetLoginFromMenu), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "Reload Player Engine", action: #selector(reloadFromMenu), keyEquivalent: "r"))
-        menu.addItem(NSMenuItem.separator())
         let syncItem = NSMenuItem(title: "Sync with YouTube Music", action: #selector(syncNowFromMenu), keyEquivalent: "")
         syncItem.isEnabled = LikedSongsManager.shared.isSignedIn
-        menu.addItem(syncItem)
+        syncItem.target = self
+        accountMenu.addItem(syncItem)
+        let resetLoginItem = NSMenuItem(title: "Reset Login…", action: #selector(confirmResetLoginFromMenu), keyEquivalent: "")
+        resetLoginItem.target = self
+        accountMenu.addItem(resetLoginItem)
+        let accountParent = NSMenuItem(title: "Account & Sync", action: nil, keyEquivalent: "")
+        accountParent.submenu = accountMenu
+        menu.addItem(accountParent)
+
+        let reloadItem = NSMenuItem(title: "Reload Player Engine…", action: #selector(confirmReloadFromMenu), keyEquivalent: "r")
+        reloadItem.target = self
+        playerMenu.addItem(reloadItem)
+        let playerParent = NSMenuItem(title: "Player", action: nil, keyEquivalent: "")
+        playerParent.submenu = playerMenu
+        menu.addItem(playerParent)
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdatesFromMenu), keyEquivalent: "u"))
         menu.addItem(NSMenuItem(title: "Help & Support", action: #selector(openSupportFromMenu), keyEquivalent: ""))
@@ -357,6 +382,26 @@ extension StatusItemManager {
         statusItem.menu = menu
         statusItem.button?.performClick(nil)
         statusItem.menu = nil
+    }
+
+    @objc private func confirmResetLoginFromMenu() {
+        let alert = NSAlert()
+        alert.messageText = "Reset YouTube Music Login?"
+        alert.informativeText = "This clears the saved YouTube Music sign-in and starts a fresh session."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Reset Login")
+        alert.addButton(withTitle: "Cancel")
+        if alert.runModal() == .alertFirstButtonReturn { resetLoginFromMenu() }
+    }
+
+    @objc private func confirmReloadFromMenu() {
+        let alert = NSAlert()
+        alert.messageText = "Reload the Player Engine?"
+        alert.informativeText = "Playback may pause briefly while the player reloads."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Reload")
+        alert.addButton(withTitle: "Cancel")
+        if alert.runModal() == .alertFirstButtonReturn { reloadFromMenu() }
     }
     
     @objc private func showGestureTutorialFromMenu() {

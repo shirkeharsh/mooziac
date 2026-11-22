@@ -2,27 +2,42 @@ import AppKit
 import CoreAudio
 import AudioToolbox
 
-// MARK: - Native CoreAudio Volume Manager (Apple Silicon Multi-Channel Aligned)
+// MARK: - Native CoreAudio Volume Manager (Apple Silicon Multi-Channel Aligned & High-Frequency Throttled)
 final class VolumeController {
     static let shared = VolumeController()
 
-    private var lastKnownVolume: Float {
-        get {
-            if let saved = UserDefaults.standard.object(forKey: "YTM_lastKnownSystemVolume") as? Float {
-                return max(0.0, min(1.0, saved))
-            }
-            return 0.3
-        }
-        set {
-            UserDefaults.standard.set(newValue, forKey: "YTM_lastKnownSystemVolume")
-        }
-    }
+    // Off-main-thread serial queue for all blocking CoreAudio HAL IPC calls
+    private let audioQueue = DispatchQueue(label: "app.mooziac.volume.audioQueue", qos: .userInteractive)
+
+    // Cached hardware device to avoid querying system object 120 times/sec
+    private var cachedDefaultDeviceID: AudioObjectID = kAudioObjectUnknown
+    private var lastDeviceQueryTime: Double = 0.0
+
+    // Fast in-memory volume cache
+    private var inMemoryVolume: Float = 0.3
+    private var isVolumeInitialized = false
+    private let stateLock = NSLock()
+
+    // Hardware write throttling state (managed on audioQueue)
+    private var lastHardwareSetTime: Double = 0.0
+    private var lastHardwareWrittenVolume: Float = -1.0
+    private var pendingHardwareVolume: Float? = nil
+    private var isDispatchScheduled = false
+    private var defaultsSaveWorkItem: DispatchWorkItem?
 
     init() {
+        if let saved = UserDefaults.standard.object(forKey: "YTM_lastKnownSystemVolume") as? Float {
+            inMemoryVolume = max(0.0, min(1.0, saved))
+        }
         _ = getVolume()
     }
 
-    private func defaultOutputDevice() -> AudioObjectID {
+    private func defaultOutputDevice(forceRefresh: Bool = false) -> AudioObjectID {
+        let now = CACurrentMediaTime()
+        if !forceRefresh && cachedDefaultDeviceID != kAudioObjectUnknown && (now - lastDeviceQueryTime) < 2.0 {
+            return cachedDefaultDeviceID
+        }
+
         var defaultOutputDeviceID = AudioObjectID(kAudioObjectUnknown)
         var propertySize = UInt32(MemoryLayout<AudioObjectID>.size)
         var propertyAddress = AudioObjectPropertyAddress(
@@ -39,10 +54,23 @@ final class VolumeController {
             &propertySize,
             &defaultOutputDeviceID
         )
-        return status == noErr ? defaultOutputDeviceID : kAudioObjectUnknown
+        if status == noErr && defaultOutputDeviceID != kAudioObjectUnknown {
+            cachedDefaultDeviceID = defaultOutputDeviceID
+            lastDeviceQueryTime = now
+            return defaultOutputDeviceID
+        }
+        return kAudioObjectUnknown
     }
 
     func getVolume() -> Float {
+        stateLock.lock()
+        if isVolumeInitialized {
+            let v = inMemoryVolume
+            stateLock.unlock()
+            return v
+        }
+        stateLock.unlock()
+
         let deviceID = defaultOutputDevice()
         if deviceID != kAudioObjectUnknown {
             var volume: Float32 = 0.0
@@ -56,7 +84,10 @@ final class VolumeController {
             )
             if AudioObjectGetPropertyData(deviceID, &address, 0, nil, &propertySize, &volume) == noErr {
                 let v = max(0.0, min(1.0, volume))
-                lastKnownVolume = v
+                stateLock.lock()
+                inMemoryVolume = v
+                isVolumeInitialized = true
+                stateLock.unlock()
                 return v
             }
 
@@ -68,42 +99,110 @@ final class VolumeController {
             )
             if AudioObjectGetPropertyData(deviceID, &address, 0, nil, &propertySize, &volume) == noErr {
                 let v = max(0.0, min(1.0, volume))
-                lastKnownVolume = v
+                stateLock.lock()
+                inMemoryVolume = v
+                isVolumeInitialized = true
+                stateLock.unlock()
                 return v
             }
 
-            // 3. Try kAudioDevicePropertyVolumeScalar on Channel 1 (Left) or Channel 2 (Right)
+            // 3. Try Channel 1 or 2
             for channel: UInt32 in [1, 2] {
                 address.mElement = channel
                 if AudioObjectGetPropertyData(deviceID, &address, 0, nil, &propertySize, &volume) == noErr {
                     let v = max(0.0, min(1.0, volume))
-                    lastKnownVolume = v
+                    stateLock.lock()
+                    inMemoryVolume = v
+                    isVolumeInitialized = true
+                    stateLock.unlock()
                     return v
                 }
             }
-
-            // 4. Try Virtual Main Volume ('vmvo') Global Scope
-            address = AudioObjectPropertyAddress(
-                mSelector: AudioObjectPropertySelector(0x766d766f),
-                mScope: kAudioObjectPropertyScopeGlobal,
-                mElement: kAudioObjectPropertyElementMain
-            )
-            if AudioObjectGetPropertyData(deviceID, &address, 0, nil, &propertySize, &volume) == noErr {
-                let v = max(0.0, min(1.0, volume))
-                lastKnownVolume = v
-                return v
-            }
         }
 
-        return lastKnownVolume
+        stateLock.lock()
+        let v = inMemoryVolume
+        isVolumeInitialized = true
+        stateLock.unlock()
+        return v
     }
 
     func setVolume(_ volume: Float) {
+        let clamped = max(0.0, min(1.0, volume))
+        
+        stateLock.lock()
+        let prev = inMemoryVolume
+        inMemoryVolume = clamped
+        stateLock.unlock()
+
+        // Skip minuscule redundant updates unless hitting boundaries
+        if abs(clamped - prev) < 0.002 && clamped != 0.0 && clamped != 1.0 {
+            return
+        }
+
+        // Schedule debounced persist to UserDefaults (avoid writing to disk/cfprefs 120 times/sec)
+        debouncePersistVolume(clamped)
+
+        // Queue CoreAudio hardware update to background audio queue
+        audioQueue.async { [weak self] in
+            self?.scheduleHardwareWrite(clamped)
+        }
+    }
+
+    private func debouncePersistVolume(_ volume: Float) {
+        defaultsSaveWorkItem?.cancel()
+        let item = DispatchWorkItem {
+            UserDefaults.standard.set(volume, forKey: "YTM_lastKnownSystemVolume")
+        }
+        defaultsSaveWorkItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: item)
+    }
+
+    func persistVolumeToDefaults() {
+        stateLock.lock()
+        let v = inMemoryVolume
+        stateLock.unlock()
+        defaultsSaveWorkItem?.cancel()
+        defaultsSaveWorkItem = nil
+        UserDefaults.standard.set(v, forKey: "YTM_lastKnownSystemVolume")
+    }
+
+    // Runs strictly on audioQueue
+    private func scheduleHardwareWrite(_ targetVolume: Float) {
+        pendingHardwareVolume = targetVolume
+        let now = CACurrentMediaTime()
+        let timeSinceLastWrite = now - lastHardwareSetTime
+
+        // Throttle hardware updates to ~35 Hz (every ~28ms) to avoid saturating coreaudiod
+        if timeSinceLastWrite >= 0.028 || targetVolume == 0.0 || targetVolume == 1.0 {
+            executeHardwareWriteNow()
+        } else if !isDispatchScheduled {
+            isDispatchScheduled = true
+            let delay = 0.028 - timeSinceLastWrite
+            audioQueue.asyncAfter(deadline: .now() + delay) { [weak self] in
+                self?.isDispatchScheduled = false
+                self?.executeHardwareWriteNow()
+            }
+        }
+    }
+
+    // Runs strictly on audioQueue
+    private func executeHardwareWriteNow() {
+        guard let targetVolume = pendingHardwareVolume else { return }
+        pendingHardwareVolume = nil
+
+        // If the volume hasn't changed meaningfully since the last hardware write, skip
+        if abs(targetVolume - lastHardwareWrittenVolume) < 0.003 && targetVolume != 0.0 && targetVolume != 1.0 {
+            return
+        }
+
         let deviceID = defaultOutputDevice()
         guard deviceID != kAudioObjectUnknown else { return }
 
-        var newVolume = max(0.0, min(1.0, volume))
-        lastKnownVolume = newVolume
+        lastHardwareSetTime = CACurrentMediaTime()
+        lastHardwareWrittenVolume = targetVolume
+
+        var vol = targetVolume
         let propertySize = UInt32(MemoryLayout<Float32>.size)
 
         // 1. Try Virtual Main Volume ('vmvo' = 0x766d766f)
@@ -112,30 +211,33 @@ final class VolumeController {
             mScope: kAudioDevicePropertyScopeOutput,
             mElement: kAudioObjectPropertyElementMain
         )
-        _ = AudioObjectSetPropertyData(deviceID, &virtualAddress, 0, nil, propertySize, &newVolume)
+        let vmvoStatus = AudioObjectSetPropertyData(deviceID, &virtualAddress, 0, nil, propertySize, &vol)
 
-        // 2. Try per-channel scalar volume
-        for channel: UInt32 in [0, 1, 2] {
-            var propertyAddress = AudioObjectPropertyAddress(
-                mSelector: kAudioDevicePropertyVolumeScalar,
-                mScope: kAudioDevicePropertyScopeOutput,
-                mElement: channel
-            )
-            _ = AudioObjectSetPropertyData(deviceID, &propertyAddress, 0, nil, propertySize, &newVolume)
+        // 2. Only if 'vmvo' was not supported by the hardware driver, fallback to channel scalar
+        if vmvoStatus != noErr {
+            for channel: UInt32 in [0, 1, 2] {
+                var propertyAddress = AudioObjectPropertyAddress(
+                    mSelector: kAudioDevicePropertyVolumeScalar,
+                    mScope: kAudioDevicePropertyScopeOutput,
+                    mElement: channel
+                )
+                _ = AudioObjectSetPropertyData(deviceID, &propertyAddress, 0, nil, propertySize, &vol)
+            }
         }
 
-        // Unmute if muted and raising volume
-        var isMuted: UInt32 = 0
-        var muteAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioDevicePropertyMute,
-            mScope: kAudioDevicePropertyScopeOutput,
-            mElement: kAudioObjectPropertyElementMain
-        )
-        var muteSize = UInt32(MemoryLayout<UInt32>.size)
-        _ = AudioObjectGetPropertyData(deviceID, &muteAddress, 0, nil, &muteSize, &isMuted)
-        if isMuted != 0 && newVolume > 0 {
-            isMuted = 0
-            _ = AudioObjectSetPropertyData(deviceID, &muteAddress, 0, nil, muteSize, &isMuted)
+        // Unmute if muted and volume is raised above zero
+        if targetVolume > 0.01 && (lastHardwareWrittenVolume == 0.0 || targetVolume <= 0.05) {
+            var isMuted: UInt32 = 0
+            var muteAddress = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyMute,
+                mScope: kAudioDevicePropertyScopeOutput,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            var muteSize = UInt32(MemoryLayout<UInt32>.size)
+            if AudioObjectGetPropertyData(deviceID, &muteAddress, 0, nil, &muteSize, &isMuted) == noErr && isMuted != 0 {
+                isMuted = 0
+                _ = AudioObjectSetPropertyData(deviceID, &muteAddress, 0, nil, muteSize, &isMuted)
+            }
         }
     }
 }
@@ -195,6 +297,7 @@ final class EdgeVolumeEngine {
     private var activeTouchID: Int32 = -1
     private var startY: Double = 0
     private var startVolume: Float = 0.5
+    private var lastDispatchedSliderVol: Float = -1.0
     private var autoReconnectTimer: Timer?
 
     // Bottom-Right Corner Tap state (2 Taps = Next, 3 Taps = Previous)
@@ -398,6 +501,9 @@ final class EdgeVolumeEngine {
             if isSwiping {
                 isSwiping = false
                 isVolumeDragActive = false
+                lastDispatchedSliderVol = -1.0
+                VolumeController.shared.persistVolumeToDefaults()
+                AppVolumeManager.shared.resetVolumeOverlayTracking()
             }
             return
         }
@@ -455,6 +561,7 @@ final class EdgeVolumeEngine {
                     activeTouchID = touchID
                     startY = y
                     startVolume = AppVolumeManager.shared.getEffectiveVolume()
+                    lastDispatchedSliderVol = -1.0
                     isVolumeDragActive = false
                     foundActiveTouch = true
                     break
@@ -471,6 +578,7 @@ final class EdgeVolumeEngine {
                             isVolumeDragActive = true
                             startY = y // Re-anchor startY to avoid sudden jump when threshold passed
                             startVolume = AppVolumeManager.shared.getEffectiveVolume()
+                            lastDispatchedSliderVol = -1.0
                         }
                     }
 
@@ -481,13 +589,16 @@ final class EdgeVolumeEngine {
                         let change = max(-0.25, min(0.25, Float(activeTravelMm / fullRangeMm)))
                         let newVol = max(0.0, min(1.0, startVolume + change))
 
-                        let isYT = GestureMappingManager.shared.isYouTubeMode
-                        DispatchQueue.main.async {
-                            AppVolumeManager.shared.setEffectiveVolume(newVol)
-                            if isYT {
-                                VideoPlayerCoordinator.shared.setVolume(newVol)
-                                let percent = Int(round(newVol * 100))
-                                FloatingHUDWindowController.shared.showVolumeOverlay(volumePercent: percent)
+                        if abs(newVol - lastDispatchedSliderVol) >= 0.002 || newVol == 0.0 || newVol == 1.0 {
+                            lastDispatchedSliderVol = newVol
+                            let isYT = GestureMappingManager.shared.isYouTubeMode
+                            DispatchQueue.main.async {
+                                AppVolumeManager.shared.setEffectiveVolume(newVol)
+                                if isYT {
+                                    VideoPlayerCoordinator.shared.setVolume(newVol)
+                                    let percent = Int(round(newVol * 100))
+                                    FloatingHUDWindowController.shared.showVolumeOverlay(volumePercent: percent)
+                                }
                             }
                         }
                     }
@@ -499,6 +610,9 @@ final class EdgeVolumeEngine {
         if isSwiping && !foundActiveTouch {
             isSwiping = false
             isVolumeDragActive = false
+            lastDispatchedSliderVol = -1.0
+            VolumeController.shared.persistVolumeToDefaults()
+            AppVolumeManager.shared.resetVolumeOverlayTracking()
         }
     }
 }

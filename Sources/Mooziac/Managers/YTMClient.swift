@@ -48,6 +48,17 @@ public final class YTMClient {
         public let album: String
         public let artworkUrl: String
         public let duration: String
+        public let isVideo: Bool
+
+        public init(videoId: String, title: String, artist: String, album: String, artworkUrl: String, duration: String, isVideo: Bool = false) {
+            self.videoId = videoId
+            self.title = title
+            self.artist = artist
+            self.album = album
+            self.artworkUrl = artworkUrl
+            self.duration = duration
+            self.isVideo = isVideo
+        }
     }
 
     public enum YTMError: Error {
@@ -361,51 +372,52 @@ public final class YTMClient {
 
     // MARK: - Search
 
+    public enum SearchFilter {
+        case songs
+        case videos
+
+        public var params: String {
+            switch self {
+            case .videos:
+                return "EgWKAQIQAWoSEAUQDhAJEAMQEBAKEAQQFRAR"
+            case .songs:
+                return "EgWKAQIIAWoSEAUQDhAJEAMQEBAKEAQQFRAR"
+            }
+        }
+    }
+
     /// Searches YouTube Music via the InnerTube API for the best matching song/video.
     /// Returns the top track with its videoId, title, artist, and artwork.
-    public func searchTopTrack(query: String, completion: @escaping (Result<Track, Error>) -> Void) {
+    public func searchTopTrack(query: String, filter: SearchFilter = .songs, completion: @escaping (Result<Track, Error>) -> Void) {
         let cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanQuery.isEmpty else {
             completion(.failure(YTMError.badResponse))
             return
         }
 
-        let payload: [String: Any] = ["query": cleanQuery]
-        post(endpoint: "search", payload: payload) { [weak self] result in
-            guard let self = self else { return }
+        let isVideo = (filter == .videos)
+        let payload: [String: Any] = [
+            "query": cleanQuery,
+            "params": filter.params
+        ]
+        post(endpoint: "search", payload: payload) { result in
             switch result {
             case .failure(let err):
                 completion(.failure(err))
             case .success(let json):
-                if let track = Self.parseTopTrack(from: json) {
+                if let track = Self.parseTopTrack(from: json, isVideo: isVideo) {
                     completion(.success(track))
                 } else {
-                    // Fallback to searching with filtered "Songs" parameter
-                    let songPayload: [String: Any] = [
-                        "query": cleanQuery,
-                        "params": "EgWKAQIIAWoSEAUQDhAJEAMQEBAKEAQQFRAR"
-                    ]
-                    self.post(endpoint: "search", payload: songPayload) { secondResult in
-                        switch secondResult {
-                        case .failure(let secondErr):
-                            completion(.failure(secondErr))
-                        case .success(let secondJson):
-                            if let songTrack = Self.parseTopTrack(from: secondJson) {
-                                completion(.success(songTrack))
-                            } else {
-                                completion(.failure(YTMError.badResponse))
-                            }
-                        }
-                    }
+                    completion(.failure(YTMError.badResponse))
                 }
             }
         }
     }
 
-    /// Searches song results for the live search dropdown. The returned token
+    /// Searches song or video results for the live search dropdown. The returned token
     /// cancels work that is no longer relevant to the current query.
     @discardableResult
-    public func searchTracks(query: String, limit: Int = 8,
+    public func searchTracks(query: String, filter: SearchFilter = .songs, limit: Int = 8,
                              completion: @escaping (Result<[Track], Error>) -> Void) -> RequestToken? {
         let cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanQuery.isEmpty else {
@@ -416,22 +428,27 @@ public final class YTMClient {
             completion(.success([]))
             return nil
         }
+        let isVideo = (filter == .videos)
+        let filterParam = isVideo
+            ? "EgWKAQIQAWoSEAUQDhAJEAMQEBAKEAQQFRAR"
+            : "EgWKAQIIAWoSEAUQDhAJEAMQEBAKEAQQFRAR"
+
         let payload: [String: Any] = [
             "query": cleanQuery,
-            "params": "EgWKAQIIAWoSEAUQDhAJEAMQEBAKEAQQFRAR"
+            "params": filterParam
         ]
         return post(endpoint: "search", payload: payload) { result in
             switch result {
             case .failure(let error):
                 completion(.failure(error))
             case .success(let page):
-                let tracks = Self.parseSearchTracks(from: page, limit: limit)
+                let tracks = Self.parseSearchTracks(from: page, limit: limit, isVideo: isVideo)
                 completion(.success(tracks))
             }
         }
     }
 
-    private static func parseSearchTracks(from page: [String: Any], limit: Int) -> [Track] {
+    private static func parseSearchTracks(from page: [String: Any], limit: Int, isVideo: Bool = false) -> [Track] {
         guard let contents = page["contents"] as? [String: Any],
               let tabbed = contents["tabbedSearchResultsRenderer"] as? [String: Any],
               let tabs = tabbed["tabs"] as? [[String: Any]],
@@ -478,7 +495,8 @@ public final class YTMClient {
                                      artist: artist,
                                      album: album,
                                      artworkUrl: artworkURL,
-                                     duration: ""))
+                                     duration: "",
+                                     isVideo: isVideo))
                 if results.count >= limit { return results }
             }
         }
@@ -832,7 +850,7 @@ public final class YTMClient {
     }
 
     /// Parses the top matching song or video from an InnerTube search response.
-    public static func parseTopTrack(from page: [String: Any]) -> Track? {
+    public static func parseTopTrack(from page: [String: Any], isVideo: Bool = false) -> Track? {
         guard let contents = page["contents"] as? [String: Any],
               let tabbed = contents["tabbedSearchResultsRenderer"] as? [String: Any],
               let tabs = tabbed["tabs"] as? [[String: Any]],
@@ -856,7 +874,7 @@ public final class YTMClient {
                     if let onTap = card["onTap"] as? [String: Any],
                        let watch = onTap["watchEndpoint"] as? [String: Any],
                        let vid = watch["videoId"] as? String, !vid.isEmpty {
-                        return Track(videoId: vid, title: title, artist: subtitle, album: "", artworkUrl: "https://i.ytimg.com/vi/\(vid)/hqdefault.jpg", duration: "")
+                        return Track(videoId: vid, title: title, artist: subtitle, album: "", artworkUrl: "https://i.ytimg.com/vi/\(vid)/hqdefault.jpg", duration: "", isVideo: isVideo)
                     }
 
                     // Check card buttons for direct videoId (excluding radio/mix playlist)
@@ -868,7 +886,7 @@ public final class YTMClient {
                                    let vid = watch["videoId"] as? String, !vid.isEmpty {
                                     let plist = watch["playlistId"] as? String ?? ""
                                     if !plist.hasPrefix("RD") {
-                                        return Track(videoId: vid, title: title, artist: subtitle, album: "", artworkUrl: "https://i.ytimg.com/vi/\(vid)/hqdefault.jpg", duration: "")
+                                        return Track(videoId: vid, title: title, artist: subtitle, album: "", artworkUrl: "https://i.ytimg.com/vi/\(vid)/hqdefault.jpg", duration: "", isVideo: isVideo)
                                     }
                                 }
                             }
@@ -882,7 +900,7 @@ public final class YTMClient {
                         if let r = item["musicResponsiveListItemRenderer"] as? [String: Any],
                            let vid = extractVideoId(from: r) {
                             let itemTitle = listItemTitle(r)
-                            return Track(videoId: vid, title: itemTitle.isEmpty ? title : itemTitle, artist: subtitle, album: "", artworkUrl: "https://i.ytimg.com/vi/\(vid)/hqdefault.jpg", duration: "")
+                            return Track(videoId: vid, title: itemTitle.isEmpty ? title : itemTitle, artist: subtitle, album: "", artworkUrl: "https://i.ytimg.com/vi/\(vid)/hqdefault.jpg", duration: "", isVideo: isVideo)
                         }
                     }
                 }
@@ -929,7 +947,7 @@ public final class YTMClient {
                         }
                     }
                     guard !title.isEmpty else { continue }
-                    return Track(videoId: vid, title: title, artist: artist, album: "", artworkUrl: "https://i.ytimg.com/vi/\(vid)/hqdefault.jpg", duration: "")
+                    return Track(videoId: vid, title: title, artist: artist, album: "", artworkUrl: "https://i.ytimg.com/vi/\(vid)/hqdefault.jpg", duration: "", isVideo: isVideo)
                 }
             }
         }

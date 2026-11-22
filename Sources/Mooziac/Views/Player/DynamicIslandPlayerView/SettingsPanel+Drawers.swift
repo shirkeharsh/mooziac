@@ -12,6 +12,8 @@ extension DynamicIslandPlayerView {
         selectedPlaylistIDs.removeAll()
         playlistSearchField?.stringValue = ""
         inlineCreateTextField.stringValue = ""
+        stopUpNextPolling()
+        if tab == .upNext { upNextRenderedSignature = "<reset>" }
         resetPlaylistSectionChrome()
         applySearchCreateFieldState(animated: false)
         refreshPlaylistsSection()
@@ -45,6 +47,8 @@ extension DynamicIslandPlayerView {
             likedShuffleButton.isHidden = true
             historyPlayAllButton.isHidden = true
             historyShuffleButton.isHidden = true
+            upNextSaveButton.isHidden = true
+            upNextRadioButton.isHidden = true
 
             if playlistAddMode {
                 playlistDetailDeleteButton.isHidden = true
@@ -154,7 +158,25 @@ extension DynamicIslandPlayerView {
                 if let search = playlistSearchField {
                     search.placeholderString = "Search listening history..."
                 }
+
+            case .upNext:
+                playlistDetailCreateButton.isHidden = true
+                playlistImportButton.isHidden = true
+                playlistSearchToggleButton.isHidden = false
+                playlistBulkDeleteButton.isHidden = true
+                playlistSelectionDoneButton.isHidden = true
+                downloadsPlayAllButton.isHidden = true
+                downloadsShuffleButton.isHidden = true
+                likedPlayAllButton.isHidden = true
+                likedShuffleButton.isHidden = true
+                historyPlayAllButton.isHidden = true
+                historyShuffleButton.isHidden = true
+                if let search = playlistSearchField {
+                    search.placeholderString = "Search up next..."
+                }
             }
+            upNextSaveButton.isHidden = (activeLibraryTab != .upNext)
+            upNextRadioButton.isHidden = (activeLibraryTab != .upNext)
 
             playlistsStackView.isHidden = false
             detailStackView.isHidden = true
@@ -390,6 +412,8 @@ extension DynamicIslandPlayerView {
             librarySectionHeaderLabel.stringValue = trimmedQuery.isEmpty ? "DOWNLOADS" : "SEARCH RESULTS"
         case .history:
             librarySectionHeaderLabel.stringValue = trimmedQuery.isEmpty ? "LISTENING HISTORY" : "SEARCH RESULTS"
+        case .upNext:
+            librarySectionHeaderLabel.stringValue = upNextHeaderText(query: trimmedQuery)
         }
 
         var builders: [() -> NSView] = []
@@ -462,6 +486,13 @@ extension DynamicIslandPlayerView {
                     { [weak self] in self?.makeHistoryRow(record: record, tone: tone) ?? NSView() }
                 }
             }
+
+        case .upNext:
+            ensureUpNextLive()
+            let built = upNextRowBuilders(query: trimmedQuery, tone: tone)
+            builders = built.builders
+            itemIDs = built.ids
+            emptyText = built.empty
         }
 
         if let empty = emptyText {
@@ -562,6 +593,7 @@ extension DynamicIslandPlayerView {
             else if let r = sub as? DownloadRowView { r.updatePlayingAppearance(tone: tone) }
             else if let r = sub as? DetailItemRowView { r.updatePlayingAppearance(tone: tone) }
             else if let r = sub as? HistoryRowView { r.updatePlayingAppearance(tone: tone) }
+            else if let r = sub as? UpNextRowView { r.updatePlayingAppearance(tone: tone) }
         }
         for sub in container.contentCardView.subviews {
             if let r = sub as? DetailItemRowView {
@@ -591,6 +623,9 @@ extension DynamicIslandPlayerView {
 
     @objc func handleSettingsPlaybackStateChanged(_ notification: Notification) {
         updatePlayingRowHighlight()
+        if isUpNextVisible {
+            reloadUpNext(delay: 0.4)
+        }
     }
 
     @objc func handleSettingsDownloadProgress(_ notification: Notification) {
@@ -607,6 +642,7 @@ extension DynamicIslandPlayerView {
                     else if let row = sub as? DownloadRowView { row.updatePlayingAppearance(tone: tone) }
                     else if let row = sub as? DetailItemRowView { row.updatePlayingAppearance(tone: tone) }
                     else if let row = sub as? HistoryRowView { row.updatePlayingAppearance(tone: tone) }
+                    else if let row = sub as? UpNextRowView { row.updatePlayingAppearance(tone: tone) }
                 }
             }
         }
@@ -726,6 +762,11 @@ extension DynamicIslandPlayerView {
             var keys = pendingRowItemIDs
             if let keyPrefix {
                 keys = keys.map { $0.hasPrefix(keyPrefix) ? String($0.dropFirst(keyPrefix.count)) : $0 }
+            }
+
+            if keyPrefix == "upnext-" {
+                applyUpNextReorder(newOrderIDs: keys)
+                return
             }
 
             if let storageKey {

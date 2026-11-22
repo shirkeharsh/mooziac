@@ -13,7 +13,10 @@ extension DynamicIslandPlayerView {
         currentArtworkDataTask = nil
 
         if let cached = AppArtworkHelper.shared.getMemoryCachedImage(forKey: urlStr) {
-            applyArtworkAnimation { [weak self] in self?.artworkImageView.image = cached }
+            applyArtworkAnimation { [weak self] in
+                self?.artworkImageView.image = cached
+                self?.updateVisualStageContent()
+            }
             if let cg = cached.cgImage(forProposedRect: nil, context: nil, hints: nil) {
                 self.updateAmbientGlow(cgImage: cg)
             }
@@ -36,14 +39,18 @@ extension DynamicIslandPlayerView {
                 let options: [CFString: Any] = [
                     kCGImageSourceCreateThumbnailFromImageAlways: true,
                     kCGImageSourceCreateThumbnailWithTransform: true,
-                    kCGImageSourceThumbnailMaxPixelSize: 128
+                    kCGImageSourceThumbnailMaxPixelSize: 256
                 ]
                 guard let source = CGImageSourceCreateWithData(artworkData as CFData, nil),
-                      let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return }
+                      let rawCG = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return }
+                let cgImage = AppArtworkHelper.cropToCenterSquare(cgImage: rawCG)
                 let thumbnail = NSImage(cgImage: cgImage, size: NSSize(width: 44, height: 44))
 
                 AppArtworkHelper.shared.setMemoryCachedImage(thumbnail, forKey: urlStr)
-                self.applyArtworkAnimation { self.artworkImageView.image = thumbnail }
+                self.applyArtworkAnimation {
+                    self.artworkImageView.image = thumbnail
+                    self.updateVisualStageContent()
+                }
                 self.updateAmbientGlow(cgImage: cgImage)
             }
         }
@@ -190,7 +197,6 @@ extension DynamicIslandPlayerView {
                 searchIconButton.contentTintColor = btnTint
                 fullScreenButton.contentTintColor = btnTint
                 browserButton.contentTintColor = btnTint
-                resetPositionButton.contentTintColor = btnTint
 
 
             case .darkMode:
@@ -220,16 +226,15 @@ extension DynamicIslandPlayerView {
                 searchIconButton.contentTintColor = darkBtnTint
                 fullScreenButton.contentTintColor = darkBtnTint
                 browserButton.contentTintColor = darkBtnTint
-                resetPositionButton.contentTintColor = darkBtnTint
 
             case .glassMode:
                 visualEffectBackdrop.isHidden = true
                 glassSheenLayer.isHidden = true
                 cylindricalLensLayer.isHidden = true
-                // Premium Light Mode #EFF2F0 with high-contrast text and crisp perimeter rim
-                containerPill.layer?.backgroundColor = NSColor(red: 0.93725, green: 0.94902, blue: 0.94118, alpha: 0.98).cgColor
+                // Premium Frosted Light Mode - soft grey-white tint with distinct perimeter
+                containerPill.layer?.backgroundColor = NSColor(red: 0.86, green: 0.88, blue: 0.89, alpha: 0.96).cgColor
                 containerPill.layer?.borderWidth = 1.2
-                containerPill.layer?.borderColor = NSColor(red: 0.70, green: 0.72, blue: 0.71, alpha: 1.0).cgColor
+                containerPill.layer?.borderColor = NSColor(red: 0.65, green: 0.68, blue: 0.70, alpha: 1.0).cgColor
                 
                 titleLabel.font = NSFont.systemFont(ofSize: 13, weight: .heavy)
                 artistLabel.font = NSFont.systemFont(ofSize: 11, weight: .bold)
@@ -240,6 +245,7 @@ extension DynamicIslandPlayerView {
                 let tertiaryBlack = SystemAppearanceHelper.tertiaryTextColor(for: .glassMode)
                 
                 waveformProgressView.accentColor = pitchBlack
+                waveformProgressView.needsDisplay = true
                 
                 titleLabel.textColor = pitchBlack
                 artistLabel.textColor = deepBlack
@@ -255,7 +261,6 @@ extension DynamicIslandPlayerView {
                 searchIconButton.contentTintColor = glassBtnTint
                 fullScreenButton.contentTintColor = glassBtnTint
                 browserButton.contentTintColor = glassBtnTint
-                resetPositionButton.contentTintColor = glassBtnTint
 
             case .liquidFluid:
                 // Apple Control Center Optical Liquid Glass: Behind-window blur, 3D meniscus acrylic rim, cylindrical lens flare
@@ -309,9 +314,6 @@ extension DynamicIslandPlayerView {
                 }
                 cylindricalLensLayer.locations = [0.0, 0.18, 0.36, 0.44, 0.50, 1.0]
                 
-                liquidFluidMeshLayer.isHidden = true
-                stopLiquidFluidAnimation()
-                
                 // Translucent liquid glass backing plate
                 containerPill.layer?.backgroundColor = SystemAppearanceHelper.liquidFluidBackingColor.cgColor
                 containerPill.layer?.borderWidth = 1.5
@@ -341,15 +343,12 @@ extension DynamicIslandPlayerView {
                 searchIconButton.contentTintColor = fluidBtnTint
                 fullScreenButton.contentTintColor = fluidBtnTint
                 browserButton.contentTintColor = fluidBtnTint
-                resetPositionButton.contentTintColor = fluidBtnTint
 
             }
         }
 
         if design != .liquidFluid {
             cylindricalLensLayer.isHidden = true
-            liquidFluidMeshLayer.isHidden = true
-            stopLiquidFluidAnimation()
         }
 
         downloadButton.updateVisuals()
@@ -361,17 +360,5 @@ extension DynamicIslandPlayerView {
         updateAddToPlaylistButtonColor()
         updateRepeatButtonColor()
         updateSearchResultsTheme()
-    }
-
-    func setupLiquidFluidLayer() {
-        liquidFluidMeshLayer.isHidden = true
-    }
-
-    func startLiquidFluidAnimation(palette1: [CGColor]? = nil, palette2: [CGColor]? = nil) {
-        // No-op: Pure transparent watery glass uses natural screen optical refraction
-    }
-
-    func stopLiquidFluidAnimation() {
-        liquidFluidMeshLayer.removeAllAnimations()
     }
 }

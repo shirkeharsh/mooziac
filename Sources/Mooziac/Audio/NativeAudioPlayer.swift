@@ -82,6 +82,35 @@ public final class NativeAudioPlayer: NSObject {
         }
     }
 
+    /// Removes an upcoming song from the queue (the playing song is left alone).
+    public func removeFromQueue(trackID: String) {
+        guard trackID != currentTrack?.id else { return }
+        currentQueue.removeAll { $0.id == trackID }
+        shuffledQueue.removeAll { $0.id == trackID }
+        syncCurrentIndexWithActiveList()
+    }
+
+    /// Moves a song inside the list that is currently being played (shuffled or normal order).
+    public func moveInQueue(from fromIndex: Int, to toIndex: Int) {
+        var list = isShuffleActive ? shuffledQueue : currentQueue
+        guard fromIndex != toIndex, list.indices.contains(fromIndex), list.indices.contains(toIndex) else { return }
+        let item = list.remove(at: fromIndex)
+        list.insert(item, at: toIndex)
+        if isShuffleActive {
+            shuffledQueue = list
+        } else {
+            currentQueue = list
+        }
+        syncCurrentIndexWithActiveList()
+    }
+
+    private func syncCurrentIndexWithActiveList() {
+        let list = isShuffleActive ? shuffledQueue : currentQueue
+        if let current = currentTrack, let idx = list.firstIndex(of: current) {
+            currentIndex = idx
+        }
+    }
+
     public func updateQueueOrder(newOrder: [LocalTrack]) {
         guard !newOrder.isEmpty else { return }
         self.currentQueue = newOrder

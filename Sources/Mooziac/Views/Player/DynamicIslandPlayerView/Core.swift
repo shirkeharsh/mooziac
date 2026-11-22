@@ -16,6 +16,8 @@ protocol DynamicIslandPlayerViewDelegate: AnyObject {
     func dynamicIslandDidTapOfflineLibrary()
     func dynamicIslandDidTapPlaylistLibrary(playlistID: String?)
     func dynamicIslandDidToggleExpanded(expanded: Bool)
+    func dynamicIslandDidToggleVisualStage(isActive: Bool, hostView: NSView?)
+    func dynamicIslandDidToggleHeroIdle(isIdle: Bool)
 }
 
 class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditingDelegate {
@@ -23,9 +25,27 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     
     let containerPill = PillContainerView()
     
-    let artworkImageView = NSImageView()
+    let heroVisualContainer = NSView()
+    let heroAmbientImageView = NSImageView()
+    let heroWebHostView = NSView()
+    let heroOverlayView = ViewOnlyOverlayView()
+    let heroLyricsView = HeroLyricsView()
+    private var lastLyricsTrackKey: String = ""
+
+    var collapsedHeroConstraints: [NSLayoutConstraint] = []
+    var expandedHeroConstraints: [NSLayoutConstraint] = []
+    public var isHeroArtworkExpanded: Bool = false
+    public private(set) var isHeroControlsHidden: Bool = false
+    private var heroIdleTimer: Timer?
+    private var heroTrackingArea: NSTrackingArea?
+    private var heroExpandedBottomConstraint: NSLayoutConstraint?
+    private var heroIdleBottomConstraint: NSLayoutConstraint?
+    private var lastMouseScreenLocation: NSPoint = .zero
+
+    let artworkImageView = InteractiveArtworkImageView()
     let titleLabel = NSTextField(labelWithString: "Not Playing")
     let artistLabel = NSTextField(labelWithString: "YouTube Music")
+    let textStack = NSStackView()
     let hqBadgeLabel = NSTextField(labelWithString: "HQ")
     
     let addToPlaylistButton = ReactiveIconButton()
@@ -38,19 +58,18 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     let downloadButton = CircularProgressDownloadButton()
     let browserButton = ReactiveIconButton()
     let fullScreenButton = ReactiveIconButton()
-    let resetPositionButton = ReactiveIconButton()
+    let topRightStack = NSStackView()
     let visualEffectBackdrop = NSVisualEffectView()
     let glassSheenLayer = CAGradientLayer()
     let cylindricalLensLayer = CAGradientLayer()
-    let liquidFluidMeshLayer = CAGradientLayer()
     var isLiked: Bool = false
-    var isRepeatActive: Bool = false
     var repeatMode: RepeatMode = .off
 
     public enum ActiveSettingsMode {
         case preferences
         case playlist
         case search
+        case visual
     }
     public var activeSettingsMode: ActiveSettingsMode = .preferences
 
@@ -59,6 +78,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         case likedSongs = 1
         case downloads = 2
         case history = 3
+        case upNext = 4
 
         public var title: String {
             switch self {
@@ -66,6 +86,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
             case .likedSongs: return "Liked Songs"
             case .downloads: return "Downloads"
             case .history: return "History"
+            case .upNext: return "Up Next"
             }
         }
 
@@ -75,6 +96,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
             case .likedSongs: return "heart"
             case .downloads: return "arrow.down.circle"
             case .history: return "clock"
+            case .upNext: return "list.bullet"
             }
         }
     }
@@ -106,6 +128,12 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     let likedShuffleButton = ReactiveIconButton()
     let historyPlayAllButton = ReactiveIconButton()
     let historyShuffleButton = ReactiveIconButton()
+    let upNextSaveButton = ReactiveIconButton()
+    let upNextRadioButton = ReactiveIconButton()
+    var upNextEntries: [UpNextEntry] = []
+    var upNextRenderedSignature: String = ""
+    var upNextLoadToken: Int = 0
+    var upNextTimer: Timer?
     let playlistsStackView = NSStackView()
     let detailStackView = NSStackView()
     let playlistDetailBackButton = ReactiveIconButton()
@@ -367,6 +395,9 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         containerPill.onBackgroundClick = { [weak self] in
             self?.collapseSettingsForOutsideClick()
         }
+        containerPill.onMouseMove = { [weak self] in
+            self?.handleHeroMouseActivity()
+        }
 
         visualEffectBackdrop.translatesAutoresizingMaskIntoConstraints = false
         visualEffectBackdrop.material = .underWindowBackground
@@ -399,17 +430,89 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         cylindricalLensLayer.masksToBounds = true
         cylindricalLensLayer.isHidden = true
         containerPill.layer?.addSublayer(cylindricalLensLayer)
-
-        setupLiquidFluidLayer()
-        containerPill.layer?.insertSublayer(liquidFluidMeshLayer, at: 0)
         
+        heroVisualContainer.translatesAutoresizingMaskIntoConstraints = false
+        heroVisualContainer.wantsLayer = true
+        heroVisualContainer.layer?.backgroundColor = NSColor(red: 0.05, green: 0.05, blue: 0.07, alpha: 0.98).cgColor
+        heroVisualContainer.layer?.cornerRadius = 8
+        heroVisualContainer.layer?.masksToBounds = true
+        heroVisualContainer.layer?.borderWidth = 0.0
+        heroVisualContainer.layer?.borderColor = NSColor.clear.cgColor
+
+        heroAmbientImageView.translatesAutoresizingMaskIntoConstraints = false
+        heroAmbientImageView.wantsLayer = true
+        heroAmbientImageView.layer?.cornerRadius = 20
+        heroAmbientImageView.layer?.masksToBounds = true
+        heroAmbientImageView.layer?.contentsGravity = .resizeAspectFill
+        heroAmbientImageView.imageScaling = .scaleAxesIndependently
+        heroAmbientImageView.alphaValue = 0.88
+        heroAmbientImageView.isHidden = true
+        heroVisualContainer.addSubview(heroAmbientImageView)
+
         artworkImageView.translatesAutoresizingMaskIntoConstraints = false
         artworkImageView.wantsLayer = true
         artworkImageView.layer?.cornerRadius = 8
         artworkImageView.layer?.masksToBounds = true
-        artworkImageView.imageScaling = .scaleAxesIndependently
-        
+        artworkImageView.layer?.contentsGravity = .resizeAspect
+        artworkImageView.imageScaling = .scaleProportionallyUpOrDown
         artworkImageView.image = AppArtworkHelper.defaultArtwork
+        artworkImageView.toolTip = "Toggle Expanded Video & Artwork View"
+        artworkImageView.onClick = { [weak self] in
+            self?.handleArtworkTapped()
+        }
+        artworkImageView.onMouseMove = { [weak self] in
+            self?.handleHeroMouseActivity()
+        }
+        heroVisualContainer.addSubview(artworkImageView)
+
+        heroLyricsView.translatesAutoresizingMaskIntoConstraints = false
+        heroLyricsView.isHidden = true
+        heroVisualContainer.addSubview(heroLyricsView)
+
+        heroWebHostView.translatesAutoresizingMaskIntoConstraints = false
+        heroWebHostView.wantsLayer = true
+        heroWebHostView.layer?.cornerRadius = 14
+        heroWebHostView.layer?.masksToBounds = true
+        heroWebHostView.isHidden = true
+        heroVisualContainer.addSubview(heroWebHostView)
+
+        heroOverlayView.translatesAutoresizingMaskIntoConstraints = false
+        heroOverlayView.wantsLayer = true
+        heroOverlayView.isHidden = true
+        heroOverlayView.onClick = { [weak self] in
+            self?.handleArtworkTapped()
+        }
+        heroOverlayView.onMouseMove = { [weak self] in
+            self?.handleHeroMouseActivity()
+        }
+        heroVisualContainer.addSubview(heroOverlayView)
+
+        NSLayoutConstraint.activate([
+            heroAmbientImageView.topAnchor.constraint(equalTo: heroVisualContainer.topAnchor),
+            heroAmbientImageView.leadingAnchor.constraint(equalTo: heroVisualContainer.leadingAnchor),
+            heroAmbientImageView.trailingAnchor.constraint(equalTo: heroVisualContainer.trailingAnchor),
+            heroAmbientImageView.bottomAnchor.constraint(equalTo: heroVisualContainer.bottomAnchor),
+
+            artworkImageView.topAnchor.constraint(equalTo: heroVisualContainer.topAnchor),
+            artworkImageView.leadingAnchor.constraint(equalTo: heroVisualContainer.leadingAnchor),
+            artworkImageView.trailingAnchor.constraint(equalTo: heroVisualContainer.trailingAnchor),
+            artworkImageView.bottomAnchor.constraint(equalTo: heroVisualContainer.bottomAnchor),
+
+            heroLyricsView.topAnchor.constraint(equalTo: heroVisualContainer.topAnchor),
+            heroLyricsView.leadingAnchor.constraint(equalTo: heroVisualContainer.leadingAnchor),
+            heroLyricsView.trailingAnchor.constraint(equalTo: heroVisualContainer.trailingAnchor),
+            heroLyricsView.bottomAnchor.constraint(equalTo: heroVisualContainer.bottomAnchor),
+
+            heroWebHostView.topAnchor.constraint(equalTo: heroVisualContainer.topAnchor),
+            heroWebHostView.leadingAnchor.constraint(equalTo: heroVisualContainer.leadingAnchor),
+            heroWebHostView.trailingAnchor.constraint(equalTo: heroVisualContainer.trailingAnchor),
+            heroWebHostView.bottomAnchor.constraint(equalTo: heroVisualContainer.bottomAnchor),
+
+            heroOverlayView.topAnchor.constraint(equalTo: heroVisualContainer.topAnchor),
+            heroOverlayView.leadingAnchor.constraint(equalTo: heroVisualContainer.leadingAnchor),
+            heroOverlayView.trailingAnchor.constraint(equalTo: heroVisualContainer.trailingAnchor),
+            heroOverlayView.bottomAnchor.constraint(equalTo: heroVisualContainer.bottomAnchor),
+        ])
         
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.font = NSFont.systemFont(ofSize: 13, weight: .bold)
@@ -439,7 +542,8 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         artistLabel.setContentCompressionResistancePriority(.init(240), for: .horizontal)
         artistLabel.setContentHuggingPriority(.init(240), for: .horizontal)
         
-        let textStack = NSStackView(views: [titleLabel, artistLabel])
+        textStack.addArrangedSubview(titleLabel)
+        textStack.addArrangedSubview(artistLabel)
         textStack.orientation = .vertical
         textStack.alignment = .leading
         textStack.spacing = 1
@@ -463,8 +567,6 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
 
         setupIconButton(fullScreenButton, systemName: "macwindow.on.rectangle", toolTip: "Open Full Web Browser View", action: #selector(fullScreenTapped), pointSize: 13.5)
         setupIconButton(browserButton, systemName: "ellipsis.circle.fill", toolTip: "Player Settings & Options", action: #selector(browserTapped), pointSize: 14.8)
-        setupIconButton(resetPositionButton, systemName: "arrow.uturn.backward", toolTip: "Snap Player Back to Menu Bar", action: #selector(resetPositionTapped), pointSize: 13.5)
-        resetPositionButton.isHidden = true
         
         playPauseButton.contentTintColor = NSColor.white
         previousButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
@@ -475,7 +577,6 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         searchIconButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
         fullScreenButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
         browserButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
-        resetPositionButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
         
         controlsStack.setViews([addToPlaylistButton, repeatButton, previousButton, playPauseButton, nextButton, likeButton, searchIconButton], in: .center)
         controlsStack.orientation = .horizontal
@@ -508,7 +609,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
             hqBadgeLabel.heightAnchor.constraint(equalToConstant: 16)
         ])
         
-        let topRightStack = NSStackView(views: [hqBadgeLabel, downloadButton, fullScreenButton, browserButton])
+        topRightStack.setViews([hqBadgeLabel, downloadButton, fullScreenButton, browserButton], in: .center)
         topRightStack.orientation = .horizontal
         topRightStack.spacing = 6
         topRightStack.alignment = .centerY
@@ -517,7 +618,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         topRightStack.setContentHuggingPriority(.required, for: .horizontal)
         
         searchField.translatesAutoresizingMaskIntoConstraints = false
-        searchField.placeholderString = "Search YouTube Music..."
+        searchField.placeholderString = "Search songs or / for video..."
         searchField.delegate = self
         searchField.font = NSFont.systemFont(ofSize: 11, weight: .medium)
         searchField.alphaValue = 0.0
@@ -596,7 +697,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         
         setupSettingsContainerView()
         
-        containerPill.addSubview(artworkImageView)
+        containerPill.addSubview(heroVisualContainer)
         containerPill.addSubview(textStack)
         containerPill.addSubview(topRightStack)
         containerPill.addSubview(controlsStack)
@@ -616,15 +717,53 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         
         controlsCenterX.isActive = true // Default centered state!
         
-        let collapsedConstraint = containerPill.bottomAnchor.constraint(equalTo: waveformProgressView.bottomAnchor, constant: 12)
+        let collapsedBottom = containerPill.bottomAnchor.constraint(equalTo: waveformProgressView.bottomAnchor, constant: 12)
         let settingsConstraint = containerPill.bottomAnchor.constraint(equalTo: settingsContainerView.bottomAnchor, constant: 12)
         let settingsHeight = settingsContainerView.heightAnchor.constraint(equalToConstant: 292)
         
-        self.containerPillBottomCollapsedConstraint = collapsedConstraint
+        self.containerPillBottomCollapsedConstraint = collapsedBottom
         self.containerPillBottomSettingsConstraint = settingsConstraint
         self.settingsContainerHeightConstraint = settingsHeight
-        
-        collapsedConstraint.isActive = true
+
+        self.collapsedHeroConstraints = [
+            heroVisualContainer.leadingAnchor.constraint(equalTo: containerPill.leadingAnchor, constant: 16),
+            heroVisualContainer.topAnchor.constraint(equalTo: containerPill.topAnchor, constant: 12),
+            heroVisualContainer.widthAnchor.constraint(equalToConstant: 44),
+            heroVisualContainer.heightAnchor.constraint(equalToConstant: 44),
+
+            textStack.leadingAnchor.constraint(equalTo: heroVisualContainer.trailingAnchor, constant: 12),
+            textStack.topAnchor.constraint(equalTo: heroVisualContainer.topAnchor, constant: 2),
+            textStack.trailingAnchor.constraint(equalTo: topRightStack.leadingAnchor, constant: -8),
+            textStack.widthAnchor.constraint(lessThanOrEqualToConstant: 200),
+
+            controlsStack.topAnchor.constraint(equalTo: heroVisualContainer.bottomAnchor, constant: 10),
+
+            waveformProgressView.topAnchor.constraint(equalTo: controlsStack.bottomAnchor, constant: 12),
+
+            collapsedBottom
+        ]
+
+        let expandedBottom = containerPill.bottomAnchor.constraint(equalTo: controlsStack.bottomAnchor, constant: 14)
+        let idleBottom = containerPill.bottomAnchor.constraint(equalTo: heroVisualContainer.bottomAnchor, constant: 0)
+        self.heroExpandedBottomConstraint = expandedBottom
+        self.heroIdleBottomConstraint = idleBottom
+
+        self.expandedHeroConstraints = [
+            heroVisualContainer.leadingAnchor.constraint(equalTo: containerPill.leadingAnchor, constant: 0),
+            heroVisualContainer.trailingAnchor.constraint(equalTo: containerPill.trailingAnchor, constant: 0),
+            heroVisualContainer.topAnchor.constraint(equalTo: containerPill.topAnchor, constant: 0),
+            heroVisualContainer.heightAnchor.constraint(equalToConstant: 202),
+
+            textStack.leadingAnchor.constraint(equalTo: containerPill.leadingAnchor, constant: 16),
+            textStack.trailingAnchor.constraint(equalTo: containerPill.trailingAnchor, constant: -16),
+            textStack.topAnchor.constraint(equalTo: heroVisualContainer.bottomAnchor, constant: 12),
+
+            waveformProgressView.topAnchor.constraint(equalTo: textStack.bottomAnchor, constant: 8),
+
+            controlsStack.topAnchor.constraint(equalTo: waveformProgressView.bottomAnchor, constant: 10)
+        ]
+
+        NSLayoutConstraint.activate(collapsedHeroConstraints)
         settingsConstraint.isActive = false
         
         NSLayoutConstraint.activate([
@@ -642,24 +781,9 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
             toastLabel.trailingAnchor.constraint(equalTo: toastView.trailingAnchor, constant: -12),
             toastLabel.centerYAnchor.constraint(equalTo: toastView.centerYAnchor),
             
-            // ROW 1: Album Artwork
-            artworkImageView.leadingAnchor.constraint(equalTo: containerPill.leadingAnchor, constant: 16),
-            artworkImageView.topAnchor.constraint(equalTo: containerPill.topAnchor, constant: 12),
-            artworkImageView.widthAnchor.constraint(equalToConstant: 44),
-            artworkImageView.heightAnchor.constraint(equalToConstant: 44),
-            
             // ROW 1: Top Right Actions (Like, Theme, Browser) Aligned with Song Name
             topRightStack.trailingAnchor.constraint(equalTo: containerPill.trailingAnchor, constant: -16),
             topRightStack.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
-            
-            // ROW 1: Title & Artist Column
-            textStack.leadingAnchor.constraint(equalTo: artworkImageView.trailingAnchor, constant: 12),
-            textStack.topAnchor.constraint(equalTo: artworkImageView.topAnchor, constant: 2),
-            textStack.trailingAnchor.constraint(equalTo: topRightStack.leadingAnchor, constant: -8),
-            textStack.widthAnchor.constraint(lessThanOrEqualToConstant: 200),
-            
-            // ROW 2: Playback Controls (Positioned vertically under artwork)
-            controlsStack.topAnchor.constraint(equalTo: artworkImageView.bottomAnchor, constant: 10),
             
             // ROW 2: Expandable Search Bar (Positioned directly after search icon, leaving all buttons intact!)
             searchField.leadingAnchor.constraint(equalTo: controlsStack.trailingAnchor, constant: 8),
@@ -670,7 +794,6 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
             // ROW 3: Waveform Progress Bar Aligned with Left Edge & Artwork
             waveformProgressView.leadingAnchor.constraint(equalTo: containerPill.leadingAnchor, constant: 16),
             waveformProgressView.trailingAnchor.constraint(equalTo: timeLabel.leadingAnchor, constant: -10),
-            waveformProgressView.topAnchor.constraint(equalTo: controlsStack.bottomAnchor, constant: 12),
             waveformProgressView.heightAnchor.constraint(equalToConstant: 12),
             
             // ROW 3: Timestamp Label Baseline Aligned with Waveform
@@ -723,6 +846,10 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
             if trackChanged {
                 lastTrackTitle = state.title
                 lastTrackArtist = state.artist
+                if isHeroArtworkExpanded && isHeroControlsHidden {
+                    setHeroControlsHidden(false, animated: true)
+                    startHeroIdleTimer()
+                }
             }
         }
         
@@ -802,6 +929,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
                         if let cg = cached.cgImage(forProposedRect: nil, context: nil, hints: nil) {
                             self.updateAmbientGlow(cgImage: cg)
                         }
+                        self.updateVisualStageContent(state: state)
                     }
                 } else {
                     let targetID = offlineTrack.id
@@ -814,6 +942,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
                             if let cg = resolved.cgImage(forProposedRect: nil, context: nil, hints: nil) {
                                 self.updateAmbientGlow(cgImage: cg)
                             }
+                            self.updateVisualStageContent(state: state)
                         }
                     }
                 }
@@ -858,6 +987,49 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         }
 
         updateDownloadButtonState()
+
+        if !state.title.isEmpty && state.title != "Not Playing" {
+            let cleanTitle = LyricsManager.cleanSongInfo(state.title).lowercased()
+            let cleanArtist = LyricsManager.cleanSongInfo(state.artist).lowercased()
+            let trackKey = state.trackID.isEmpty ? "\(cleanTitle)|\(cleanArtist)" : "VID:\(state.trackID)|\(cleanTitle)"
+            
+            if trackKey != lastLyricsTrackKey {
+                lastLyricsTrackKey = trackKey
+                let requestKey = trackKey
+                
+                // Zero-latency instant cache check
+                if let instant = LyricsManager.shared.getCachedLRCLines(trackID: state.trackID, title: state.title, artist: state.artist, duration: state.duration), !instant.isEmpty {
+                    heroLyricsView.setLyrics(instant)
+                } else {
+                    heroLyricsView.clear()
+                }
+                
+                LyricsManager.shared.fetchLyrics(
+                    artist: state.artist,
+                    title: state.title,
+                    duration: state.duration,
+                    trackID: state.trackID,
+                    videoId: state.videoId.isEmpty ? nil : state.videoId
+                ) { [weak self] _, lrcLines in
+                    DispatchQueue.main.async {
+                        guard let self = self, self.lastLyricsTrackKey == requestKey else { return }
+                        self.heroLyricsView.setLyrics(lrcLines)
+                        self.updateVisualStageContent(state: NowPlayingManager.shared.currentState)
+                    }
+                }
+            } else {
+                if isHeroArtworkExpanded {
+                    heroLyricsView.updateTime(state.getAccurateTime())
+                }
+            }
+        } else {
+            if !lastLyricsTrackKey.isEmpty {
+                lastLyricsTrackKey = ""
+                heroLyricsView.clear()
+            }
+        }
+
+        updateVisualStageContent(state: state)
     }
     
     func formatTime(_ seconds: Double) -> String {
@@ -894,9 +1066,11 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
             return
         }
         isSettingsExpanded = false
+        stopUpNextPolling()
         if activeSettingsMode == .preferences {
             browserButton.animatePop()
         }
+        updateArtworkHighlight()
         updateBrowserButtonColor()
         updateAddToPlaylistButtonColor()
 
@@ -913,28 +1087,244 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         }
     }
 
-    public func expandPreferences() {
+    @objc func handleArtworkTapped() {
+        if isHeroArtworkExpanded {
+            collapseHeroStage()
+        } else {
+            expandVisualStage()
+        }
+    }
+
+    public func expandVisualStage() {
+        guard !isHeroArtworkExpanded else { return }
+        if isSettingsExpanded {
+            collapseSettings()
+        }
+        if isSearchFieldActive || !searchField.isHidden {
+            collapseSearchField()
+            searchField.isHidden = true
+            searchField.alphaValue = 0.0
+            window?.makeFirstResponder(nil)
+        }
+        cancelLiveSearch()
+        hideSearchResultsPanel()
+
+        isHeroArtworkExpanded = true
+        isHeroControlsHidden = false
+        activeSettingsMode = .visual
+        settingsContainerView.isHidden = true
+
+        // Clean & fast hero player: hide top-right stack, library and search buttons
+        topRightStack.isHidden = true
+        addToPlaylistButton.isHidden = true
+        searchIconButton.isHidden = true
+        controlsStack.spacing = 16
+
+        textStack.alphaValue = 1.0
+        waveformProgressView.alphaValue = 1.0
+        controlsStack.alphaValue = 1.0
+
+        let current = NowPlayingManager.shared.currentState
+        if !heroLyricsView.hasLyrics && !current.title.isEmpty {
+            if let cached = LyricsManager.shared.getCachedLRCLines(trackID: current.trackID, title: current.title, artist: current.artist, duration: current.duration), !cached.isEmpty {
+                heroLyricsView.setLyrics(cached)
+            }
+        }
+
+        updateVisualStageContent(state: current)
+        delegate?.dynamicIslandDidToggleVisualStage(isActive: true, hostView: heroWebHostView)
+        delegate?.dynamicIslandDidToggleExpanded(expanded: true)
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.28
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            context.allowsImplicitAnimation = true
+
+            NSLayoutConstraint.deactivate(self.collapsedHeroConstraints)
+            NSLayoutConstraint.activate(self.expandedHeroConstraints)
+            self.heroIdleBottomConstraint?.isActive = false
+            self.heroExpandedBottomConstraint?.isActive = true
+
+            self.heroVisualContainer.animator().layer?.cornerRadius = 20
+            self.containerPill.layoutSubtreeIfNeeded()
+        }
+
+        updateArtworkHighlight()
+        lastMouseScreenLocation = NSEvent.mouseLocation
+        startHeroIdleTimer()
+    }
+
+    public func collapseHeroStage() {
+        guard isHeroArtworkExpanded else { return }
+        isHeroArtworkExpanded = false
+        stopHeroIdleTimer()
+        if isHeroControlsHidden {
+            isHeroControlsHidden = false
+            self.heroIdleBottomConstraint?.isActive = false
+        }
+        self.textStack.alphaValue = 1.0
+        self.waveformProgressView.alphaValue = 1.0
+        self.controlsStack.alphaValue = 1.0
+
+        heroLyricsView.stopTimer()
         activeSettingsMode = .preferences
+
+        // Ensure search bar and live search results are cleanly reset
+        if isSearchFieldActive || !searchField.isHidden {
+            collapseSearchField()
+            searchField.isHidden = true
+            searchField.alphaValue = 0.0
+        }
+        hideSearchResultsPanel()
+
+        // Restore secondary buttons for compact pill player
+        topRightStack.isHidden = false
+        addToPlaylistButton.isHidden = false
+        searchIconButton.isHidden = false
+        controlsStack.spacing = 7
+
+        delegate?.dynamicIslandDidToggleVisualStage(isActive: false, hostView: nil)
+        delegate?.dynamicIslandDidToggleExpanded(expanded: false)
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.28
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            context.allowsImplicitAnimation = true
+
+            NSLayoutConstraint.deactivate(self.expandedHeroConstraints)
+            self.heroExpandedBottomConstraint?.isActive = false
+            self.heroIdleBottomConstraint?.isActive = false
+            NSLayoutConstraint.activate(self.collapsedHeroConstraints)
+
+            self.heroVisualContainer.animator().layer?.cornerRadius = 8
+            self.updateVisualStageContent(state: NowPlayingManager.shared.currentState)
+            self.containerPill.layoutSubtreeIfNeeded()
+        }
+
+        updateArtworkHighlight()
+    }
+
+    public func startHeroIdleTimer() {
+        stopHeroIdleTimer()
+        guard isHeroArtworkExpanded else { return }
+        let timer = Timer(timeInterval: 10.0, repeats: false) { [weak self] _ in
+            guard let self = self, self.isHeroArtworkExpanded else { return }
+            self.setHeroControlsHidden(true, animated: true)
+        }
+        heroIdleTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    public func stopHeroIdleTimer() {
+        heroIdleTimer?.invalidate()
+        heroIdleTimer = nil
+    }
+
+    public func resetHeroIdleTimer() {
+        guard isHeroArtworkExpanded else { return }
+        startHeroIdleTimer()
+    }
+
+    public func setHeroControlsHidden(_ hidden: Bool, animated: Bool) {
+        guard isHeroArtworkExpanded else { return }
+        guard isHeroControlsHidden != hidden else { return }
+        isHeroControlsHidden = hidden
+
+        let duration: TimeInterval = animated ? 0.28 : 0.0
+
+        if hidden {
+            self.lastMouseScreenLocation = NSEvent.mouseLocation
+            self.heroExpandedBottomConstraint?.isActive = false
+            self.heroIdleBottomConstraint?.isActive = true
+        } else {
+            self.heroIdleBottomConstraint?.isActive = false
+            self.heroExpandedBottomConstraint?.isActive = true
+        }
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = duration
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            context.allowsImplicitAnimation = true
+
+            let targetAlpha: CGFloat = hidden ? 0.0 : 1.0
+            self.textStack.animator().alphaValue = targetAlpha
+            self.waveformProgressView.animator().alphaValue = targetAlpha
+            self.controlsStack.animator().alphaValue = targetAlpha
+
+            self.containerPill.layoutSubtreeIfNeeded()
+        }
+
+        delegate?.dynamicIslandDidToggleHeroIdle(isIdle: hidden)
+    }
+
+    func handleHeroMouseActivity(force: Bool = false) {
+        guard isHeroArtworkExpanded else { return }
+        let currentMouse = NSEvent.mouseLocation
+        let dx = abs(currentMouse.x - lastMouseScreenLocation.x)
+        let dy = abs(currentMouse.y - lastMouseScreenLocation.y)
+
+        if !force {
+            guard dx > 1.0 || dy > 1.0 else { return }
+        }
+        lastMouseScreenLocation = currentMouse
+
+        if isHeroControlsHidden {
+            setHeroControlsHidden(false, animated: true)
+        }
+        startHeroIdleTimer()
+    }
+
+    func updateArtworkHighlight() {
+        let isActive = isHeroArtworkExpanded
+        if isActive {
+            heroVisualContainer.layer?.borderColor = NSColor.clear.cgColor
+            heroVisualContainer.layer?.borderWidth = 0.0
+            containerPill.layer?.borderWidth = 0.0
+            containerPill.layer?.borderColor = NSColor.clear.cgColor
+        } else {
+            heroVisualContainer.layer?.borderColor = NSColor.clear.cgColor
+            heroVisualContainer.layer?.borderWidth = 0.0
+            containerPill.layer?.borderWidth = 1.0
+            containerPill.layer?.borderColor = NSColor(white: 1.0, alpha: 0.15).cgColor
+        }
+    }
+
+    public func expandPreferences() {
+        if isHeroArtworkExpanded {
+            collapseHeroStage()
+        }
+        activeSettingsMode = .preferences
+        updateArtworkHighlight()
         settingsContainerHeightConstraint?.constant = 272
         showMainSettingsView()
         expandSettingsPanel()
     }
 
     public func expandAddToPlaylist() {
+        if isHeroArtworkExpanded {
+            collapseHeroStage()
+        }
         activeSettingsMode = .playlist
+        updateArtworkHighlight()
         settingsContainerHeightConstraint?.constant = 305
         showAddToPlaylistSubView()
         expandSettingsPanel()
+        if activeLibraryTab == .upNext {
+            ensureUpNextLive()
+        }
     }
 
     func expandSettingsPanel() {
         if isSettingsExpanded {
+            updateArtworkHighlight()
             updateBrowserButtonColor()
             updateAddToPlaylistButtonColor()
             updateSettingsThemeHighlight()
+            delegate?.dynamicIslandDidToggleExpanded(expanded: true)
             return
         }
         isSettingsExpanded = true
+        updateArtworkHighlight()
         updateBrowserButtonColor()
         updateAddToPlaylistButtonColor()
         updateSettingsThemeHighlight()
@@ -1280,12 +1670,18 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     }
 
     @objc func offlineLibraryTapped() {
+        if isHeroArtworkExpanded {
+            collapseHeroStage()
+        }
         collapseSettings()
         delegate?.dynamicIslandDidTapOfflineLibrary()
     }
 
     @objc func fullScreenTapped() {
         fullScreenButton.animatePop()
+        if isHeroArtworkExpanded {
+            collapseHeroStage()
+        }
         collapseSettings()
         delegate?.dynamicIslandDidTapWebBrowser()
     }
@@ -1328,14 +1724,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         }
     }
 
-    @objc func resetPositionTapped() {
-        resetPositionButton.animateSpinPop()
-        delegate?.dynamicIslandDidTapResetPosition()
-    }
-    
-    public func setResetPositionButtonHidden(_ isHidden: Bool) {
-        resetPositionButton.isHidden = true
-    }
+    public func setResetPositionButtonHidden(_ isHidden: Bool) {}
 
     public override func resetCursorRects() {
         super.resetCursorRects()
@@ -1343,6 +1732,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
     }
 
     public override func mouseDown(with event: NSEvent) {
+        handleHeroMouseActivity(force: true)
         if event.clickCount == 2 {
             if isSettingsExpanded && activeSettingsMode == .preferences {
                 collapseSettings()
@@ -1372,6 +1762,43 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         } else {
             super.mouseDown(with: event)
         }
+    }
+
+    public override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let existing = heroTrackingArea {
+            removeTrackingArea(existing)
+        }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        heroTrackingArea = area
+    }
+
+    public override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        handleHeroMouseActivity()
+    }
+
+    public override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        handleHeroMouseActivity()
+    }
+
+    public override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        if isHeroArtworkExpanded && !isHeroControlsHidden {
+            startHeroIdleTimer()
+        }
+    }
+
+    public override func mouseDragged(with event: NSEvent) {
+        super.mouseDragged(with: event)
+        handleHeroMouseActivity(force: true)
     }
 
     public override var acceptsFirstResponder: Bool {
@@ -1409,7 +1836,6 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         super.layout()
         glassSheenLayer.frame = containerPill.bounds
         cylindricalLensLayer.frame = containerPill.bounds
-        liquidFluidMeshLayer.frame = containerPill.bounds
     }
 
     public override func viewDidChangeEffectiveAppearance() {
@@ -1426,8 +1852,41 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
 
 final class PillContainerView: NSView {
     var onBackgroundClick: (() -> Void)?
+    var onMouseMove: (() -> Void)?
+    private var trackingArea: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let existing = trackingArea {
+            removeTrackingArea(existing)
+        }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        trackingArea = area
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        onMouseMove?()
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        onMouseMove?()
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        super.mouseDragged(with: event)
+        onMouseMove?()
+    }
 
     override func mouseDown(with event: NSEvent) {
+        onMouseMove?()
         let localPoint = convert(event.locationInWindow, from: nil)
         if hitTest(localPoint) == self {
             onBackgroundClick?()

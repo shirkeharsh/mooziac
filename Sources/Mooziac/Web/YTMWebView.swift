@@ -144,6 +144,7 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
     /// so a full page reload (e.g. crash recovery) can't silently reset browse mode back to
     /// stripped-down compact styling.
     private var isCompactModeEnabled = true
+    private var isDrawerVideoModeEnabled = false
 
     public func setCompactModeEnabled(_ enabled: Bool) {
         isCompactModeEnabled = enabled
@@ -152,7 +153,23 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
             completionHandler: nil
         )
     }
-    
+
+    public func setDrawerVideoModeEnabled(_ enabled: Bool) {
+        isDrawerVideoModeEnabled = enabled
+        if #available(macOS 12.0, *) {
+            webView.underPageBackgroundColor = .clear
+        }
+        webView.setValue(false, forKey: "drawsBackground")
+        webView.evaluateJavaScript(
+            "window.__mooziacSetDrawerVideoMode && window.__mooziacSetDrawerVideoMode(\(enabled));",
+            completionHandler: nil
+        )
+    }
+
+    public func setVisualDrawerModeEnabled(_ enabled: Bool) {
+        setDrawerVideoModeEnabled(enabled)
+    }
+
     // MARK: - WebContent crash recovery state
     private var isRecoveringFromTermination = false
     private var recoveryVideoId = ""
@@ -408,6 +425,205 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
             object-fit: contain !important;
             border-radius: 8px !important;
         }
+
+        /* Drawer Video Mode: view-only isolated video / artwork display in expanded island */
+        html.mooziac-drawer-video {
+            background: transparent !important;
+            overflow: hidden !important;
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+        }
+        html.mooziac-drawer-video body {
+            background: transparent !important;
+            overflow: hidden !important;
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+        }
+        html.mooziac-drawer-video ytmusic-app-layout,
+        html.mooziac-drawer-video ytmusic-player-page,
+        html.mooziac-drawer-video #main-panel,
+        html.mooziac-drawer-video ytmusic-player#player,
+        html.mooziac-drawer-video #player {
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            z-index: 1000 !important;
+            background: transparent !important;
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+            pointer-events: none !important;
+        }
+        html.mooziac-drawer-video #song-video,
+        html.mooziac-drawer-video #player-video,
+        html.mooziac-drawer-video .html5-video-player {
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+            pointer-events: none !important;
+            z-index: 1001 !important;
+            background: transparent !important;
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+            overflow: hidden !important;
+        }
+        html.mooziac-drawer-video video {
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            object-fit: cover !important;
+            transform: scale(1.06) !important;
+            transform-origin: center center !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+            pointer-events: none !important;
+            z-index: 1002 !important;
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+        }
+        /* The video player can briefly re-create its scrubber while buffering or
+           after a track transition. Hide the progress controls themselves as
+           well as the surrounding chrome so they cannot flash through the
+           view-only artwork stage. */
+        html.mooziac-drawer-video .ytp-progress-bar-container,
+        html.mooziac-drawer-video .ytp-progress-bar,
+        html.mooziac-drawer-video .ytp-progress-list,
+        html.mooziac-drawer-video .ytp-load-progress,
+        html.mooziac-drawer-video .ytp-play-progress,
+        html.mooziac-drawer-video .ytp-hover-progress,
+        html.mooziac-drawer-video .ytp-scrubber-container,
+        html.mooziac-drawer-video .ytp-chapter-hover-container,
+        html.mooziac-drawer-video video::-webkit-media-controls,
+        html.mooziac-drawer-video video::-webkit-media-controls-panel,
+        html.mooziac-drawer-video video::-webkit-media-controls-timeline {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+        }
+        html.mooziac-drawer-video #song-image,
+        html.mooziac-drawer-video .song-image {
+            display: flex !important;
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+            pointer-events: none !important;
+            z-index: 1000 !important;
+            align-items: center !important;
+            justify-content: center !important;
+            background: transparent !important;
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+        }
+        html.mooziac-drawer-video #song-image #img,
+        html.mooziac-drawer-video #song-image img,
+        html.mooziac-drawer-video .song-image img {
+            display: block !important;
+            margin: auto !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
+            object-fit: contain !important;
+            border-radius: 8px !important;
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+            pointer-events: none !important;
+        }
+        html.mooziac-drawer-video.mooziac-drawer-has-video #song-image,
+        html.mooziac-drawer-video.mooziac-drawer-has-video .song-image {
+            display: none !important;
+        }
+        html.mooziac-drawer-video ytmusic-nav-bar,
+        html.mooziac-drawer-video ytmusic-player-bar,
+        html.mooziac-drawer-video ytmusic-player-controls,
+        html.mooziac-drawer-video ytmusic-player-controls-renderer,
+        html.mooziac-drawer-video ytmusic-wiz-player-controls,
+        html.mooziac-drawer-video ytmusic-miniplayer,
+        html.mooziac-drawer-video #player-controls,
+        html.mooziac-drawer-video .player-controls,
+        html.mooziac-drawer-video #player ytmusic-player-controls,
+        html.mooziac-drawer-video #player ytmusic-player-controls-renderer,
+        html.mooziac-drawer-video #player #player-controls,
+        html.mooziac-drawer-video #player #controls,
+        html.mooziac-drawer-video #player .middle-controls,
+        html.mooziac-drawer-video #player .middle-controls-buttons,
+        html.mooziac-drawer-video #player [slot="player-controls"],
+        html.mooziac-drawer-video #player #hover-elements,
+        html.mooziac-drawer-video #player .hover-elements,
+        html.mooziac-drawer-video #player .song-media-controls,
+        html.mooziac-drawer-video #player #song-media-controls,
+        html.mooziac-drawer-video #player .controls-overlay,
+        html.mooziac-drawer-video #player ytmusic-menu-renderer,
+        html.mooziac-drawer-video #player #play-pause-button,
+        html.mooziac-drawer-video #player .play-pause-button,
+        html.mooziac-drawer-video #player .previous-button,
+        html.mooziac-drawer-video #player .next-button,
+        html.mooziac-drawer-video #player .shuffle-button,
+        html.mooziac-drawer-video #player .repeat-button,
+        html.mooziac-drawer-video #player .top-row-buttons,
+        html.mooziac-drawer-video #player .bottom-row-buttons,
+        html.mooziac-drawer-video #player #top-row,
+        html.mooziac-drawer-video #player #bottom-row,
+        html.mooziac-drawer-video #player #scrim,
+        html.mooziac-drawer-video #player .scrim,
+        html.mooziac-drawer-video #player #overlay,
+        html.mooziac-drawer-video #player .overlay,
+        html.mooziac-drawer-video ytmusic-guide-renderer,
+        html.mooziac-drawer-video #nav-bar-background,
+        html.mooziac-drawer-video ytmusic-app-layout > [slot="nav-bar"],
+        html.mooziac-drawer-video ytmusic-app-layout > [slot="player-bar"],
+        html.mooziac-drawer-video ytmusic-player-page #top-row,
+        html.mooziac-drawer-video ytmusic-player-page .top-bar-buttons,
+        html.mooziac-drawer-video ytmusic-player-page #action-bar,
+        html.mooziac-drawer-video ytmusic-player-page #action-buttons,
+        html.mooziac-drawer-video ytmusic-player-page yt-icon-button,
+        html.mooziac-drawer-video ytmusic-player-page .collapse-button,
+        html.mooziac-drawer-video ytmusic-player-page .fullscreen-button,
+        html.mooziac-drawer-video ytmusic-player-page ytmusic-menu-renderer,
+        html.mooziac-drawer-video ytmusic-player-page .menu,
+        html.mooziac-drawer-video ytmusic-player-page #menu,
+        html.mooziac-drawer-video #collapse-button,
+        html.mooziac-drawer-video .collapse-button,
+        html.mooziac-drawer-video .dropdown-button,
+        html.mooziac-drawer-video #dropdown-button,
+        html.mooziac-drawer-video ytmusic-player > *:not(#song-image):not(#song-video):not(#player-video):not(.html5-video-player):not(video),
+        html.mooziac-drawer-video #player > *:not(#song-image):not(#song-video):not(#player-video):not(.html5-video-player):not(video),
+        html.mooziac-drawer-video .ytp-chrome-top,
+        html.mooziac-drawer-video .ytp-chrome-bottom,
+        html.mooziac-drawer-video .ytp-gradient-top,
+        html.mooziac-drawer-video .ytp-gradient-bottom,
+        html.mooziac-drawer-video .ytp-pause-overlay,
+        html.mooziac-drawer-video .ytp-ce-element,
+        html.mooziac-drawer-video .ytp-cards-teaser,
+        html.mooziac-drawer-video #player-ads,
+        html.mooziac-drawer-video ytmusic-mealbar-promo-renderer,
+        html.mooziac-drawer-video #side-panel,
+        html.mooziac-drawer-video #cinematics,
+        html.mooziac-drawer-video .background-gradient,
+        html.mooziac-drawer-video #background-gradient {
+            display: none !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+            opacity: 0 !important;
+        }
         """
         // JSON-encode the CSS so the injected JS string literal is always valid
         // (multi-line CSS embedded directly would break the script).
@@ -431,6 +647,34 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
             window.__mooziacSetCompactMode = function(enabled) {
                 document.documentElement.classList.toggle('mooziac-compact', !!enabled);
             };
+            function checkDrawerVideo() {
+                if (!document.documentElement.classList.contains('mooziac-drawer-video')) return;
+                const video = document.querySelector('video');
+                if (video) {
+                    if (video.videoWidth > 0 && video.videoHeight > 0) {
+                        document.documentElement.classList.add('mooziac-drawer-has-video');
+                    } else if (video.readyState >= 2 && video.videoWidth === 0) {
+                        document.documentElement.classList.remove('mooziac-drawer-has-video');
+                    }
+                }
+            }
+            window.__mooziacSetDrawerVideoMode = function(enabled) {
+                if (enabled) {
+                    document.documentElement.classList.remove('mooziac-compact');
+                    document.documentElement.classList.add('mooziac-drawer-video');
+                    checkDrawerVideo();
+                } else {
+                    document.documentElement.classList.remove('mooziac-drawer-video');
+                    document.documentElement.classList.remove('mooziac-drawer-has-video');
+                }
+            };
+            ['loadedmetadata', 'loadeddata', 'canplay', 'playing', 'timeupdate', 'resize'].forEach(function(evt) {
+                document.addEventListener(evt, function(event) {
+                    if (event.target && event.target.tagName === 'VIDEO') {
+                        checkDrawerVideo();
+                    }
+                }, true);
+            });
             """,
             injectionTime: .atDocumentEnd,
             forMainFrameOnly: true
@@ -586,6 +830,12 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
     }
     
     private func setupViews() {
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.clear.cgColor
+        webView.setValue(false, forKey: "drawsBackground")
+        if #available(macOS 12.0, *) {
+            webView.underPageBackgroundColor = .clear
+        }
         webView.translatesAutoresizingMaskIntoConstraints = false
         progressView.translatesAutoresizingMaskIntoConstraints = false
         progressView.style = .bar
@@ -689,7 +939,11 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         // Re-assert the current compact/browse mode: the injected script defaults every fresh
         // document to compact styling, which would incorrectly re-strip the page if this
         // navigation happened while the user already had the browse window open.
-        setCompactModeEnabled(isCompactModeEnabled)
+        if isDrawerVideoModeEnabled {
+            setDrawerVideoModeEnabled(true)
+        } else {
+            setCompactModeEnabled(isCompactModeEnabled)
+        }
         LikedSongsManager.shared.refreshSignInStatus()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             self?.progressView.isHidden = true

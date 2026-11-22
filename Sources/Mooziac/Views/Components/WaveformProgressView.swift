@@ -58,10 +58,10 @@ class InteractiveWaveformProgressView: NSView {
     
     private func startWaveAnimation() {
         stopWaveAnimation()
-        guard let window = self.window, window.isVisible, !self.isHidden else { return }
-        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.12, repeats: true) { [weak self] _ in
+        guard let window = self.window, window.isVisible, !self.isHidden, window.occlusionState.contains(.visible) else { return }
+        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.20, repeats: true) { [weak self] _ in
             guard let self = self else { return }
-            guard let window = self.window, window.isVisible, !self.isHidden else {
+            guard let window = self.window, window.isVisible, !self.isHidden, window.occlusionState.contains(.visible) else {
                 self.stopWaveAnimation()
                 return
             }
@@ -80,6 +80,22 @@ class InteractiveWaveformProgressView: NSView {
     
     var accentColor: NSColor = NSColor(red: 0.98, green: 0.25, blue: 0.35, alpha: 1.0) {
         didSet { needsDisplay = true }
+    }
+    
+    var unplayedColor: NSColor? {
+        didSet { needsDisplay = true }
+    }
+
+    private var effectiveUnplayedColor: NSColor {
+        if let custom = unplayedColor {
+            return custom
+        }
+        let design = PlayerDesign.current
+        if design == .glassMode || (design == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance) {
+            // Elegant distinct greyish bars for frosted / light themes so it never looks blank
+            return NSColor(red: 0.34, green: 0.36, blue: 0.40, alpha: 0.42)
+        }
+        return NSColor(white: 1.0, alpha: 0.20)
     }
     
     private var trackingArea: NSTrackingArea?
@@ -237,7 +253,7 @@ class InteractiveWaveformProgressView: NSView {
                 let baseH = baseHeights[i]
                 var dynamicH = baseH
                 if isPlaying {
-                    let waveOffset = sin(wavePhase + Double(i) * 0.4) * 0.20
+                    let waveOffset = sin(wavePhase + Double(i) * 0.4) * 0.12
                     dynamicH = max(0.20, min(1.0, baseH + CGFloat(waveOffset)))
                 }
                 
@@ -249,7 +265,9 @@ class InteractiveWaveformProgressView: NSView {
                 let path = CGPath(roundedRect: rect, cornerWidth: barW / 2.0, cornerHeight: barW / 2.0, transform: nil)
                 
                 let isBarActive = (Double(x + barW) / Double(bounds.width)) <= activeRatio
-                let fillColor = isBarActive ? accentColor : NSColor(white: 1.0, alpha: 0.20)
+                let fillColor = isBarActive
+                    ? accentColor.usingColorSpace(.deviceRGB)?.blended(withFraction: 0.10, of: .white) ?? accentColor
+                    : effectiveUnplayedColor
                 
                 ctx.setFillColor(fillColor.cgColor)
                 ctx.addPath(path)
@@ -260,7 +278,7 @@ class InteractiveWaveformProgressView: NSView {
             let trackH: CGFloat = 4.5
             let y = (bounds.height - trackH) / 2.0
             
-            ctx.setFillColor(NSColor(white: 1.0, alpha: 0.16).cgColor)
+            ctx.setFillColor(effectiveUnplayedColor.withAlphaComponent(0.35).cgColor)
             let bgRect = CGRect(x: 0, y: y, width: bounds.width, height: trackH)
             let bgPath = CGPath(roundedRect: bgRect, cornerWidth: trackH / 2.0, cornerHeight: trackH / 2.0, transform: nil)
             ctx.addPath(bgPath)
@@ -317,7 +335,7 @@ class InteractiveWaveformProgressView: NSView {
                 }
                 
                 let rect = CGRect(x: nodeX - radius, y: centerY - radius, width: radius * 2, height: radius * 2)
-                let color = isActive ? accentColor : NSColor(white: 1.0, alpha: 0.25)
+                let color = isActive ? accentColor : effectiveUnplayedColor
                 ctx.setFillColor(color.cgColor)
                 ctx.addEllipse(in: rect)
                 ctx.fillPath()
@@ -327,7 +345,7 @@ class InteractiveWaveformProgressView: NSView {
             let trackH: CGFloat = 2.5
             let y = (bounds.height - trackH) / 2.0
             
-            ctx.setFillColor(NSColor(white: 1.0, alpha: 0.18).cgColor)
+            ctx.setFillColor(effectiveUnplayedColor.withAlphaComponent(0.35).cgColor)
             let bgRect = CGRect(x: 0, y: y, width: bounds.width, height: trackH)
             let bgPath = CGPath(roundedRect: bgRect, cornerWidth: 1.25, cornerHeight: 1.25, transform: nil)
             ctx.addPath(bgPath)
