@@ -48,8 +48,8 @@ jobs:
       - name: Verify Universal Binary Architectures
         run: |
           lipo -info dist/staging/Mooziac.app/Contents/MacOS/Mooziac
-          lipo -verify_arch arm64 dist/staging/Mooziac.app/Contents/MacOS/Mooziac
-          lipo -verify_arch x86_64 dist/staging/Mooziac.app/Contents/MacOS/Mooziac
+          lipo dist/staging/Mooziac.app/Contents/MacOS/Mooziac -verify_arch arm64
+          lipo dist/staging/Mooziac.app/Contents/MacOS/Mooziac -verify_arch x86_64
 
       - name: Upload macOS Universal Artifacts
         uses: actions/upload-artifact@v4

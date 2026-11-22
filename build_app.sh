@@ -147,8 +147,8 @@ fi
 echo "    Architectures in binary:"
 lipo -info "$BIN_PATH" || true
 if [ "$REQUIRE_UNIVERSAL" = true ]; then
-    lipo -verify_arch arm64 "$BIN_PATH"
-    lipo -verify_arch x86_64 "$BIN_PATH"
+    lipo "$BIN_PATH" -verify_arch arm64
+    lipo "$BIN_PATH" -verify_arch x86_64
 fi
 
 echo "[3/7] Assembling $APP_NAME bundle..."
