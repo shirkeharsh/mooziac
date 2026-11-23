@@ -147,7 +147,8 @@
 - Pure Swift 5.9 and AppKit with zero third-party runtime dependencies
 - Under 50 MB RAM footprint (compared to 1 GB+ for Electron apps)
 - Zero telemetry: no analytics SDKs, trackers, or crash reporters
-- Credentials isolated inside Apple's sandboxed WKWebsiteDataStore
+- Hardened Runtime enabled with protected executable memory
+- Credentials securely isolated inside Apple's WKWebsiteDataStore
 - Native Discord Rich Presence via Unix domain socket (zero dependencies)
 
 </td>
@@ -174,6 +175,14 @@ Most desktop players are heavy Electron wrappers that bundle a full Chromium bro
 | **Media Keys** | **Native macOS NowPlaying integration** | Requires active browser focus |
 | **Discord Status** | **Native Unix socket (0 dependencies)** | Third-party plugin required |
 | **Privacy & Telemetry** | **100% Local-First (Zero tracking SDKs)** | Extensive Google tracking |
+
+---
+
+## Security & Privacy
+
+- **Hardened Runtime Enabled:** In `Mooziac.entitlements`, Mooziac uses Apple's Hardened Runtime, which protects the app against code injection, memory tampering, and privilege escalation.
+- **Isolated WebKit Engine:** When loading YouTube Music, macOS automatically runs the `WKWebView` web content inside its own isolated Apple process, so YouTube's web scripts cannot access your personal files.
+- **Zero Telemetry / Zero Tracking:** All playlists, cache, and history are stored locally in an on-device SQLite database with zero external analytics servers.
 
 ---
 
@@ -297,7 +306,7 @@ Mooziac/
 │   ├── Managers/                         # Local SQLite3, YTMClient, synced lyrics, yt-dlp downloader
 │   ├── Models/                           # State representations, playlist records, audio configs
 │   ├── Views/                            # Dynamic Island player UI, waveform, floating lyrics HUD
-│   ├── Web/                              # Sandboxed WebKit bridge for YouTube Music streaming
+│   ├── Web/                              # WebKit bridge for YouTube Music streaming
 │   └── YouTube/                          # Native YouTube video player subsystem
 │       ├── Core/                         # MainVideoWindowController, VideoPlayerCoordinator
 │       ├── Database/                     # YouTubeDatabaseManager local watch history & likes
@@ -371,7 +380,7 @@ Mooziac/
 
 <details>
 <summary><b>Does Mooziac collect any personal data or listening history?</b></summary>
-<p>None. Mooziac features a zero-telemetry architecture: no analytics beacons, no tracking SDKs, and no crash reporters. Your listening history, playlists, and liked songs are saved solely in a local SQLite database on your Mac, and credentials remain sandboxed in Apple's official <code>WKWebsiteDataStore</code>.</p>
+<p>None. Mooziac features a zero-telemetry architecture: no analytics beacons, no tracking SDKs, and no crash reporters. Your listening history, playlists, and liked songs are saved solely in a local SQLite database on your Mac, and credentials remain securely isolated in Apple's official <code>WKWebsiteDataStore</code>.</p>
 </details>
 
 <details>
