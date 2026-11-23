@@ -264,6 +264,18 @@ extension StatusItemManager {
         )
         quickMenu.addItem(focusAudioRes.menuItem)
 
+        let shortcutsRes = makeCapsuleToggleMenuItem(
+            title: "Global Shortcuts",
+            isOn: GlobalHotKeyManager.shared.isEnabled,
+            onToggle: { enabled in
+                GlobalHotKeyManager.shared.isEnabled = enabled
+                CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(
+                    text: enabled ? "✓ Global Shortcuts: Enabled" : "Global Shortcuts: Disabled"
+                )
+            }
+        )
+        quickMenu.addItem(shortcutsRes.menuItem)
+
         let wakeRes = makeCapsuleToggleMenuItem(
             title: "Prevent Wake Auto-Play",
             isOn: NowPlayingManager.shared.isPreventAutoplayOnWakeEnabled,
@@ -623,6 +635,13 @@ extension StatusItemManager {
         sponsorItem.target = self
         menu.addItem(sponsorItem)
 
+        // Global Shortcuts toggle
+        let isShortcuts = GlobalHotKeyManager.shared.isEnabled
+        let shortcutsItem = NSMenuItem(title: "Global Shortcuts", action: #selector(toggleYouTubeGlobalShortcutsFromMenu(_:)), keyEquivalent: "")
+        shortcutsItem.state = isShortcuts ? .on : .off
+        shortcutsItem.target = self
+        menu.addItem(shortcutsItem)
+
         menu.addItem(NSMenuItem.separator())
 
         // Video Quality Submenu
@@ -726,5 +745,12 @@ extension StatusItemManager {
         guard let speed = sender.representedObject as? Double else { return }
         VideoPlayerCoordinator.shared.setPlaybackSpeed(speed)
         FloatingHUDWindowController.shared.showCustomTextOverlay(text: String(format: "Speed: %.2f×", speed))
+    }
+
+    @objc private func toggleYouTubeGlobalShortcutsFromMenu(_ sender: NSMenuItem) {
+        let newState = !GlobalHotKeyManager.shared.isEnabled
+        GlobalHotKeyManager.shared.isEnabled = newState
+        sender.state = newState ? .on : .off
+        FloatingHUDWindowController.shared.showCustomTextOverlay(text: newState ? "Global Shortcuts: Enabled" : "Global Shortcuts: Disabled")
     }
 }

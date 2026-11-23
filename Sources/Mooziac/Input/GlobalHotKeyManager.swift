@@ -5,14 +5,31 @@ import ApplicationServices
 public final class GlobalHotKeyManager {
     public static let shared = GlobalHotKeyManager()
     
+    public static let didChangeStateNotification = Notification.Name("GlobalHotKeyManagerDidChangeState")
+    
     private var eventMonitor: Any?
     private var localMonitor: Any?
     private var hotKeyRefs: [EventHotKeyRef?] = []
     private var eventHandler: EventHandlerRef?
     
+    public var isEnabled: Bool {
+        get { UserDefaults.standard.object(forKey: "YTM_globalShortcutsEnabled") as? Bool ?? true }
+        set {
+            guard isEnabled != newValue else { return }
+            UserDefaults.standard.set(newValue, forKey: "YTM_globalShortcutsEnabled")
+            if newValue {
+                startMonitoring()
+            } else {
+                stopMonitoring()
+            }
+            NotificationCenter.default.post(name: GlobalHotKeyManager.didChangeStateNotification, object: nil)
+        }
+    }
+    
     private init() {}
     
     public func startMonitoring() {
+        guard isEnabled else { return }
         registerCarbonHotKeys()
         registerNSEventMonitors()
     }
@@ -107,6 +124,7 @@ public final class GlobalHotKeyManager {
     
     @discardableResult
     private func handleKeyEvent(_ event: NSEvent) -> Bool {
+        guard isEnabled else { return false }
         let modifierFlags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let isControlOption = modifierFlags.contains([.control, .option])
         let isCmdShift = modifierFlags.contains([.command, .shift])

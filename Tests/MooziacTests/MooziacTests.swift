@@ -6,6 +6,26 @@ final class MooziacTests: XCTestCase {
         XCTAssertTrue(true)
     }
 
+    func testGlobalShortcutsToggle() {
+        let initial = GlobalHotKeyManager.shared.isEnabled
+        var notificationFired = false
+        let observer = NotificationCenter.default.addObserver(
+            forName: GlobalHotKeyManager.didChangeStateNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            notificationFired = true
+        }
+
+        GlobalHotKeyManager.shared.isEnabled = !initial
+        XCTAssertEqual(GlobalHotKeyManager.shared.isEnabled, !initial)
+        XCTAssertTrue(notificationFired)
+
+        // Restore
+        GlobalHotKeyManager.shared.isEnabled = initial
+        NotificationCenter.default.removeObserver(observer)
+    }
+
     func testKeyboardSeekModifiers() {
         var capturedOverlay = ""
 
