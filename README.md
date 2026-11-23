@@ -4,8 +4,6 @@
   <img src="assets/banner5.png" alt="Mooziac Banner" width="100%">
 </a>
 
-# Mooziac
-
 **The native desktop YouTube Music & 4K video client for macOS. Swift + AppKit, SponsorBlock, zero Electron.**
 
 <p align="center">
