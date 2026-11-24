@@ -392,10 +392,18 @@ public final class HeroLyricsView: NSView {
         pStyle.alignment = .center
         pStyle.lineBreakMode = .byWordWrapping
 
+        let sharpShadow = NSShadow()
+        sharpShadow.shadowColor = NSColor.black.withAlphaComponent(0.85)
+        sharpShadow.shadowBlurRadius = 2.5
+        sharpShadow.shadowOffset = CGSize(width: 0, height: -1.0)
+
         guard !words.isEmpty else {
             let attrs: [NSAttributedString.Key: Any] = [
                 .font: activeFont,
                 .foregroundColor: NSColor(white: 1.0, alpha: 0.98),
+                .shadow: sharpShadow,
+                .strokeColor: NSColor.black.withAlphaComponent(0.70),
+                .strokeWidth: -1.5,
                 .paragraphStyle: pStyle
             ]
             return NSAttributedString(string: line.text, attributes: attrs)
@@ -403,35 +411,30 @@ public final class HeroLyricsView: NSView {
 
         let attrString = NSMutableAttributedString()
         let accent = currentAccentColor
-        let highlightColor = accent.blended(withFraction: 0.55, of: .white) ?? NSColor(white: 1.0, alpha: 1.0)
+        let highlightColor = accent.blended(withFraction: 0.82, of: .white) ?? NSColor.white
         let sungColor = NSColor(white: 1.0, alpha: 0.98)
-        let upcomingColor = NSColor(white: 1.0, alpha: 0.42)
-
-        let glowShadow = NSShadow()
-        glowShadow.shadowColor = accent.withAlphaComponent(0.85)
-        glowShadow.shadowBlurRadius = 10
-        glowShadow.shadowOffset = CGSize(width: 0, height: 0)
-
-        let subtleShadow = NSShadow()
-        subtleShadow.shadowColor = NSColor.black.withAlphaComponent(0.50)
-        subtleShadow.shadowBlurRadius = 3
-        subtleShadow.shadowOffset = CGSize(width: 0, height: -1)
+        let upcomingColor = NSColor(white: 1.0, alpha: 0.45)
 
         for (idx, w) in words.enumerated() {
             let wordStr = (idx == words.count - 1) ? w.text : "\(w.text) "
             var attrs: [NSAttributedString.Key: Any] = [
                 .font: activeFont,
-                .paragraphStyle: pStyle
+                .paragraphStyle: pStyle,
+                .shadow: sharpShadow,
+                .strokeColor: NSColor.black.withAlphaComponent(0.65),
+                .strokeWidth: -1.5
             ]
 
             if idx < activeWordIndex {
                 attrs[.foregroundColor] = sungColor
-                attrs[.shadow] = subtleShadow
             } else if idx == activeWordIndex {
                 attrs[.foregroundColor] = highlightColor
-                attrs[.shadow] = glowShadow
+                attrs[.strokeColor] = NSColor.black.withAlphaComponent(0.85)
+                attrs[.strokeWidth] = -2.0
             } else {
                 attrs[.foregroundColor] = upcomingColor
+                attrs[.strokeColor] = NSColor.black.withAlphaComponent(0.40)
+                attrs[.strokeWidth] = -1.0
             }
 
             attrString.append(NSAttributedString(string: wordStr, attributes: attrs))
@@ -443,15 +446,17 @@ public final class HeroLyricsView: NSView {
     private func buildInstrumentalAttributedLyric() -> NSAttributedString {
         let pStyle = NSMutableParagraphStyle()
         pStyle.alignment = .center
-        let glowShadow = NSShadow()
-        glowShadow.shadowColor = currentAccentColor.withAlphaComponent(0.85)
-        glowShadow.shadowBlurRadius = 12
-        glowShadow.shadowOffset = CGSize(width: 0, height: 0)
+        let sharpShadow = NSShadow()
+        sharpShadow.shadowColor = NSColor.black.withAlphaComponent(0.85)
+        sharpShadow.shadowBlurRadius = 2.5
+        sharpShadow.shadowOffset = CGSize(width: 0, height: -1.0)
 
         let attrs: [NSAttributedString.Key: Any] = [
             .font: activeFont,
-            .foregroundColor: currentAccentColor.blended(withFraction: 0.5, of: .white) ?? NSColor.white,
-            .shadow: glowShadow,
+            .foregroundColor: NSColor.white,
+            .shadow: sharpShadow,
+            .strokeColor: NSColor.black.withAlphaComponent(0.70),
+            .strokeWidth: -1.5,
             .paragraphStyle: pStyle
         ]
         return NSAttributedString(string: "♪ ♪ ♪", attributes: attrs)

@@ -27,4 +27,19 @@ final class StatusItemPanel: NSPanel {
     override var canBecomeMain: Bool {
         return true
     }
+
+    override func setFrameOrigin(_ newOrigin: NSPoint) {
+        guard let screen = self.screen ?? NSScreen.main else {
+            super.setFrameOrigin(newOrigin)
+            return
+        }
+        let scale = screen.backingScaleFactor
+        if scale > 0 {
+            let snappedX = round(newOrigin.x * scale) / scale
+            let snappedY = round(newOrigin.y * scale) / scale
+            super.setFrameOrigin(NSPoint(x: snappedX, y: snappedY))
+        } else {
+            super.setFrameOrigin(newOrigin)
+        }
+    }
 }

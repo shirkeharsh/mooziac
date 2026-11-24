@@ -4,6 +4,21 @@ All notable changes to Mooziac are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.2.5] - 2026-11-25
+
+### Added
+- Scrobbling Controls: Added native toggles for Last.fm and ListenBrainz in Quick Controls (right-click menu) with instant account connect and disconnect options.
+- Smart Scrobble Engine: Automatically cleans YouTube video clutter from track titles, ignores ads and early skips, and retries failed scrobbles when back online.
+- Launch at Login Toggle: Added a native toggle in Quick Controls that syncs directly with macOS Login Items.
+
+### Improved
+- Lyrics Text Contrast: Added subtle black border outlines to lyrics in the Hero visual stage for sharp readability across bright album covers.
+- Window Dragging: Smoothed out window movement to prevent edge outline jitter and flickering while repositioning the player.
+- Player Sizing & Transitions: Refined Hero view heights (176 pt idle / 304 pt with controls) and fixed browser view resets when exiting video playback.
+
+### Security
+- Cloudflare Serverless Proxy: Last.fm authentication and signing are routed through Cloudflare Pages proxy (https://mooziac.pages.dev/api/lastfm), eliminating hardcoded API keys and secrets from the client.
+
 ## [1.2.4] - 2026-11-23
 
 ### Added

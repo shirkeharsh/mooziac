@@ -65,6 +65,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         DiscordRPCManager.shared.startReconnectLoop()
         DiscordRPCManager.shared.tryConnect()
 
+        // Start Last.fm / ListenBrainz scrobbling
+        ScrobbleManager.shared.start()
+
         // Initialize menu bar status item & webview popover
         statusItemManager = StatusItemManager()
 

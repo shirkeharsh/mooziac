@@ -9,8 +9,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-APP_VERSION="1.2.4"
-APP_BUILD="24"
+APP_VERSION="1.2.5"
+APP_BUILD="25"
 APP_NAME="Mooziac.app"
 APP_BUNDLE_ID="app.mooziac.mac"
 APP_COPYRIGHT="Copyright © 2026 ThreeTen. All rights reserved."
@@ -223,6 +223,10 @@ cat << EOF > "$BUNDLE_DIR/Info.plist"
     <true/>
     <key>NSSupportsAutomaticGraphicsSwitching</key>
     <true/>
+    <key>LastFMAPIKey</key>
+    <string>${MOOZIAC_LASTFM_API_KEY:-""}</string>
+    <key>LastFMSharedSecret</key>
+    <string>${MOOZIAC_LASTFM_SECRET:-""}</string>
     <key>CFBundleURLTypes</key>
     <array>
         <dict>

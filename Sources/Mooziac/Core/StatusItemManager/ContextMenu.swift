@@ -135,6 +135,65 @@ extension StatusItemManager {
         menuItem.view = rowView
         return (menuItem, rowView.toggle)
     }
+
+    // MARK: Scrobbling (Quick Controls)
+
+    private func addScrobbleToggle(for provider: ScrobbleProvider, to menu: NSMenu) {
+        let manager = ScrobbleManager.shared
+        let connected = manager.isConnected(provider)
+
+        let toggleRes = makeCapsuleToggleMenuItem(
+            title: "\(provider.displayName) Scrobble",
+            isOn: connected && manager.isEnabled(provider),
+            onToggle: { enabled in
+                if enabled && !manager.isConnected(provider) {
+                    CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(
+                        text: "Connect \(provider.displayName) first"
+                    )
+                    ScrobbleConnectUI.connect(provider)
+                    return
+                }
+                manager.setEnabled(enabled, for: provider)
+                CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(
+                    text: enabled ? "✓ \(provider.displayName) Scrobbling: On" : "\(provider.displayName) Scrobbling: Off"
+                )
+            }
+        )
+        menu.addItem(toggleRes.menuItem)
+    }
+
+    private func addScrobbleAccountItems(for provider: ScrobbleProvider, to menu: NSMenu) {
+        let manager = ScrobbleManager.shared
+        let connected = manager.isConnected(provider)
+
+        if connected {
+            let name = manager.username(for: provider).map { " (@\($0))" } ?? ""
+            let status = NSMenuItem(title: "\(provider.displayName): Connected\(name)", action: nil, keyEquivalent: "")
+            status.isEnabled = false
+            menu.addItem(status)
+
+            let disconnect = NSMenuItem(title: "Disconnect \(provider.displayName)", action: #selector(disconnectScrobbleProviderFromMenu(_:)), keyEquivalent: "")
+            disconnect.target = self
+            disconnect.representedObject = provider.rawValue
+            menu.addItem(disconnect)
+        } else {
+            let connect = NSMenuItem(title: "Connect \(provider.displayName)…", action: #selector(connectScrobbleProviderFromMenu(_:)), keyEquivalent: "")
+            connect.target = self
+            connect.representedObject = provider.rawValue
+            menu.addItem(connect)
+        }
+    }
+
+    @objc private func connectScrobbleProviderFromMenu(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let provider = ScrobbleProvider(rawValue: raw) else { return }
+        ScrobbleConnectUI.connect(provider)
+    }
+
+    @objc private func disconnectScrobbleProviderFromMenu(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let provider = ScrobbleProvider(rawValue: raw) else { return }
+        ScrobbleManager.shared.disconnect(provider)
+        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "\(provider.displayName) disconnected")
+    }
     
     private func makeGestureMappingMenuItem(for gesture: GestureType) -> NSMenuItem {
         let parentItem = NSMenuItem(title: gesture.displayName, action: nil, keyEquivalent: "")
@@ -276,6 +335,28 @@ extension StatusItemManager {
         )
         quickMenu.addItem(shortcutsRes.menuItem)
 
+        let launchRes = makeCapsuleToggleMenuItem(
+            title: "Launch at Login",
+            isOn: LaunchAtLoginManager.isEnabled,
+            onToggle: { enabled in
+                if let error = LaunchAtLoginManager.setEnabled(enabled) {
+                    CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(
+                        text: "Launch at Login failed: \(error)"
+                    )
+                } else {
+                    CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(
+                        text: enabled ? "✓ Launch at Login: On" : "Launch at Login: Off"
+                    )
+                }
+            }
+        )
+        quickMenu.addItem(launchRes.menuItem)
+
+        quickMenu.addItem(NSMenuItem.separator())
+        addScrobbleToggle(for: .lastFM, to: quickMenu)
+        addScrobbleToggle(for: .listenBrainz, to: quickMenu)
+        quickMenu.addItem(NSMenuItem.separator())
+
         let wakeRes = makeCapsuleToggleMenuItem(
             title: "Prevent Wake Auto-Play",
             isOn: NowPlayingManager.shared.isPreventAutoplayOnWakeEnabled,
@@ -369,6 +450,12 @@ extension StatusItemManager {
         let resetLoginItem = NSMenuItem(title: "Reset Login…", action: #selector(confirmResetLoginFromMenu), keyEquivalent: "")
         resetLoginItem.target = self
         accountMenu.addItem(resetLoginItem)
+
+        accountMenu.addItem(NSMenuItem.separator())
+        addScrobbleAccountItems(for: .lastFM, to: accountMenu)
+        accountMenu.addItem(NSMenuItem.separator())
+        addScrobbleAccountItems(for: .listenBrainz, to: accountMenu)
+
         let accountParent = NSMenuItem(title: "Account & Sync", action: nil, keyEquivalent: "")
         accountParent.submenu = accountMenu
         menu.addItem(accountParent)

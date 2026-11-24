@@ -21,6 +21,13 @@ protocol DynamicIslandPlayerViewDelegate: AnyObject {
 }
 
 class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditingDelegate {
+    /// Height of the expanded artwork / video / lyrics frame (width stays the full 360 pt pill).
+    /// Lower = shorter frame, more of the video's top/bottom black bars are cropped.
+    /// Everything that sizes the window for the expanded view derives from this one value.
+    static let heroVisualHeight: CGFloat = 176
+    /// Height of everything below the frame (title, waveform, controls) while controls are visible.
+    static let heroControlsExtraHeight: CGFloat = 128
+
     weak var delegate: DynamicIslandPlayerViewDelegate?
     
     let containerPill = PillContainerView()
@@ -392,6 +399,8 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
         containerPill.layer?.masksToBounds = true
         containerPill.layer?.borderWidth = 1.0
         containerPill.layer?.borderColor = NSColor(white: 1.0, alpha: 0.15).cgColor
+        containerPill.layer?.allowsEdgeAntialiasing = true
+        containerPill.layer?.edgeAntialiasingMask = [.layerLeftEdge, .layerRightEdge, .layerTopEdge, .layerBottomEdge]
         containerPill.onBackgroundClick = { [weak self] in
             self?.collapseSettingsForOutsideClick()
         }
@@ -486,6 +495,12 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
             self?.handleHeroMouseActivity()
         }
         heroVisualContainer.addSubview(heroOverlayView)
+
+        heroAmbientImageView.layer?.zPosition = 4
+        heroWebHostView.layer?.zPosition = 2
+        artworkImageView.layer?.zPosition = 5
+        heroLyricsView.layer?.zPosition = 6
+        heroOverlayView.layer?.zPosition = 20
 
         NSLayoutConstraint.activate([
             heroAmbientImageView.topAnchor.constraint(equalTo: heroVisualContainer.topAnchor),
@@ -752,7 +767,7 @@ class DynamicIslandPlayerView: NSView, NSSearchFieldDelegate, NSControlTextEditi
             heroVisualContainer.leadingAnchor.constraint(equalTo: containerPill.leadingAnchor, constant: 0),
             heroVisualContainer.trailingAnchor.constraint(equalTo: containerPill.trailingAnchor, constant: 0),
             heroVisualContainer.topAnchor.constraint(equalTo: containerPill.topAnchor, constant: 0),
-            heroVisualContainer.heightAnchor.constraint(equalToConstant: 202),
+            heroVisualContainer.heightAnchor.constraint(equalToConstant: DynamicIslandPlayerView.heroVisualHeight),
 
             textStack.leadingAnchor.constraint(equalTo: containerPill.leadingAnchor, constant: 16),
             textStack.trailingAnchor.constraint(equalTo: containerPill.trailingAnchor, constant: -16),

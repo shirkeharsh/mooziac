@@ -148,6 +148,9 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
 
     public func setCompactModeEnabled(_ enabled: Bool) {
         isCompactModeEnabled = enabled
+        if !enabled {
+            isDrawerVideoModeEnabled = false
+        }
         webView.evaluateJavaScript(
             "window.__mooziacSetCompactMode && window.__mooziacSetCompactMode(\(enabled));",
             completionHandler: nil
@@ -156,10 +159,12 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
 
     public func setDrawerVideoModeEnabled(_ enabled: Bool) {
         isDrawerVideoModeEnabled = enabled
-        if #available(macOS 12.0, *) {
-            webView.underPageBackgroundColor = .clear
+        if !enabled {
+            webView.setValue(true, forKey: "drawsBackground")
         }
-        webView.setValue(false, forKey: "drawsBackground")
+        if #available(macOS 12.0, *) {
+            webView.underPageBackgroundColor = enabled ? .clear : nil
+        }
         webView.evaluateJavaScript(
             "window.__mooziacSetDrawerVideoMode && window.__mooziacSetDrawerVideoMode(\(enabled));",
             completionHandler: nil
@@ -646,6 +651,10 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
             document.documentElement.classList.add('mooziac-compact');
             window.__mooziacSetCompactMode = function(enabled) {
                 document.documentElement.classList.toggle('mooziac-compact', !!enabled);
+                if (!enabled) {
+                    document.documentElement.classList.remove('mooziac-drawer-video');
+                    document.documentElement.classList.remove('mooziac-drawer-has-video');
+                }
             };
             function checkDrawerVideo() {
                 if (!document.documentElement.classList.contains('mooziac-drawer-video')) return;

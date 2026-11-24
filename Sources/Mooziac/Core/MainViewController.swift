@@ -62,7 +62,7 @@ class MainViewController: NSViewController, DynamicIslandPlayerViewDelegate, Hea
         browserContainerView.layer?.backgroundColor = NSColor(red: 0.08, green: 0.08, blue: 0.10, alpha: 0.98).cgColor
         browserContainerView.layer?.cornerRadius = 20.0
         browserContainerView.layer?.masksToBounds = true
-        browserContainerView.layer?.borderWidth = 1.0
+        browserContainerView.layer?.borderWidth = 0.0
         browserContainerView.layer?.borderColor = NSColor(white: 1.0, alpha: 0.15).cgColor
         browserContainerView.alphaValue = 0.001
         browserContainerView.isHidden = false
@@ -154,6 +154,12 @@ class MainViewController: NSViewController, DynamicIslandPlayerViewDelegate, Hea
         browserContainerView.isHitTestingEnabled = visible
         dynamicIslandPlayer.collapseSettings()
         if visible {
+            // If the expanded artwork/video view is still open, close it first. That hands the
+            // webview back to the browser container and turns off the "video only" page styling.
+            // Otherwise the browser opens showing the stripped-down video-only page.
+            if dynamicIslandPlayer.isHeroArtworkExpanded {
+                dynamicIslandPlayer.collapseHeroStage()
+            }
             if isOfflineLibraryMode {
                 setOfflineLibraryVisible(false)
             }
@@ -163,6 +169,7 @@ class MainViewController: NSViewController, DynamicIslandPlayerViewDelegate, Hea
             headerView.isHidden = false
             browserContainerView.isHidden = false
             browserContainerView.alphaValue = 1.0
+            browserContainerView.layer?.borderWidth = 1.0
             dynamicIslandPlayer.isHidden = true
             offlineLibraryView.isHidden = true
             playlistLibraryView.isHidden = true
@@ -175,6 +182,7 @@ class MainViewController: NSViewController, DynamicIslandPlayerViewDelegate, Hea
             headerView.isHidden = true // Hide headerView in player mode!
             browserContainerView.alphaValue = 0.001
             browserContainerView.isHidden = false
+            browserContainerView.layer?.borderWidth = 0.0
             if !isOfflineLibraryMode && !isPlaylistLibraryMode {
                 dynamicIslandPlayer.isHidden = false
                 onChangeSize?(360, 120)
@@ -557,13 +565,20 @@ class MainViewController: NSViewController, DynamicIslandPlayerViewDelegate, Hea
         NowPlayingManager.shared.toggleRepeat()
     }
     
+    /// Window height for the expanded hero view when its controls have faded out (frame only).
+    private var heroIdleWindowHeight: CGFloat { DynamicIslandPlayerView.heroVisualHeight }
+    /// Window height for the expanded hero view while the controls are visible.
+    private var heroControlsWindowHeight: CGFloat {
+        DynamicIslandPlayerView.heroVisualHeight + DynamicIslandPlayerView.heroControlsExtraHeight
+    }
+
     func dynamicIslandDidToggleExpanded(expanded: Bool) {
         if expanded {
             if dynamicIslandPlayer.isHeroArtworkExpanded {
                 if dynamicIslandPlayer.isHeroControlsHidden {
-                    onChangeSize?(360, 202)
+                    onChangeSize?(360, heroIdleWindowHeight)
                 } else {
-                    onChangeSize?(360, 330)
+                    onChangeSize?(360, heroControlsWindowHeight)
                 }
             } else {
                 switch dynamicIslandPlayer.activeSettingsMode {
@@ -585,15 +600,15 @@ class MainViewController: NSViewController, DynamicIslandPlayerViewDelegate, Hea
     func dynamicIslandDidToggleHeroIdle(isIdle: Bool) {
         if isIdle {
             if let onChangeSizeAnimated = onChangeSizeAnimated {
-                onChangeSizeAnimated(360, 202, true)
+                onChangeSizeAnimated(360, heroIdleWindowHeight, true)
             } else {
-                onChangeSize?(360, 202)
+                onChangeSize?(360, heroIdleWindowHeight)
             }
         } else {
             if let onChangeSizeAnimated = onChangeSizeAnimated {
-                onChangeSizeAnimated(360, 330, true)
+                onChangeSizeAnimated(360, heroControlsWindowHeight, true)
             } else {
-                onChangeSize?(360, 330)
+                onChangeSize?(360, heroControlsWindowHeight)
             }
         }
     }

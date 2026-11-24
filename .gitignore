@@ -4,6 +4,7 @@ dist/
 .swiftpm/
 .wrangler/
 dev_server.js
+.rollback_checkpoint/
 
 # Website & Edge Functions (Maintained in private repo shirkeharsh/mooziac-site)
 www/
