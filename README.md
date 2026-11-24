@@ -86,6 +86,7 @@
 - Discreet Dynamic Island player tucked into macOS status bar
 - Lossless offline local playback: FLAC, ALAC, WAV, MP3, AAC, M4A
 - Loudness leveling and gapless track transitions
+- Scrobbling to Last.fm and ListenBrainz, so your listening history is saved on both
 - Built-in yt-dlp downloader with automatic tagging and artwork embedding
 - Interactive waveform scrub bar with real-time seeking
 
@@ -174,6 +175,7 @@ Most desktop players are heavy Electron wrappers that bundle a full Chromium bro
 | **Offline Audio** | **Lossless FLAC, WAV, MP3, AAC, M4A** | Cloud only |
 | **Media Keys** | **Native macOS NowPlaying integration** | Requires active browser focus |
 | **Discord Status** | **Native Unix socket (0 dependencies)** | Third-party plugin required |
+| **Scrobbling** | **Built-in Last.fm & ListenBrainz** | Needs a third-party plugin |
 | **Privacy & Telemetry** | **100% Local-First (Zero tracking SDKs)** | Extensive Google tracking |
 
 ---
@@ -183,6 +185,7 @@ Most desktop players are heavy Electron wrappers that bundle a full Chromium bro
 - **Hardened Runtime Enabled:** In `Mooziac.entitlements`, Mooziac uses Apple's Hardened Runtime, which protects the app against code injection, memory tampering, and privilege escalation.
 - **Isolated WebKit Engine:** When loading YouTube Music, macOS automatically runs the `WKWebView` web content inside its own isolated Apple process, so YouTube's web scripts cannot access your personal files.
 - **Zero Telemetry / Zero Tracking:** All playlists, cache, and history are stored locally in an on-device SQLite database with zero external analytics servers.
+- **Scrobbling is opt-in:** Nothing is sent to Last.fm or ListenBrainz unless you connect your own account.
 
 ---
 
@@ -303,7 +306,7 @@ Mooziac/
 │   ├── Audio/                            # CoreAudio volume hooks, AVFoundation audio player
 │   ├── Core/                             # Central coordinators, NowPlaying, StatusItemManager
 │   ├── Input/                            # MultiTouch gesture engine & global keyboard shortcuts
-│   ├── Managers/                         # Local SQLite3, YTMClient, synced lyrics, yt-dlp downloader
+│   ├── Managers/                         # Local SQLite3, YTMClient, synced lyrics, yt-dlp downloader, Last.fm & ListenBrainz scrobbling
 │   ├── Models/                           # State representations, playlist records, audio configs
 │   ├── Views/                            # Dynamic Island player UI, waveform, floating lyrics HUD
 │   ├── Web/                              # WebKit bridge for YouTube Music streaming
@@ -376,6 +379,11 @@ Mooziac/
 <details>
 <summary><b>How does the MacBook trackpad volume gesture work?</b></summary>
 <p>Mooziac captures multi-touch events along the rightmost 1mm border of your MacBook trackpad. Gliding your finger along that outer edge smoothly adjusts system volume while triggering physical tactile clicks through the Mac's built-in Taptic Engine. Intelligent palm rejection prevents accidental triggers during typing.</p>
+</details>
+
+<details>
+<summary><b>Does Mooziac support Last.fm and ListenBrainz scrobbling?</b></summary>
+<p>Yes. Connect your Last.fm and/or ListenBrainz account in Preferences, and Mooziac will scrobble the tracks you play to them. You can use one service or both.</p>
 </details>
 
 <details>
