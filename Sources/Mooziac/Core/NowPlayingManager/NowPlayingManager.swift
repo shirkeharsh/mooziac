@@ -298,6 +298,7 @@ class NowPlayingManager: NSObject, WKScriptMessageHandler {
         """
         DispatchQueue.main.async {
             StatusItemManager.shared?.mainViewController.webViewContainer.webView.evaluateJavaScript(js, completionHandler: nil)
+            self.notifyObservers(self.currentState)
         }
         
         if !keepCookies {

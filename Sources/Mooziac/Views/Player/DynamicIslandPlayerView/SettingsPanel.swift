@@ -474,7 +474,7 @@ extension DynamicIslandPlayerView {
         let importConfig = NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
         playlistImportButton.image = NSImage(systemSymbolName: "square.and.arrow.down", accessibilityDescription: "Import Playlist")?.withSymbolConfiguration(importConfig)
         playlistImportButton.contentTintColor = NSColor(white: 0.85, alpha: 1.0)
-        playlistImportButton.toolTip = "Import Playlist (.m3u8, .json)"
+        playlistImportButton.toolTip = "Import Playlist or Local Folder"
         playlistImportButton.target = self
         playlistImportButton.action = #selector(handleImportPlaylistTapped)
         playlistImportButton.isBordered = false

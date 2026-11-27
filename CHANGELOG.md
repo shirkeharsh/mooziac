@@ -4,6 +4,25 @@ All notable changes to Mooziac are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.2.6] - 2026-11-28
+
+### Added
+- Unified Google Session & Account Menu: Shared sign-in across both YouTube Music and YouTube Mode (`WKWebsiteDataStore.default()`), with an organized Account & Sync menu showing signed-in identity, Sign In / Sign Out, YouTube Music sync, and a Scrobbling submenu.
+- Full YouTube Music Two-Way Playlist Sync: Syncs remote YouTube Music playlists into the player, creates playlists from local tracks/folders, updates metadata/privacy, deletes playlists locally or from YouTube Music, and supports move/reorder operations plus WebView-backed SAPISID/internal API requests.
+- Local Songs Folder Playlists: Import any local music folder directly as a named playlist (using the folder name instead of placing tracks into Downloads), renameable and editable afterward.
+- Playlist Organization & Smart Playlists: Added playlist folders, smart playlists, custom sort modes (Custom, Title, Artist, Duration, Date Added), cover/description/privacy editing, Duplicate & Merge actions, batch multi-select actions, and M3U8/JSON import & export.
+- YouTube Mode Shorts & Offline Playlists: Added a Shorts button to the YouTube Mode header bar, plus YouTube Mode playlist queue playback (Play All / Shuffle Play), track reordering/removal, saved-video search, and M3U8/JSON import & export.
+- Quick Controls Ad Blocker Toggle: Added an Ad Blocker toggle directly in the Music Player Quick Controls menu and defaulted Ad Blocker to OFF when signed in so users can re-enable it as needed.
+- Automatic yt-dlp Helper Installation: Added automatic yt-dlp helper installation and expanded binary lookup paths with MP4/M4A format fallback selectors for YouTube downloads.
+
+### Improved
+- Playback Reliability: Improved play/toggle-play/skip logic to check whether a video ID is loaded, resolve DOM watch cards, and prompt users to finish Google sign-in if `accounts.google.com` is open.
+- PiP Window Restoration: Minimizing YouTube Mode while Picture-in-Picture is active keeps the host window alive transparently so macOS's "Return to Window" button and menu bar toggles reliably restore the player window.
+
+### Fixed
+- Music Autoplay When Opening YouTube Mode: Removed the hidden YouTube Music WKWebView reload from `MainVideoWindowController.checkAuthenticationStatus()` and guarded `YTMWebViewContainer` `didFinish` loads during YouTube Mode so Mooziac stays paused when switching to YouTube.
+- Single-Account Schema Consolidation: Consolidated local and YouTube SQLite tables back to clean single-account schemas without losing existing liked songs, playlists, folders, or history.
+
 ## [1.2.5] - 2026-11-25
 
 ### Added

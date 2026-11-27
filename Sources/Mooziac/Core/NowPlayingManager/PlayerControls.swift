@@ -41,6 +41,90 @@ extension NowPlayingManager {
         center.playbackState = state.isPlaying ? .playing : .paused
     }
     
+    /// Shared JS block that finds and starts a playable track on `music.youtube.com`
+    /// when no track is loaded yet (for example right after an account switch).
+    private static let playFromPageJS = """
+        function triggerClick(element) {
+            if (!element) return false;
+            try {
+                element.scrollIntoView({ behavior: 'instant', block: 'center' });
+                var opts = { bubbles: true, cancelable: true, view: window };
+                element.dispatchEvent(new MouseEvent('mousedown', opts));
+                element.dispatchEvent(new MouseEvent('mouseup', opts));
+                element.dispatchEvent(new MouseEvent('click', opts));
+                if (typeof element.click === 'function') { element.click(); }
+                return true;
+            } catch(e) {
+                try { element.click(); return true; } catch(err) { return false; }
+            }
+        }
+
+        function resolveFirstWatchFromDOM() {
+            try {
+                var app = document.querySelector('ytmusic-app');
+                if (!app || typeof app.resolveCommand !== 'function') return false;
+                var cards = document.querySelectorAll('ytmusic-responsive-list-item-renderer, ytmusic-two-row-item-renderer');
+                for (var i = 0; i < cards.length; i++) {
+                    var data = cards[i].data;
+                    if (!data) continue;
+                    var nav = data.navigationEndpoint ||
+                              (data.overlay && data.overlay.musicItemThumbnailOverlayRenderer && data.overlay.musicItemThumbnailOverlayRenderer.content && data.overlay.musicItemThumbnailOverlayRenderer.content.musicPlayButtonRenderer && data.overlay.musicItemThumbnailOverlayRenderer.content.musicPlayButtonRenderer.playNavigationEndpoint);
+                    if (nav && nav.watchEndpoint && nav.watchEndpoint.videoId) {
+                        app.resolveCommand({ watchEndpoint: nav.watchEndpoint });
+                        return true;
+                    }
+                    if (nav && nav.watchPlaylistEndpoint && nav.watchPlaylistEndpoint.playlistId) {
+                        app.resolveCommand({ watchPlaylistEndpoint: nav.watchPlaylistEndpoint });
+                        return true;
+                    }
+                }
+                var anchor = document.querySelector('a[href*="watch?v="]');
+                if (anchor) {
+                    var m = (anchor.getAttribute('href') || '').match(/[?&]v=([A-Za-z0-9_-]{11})/);
+                    if (m && m[1]) {
+                        app.resolveCommand({ watchEndpoint: { videoId: m[1] } });
+                        return true;
+                    }
+                }
+            } catch(e) {}
+            return false;
+        }
+
+        function playRandomFromPage() {
+            var playBtns = Array.from(document.querySelectorAll(
+                'ytmusic-responsive-list-item-renderer ytmusic-play-button-renderer #button, ' +
+                'ytmusic-two-row-item-renderer ytmusic-play-button-renderer #button, ' +
+                'ytmusic-card-shelf-renderer ytmusic-play-button-renderer #button, ' +
+                'ytmusic-shelf-renderer ytmusic-play-button-renderer #button, ' +
+                'ytmusic-item-section-renderer ytmusic-play-button-renderer #button, ' +
+                'ytmusic-carousel-shelf-basic-header-renderer ytmusic-play-button-renderer #button, ' +
+                'ytmusic-play-button-renderer #button, ' +
+                'ytmusic-play-button-renderer, ' +
+                '.play-button'
+            )).filter(function(el) {
+                return (el.offsetWidth > 0 || el.offsetHeight > 0 || el.offsetParent !== null);
+            });
+
+            if (playBtns.length > 0) {
+                var idx = Math.floor(Math.random() * playBtns.length);
+                if (triggerClick(playBtns[idx])) return true;
+            }
+
+            if (resolveFirstWatchFromDOM()) return true;
+
+            var links = Array.from(document.querySelectorAll(
+                'ytmusic-responsive-list-item-renderer a.yt-simple-endpoint, ' +
+                'ytmusic-two-row-item-renderer a.yt-simple-endpoint, ' +
+                'a[href*="watch?v="]'
+            ));
+            if (links.length > 0) {
+                var lIdx = Math.floor(Math.random() * links.length);
+                if (triggerClick(links[lIdx])) return true;
+            }
+            return false;
+        }
+    """
+
     // Playback Controls Injection using native #movie_player API or NativeAudioPlayer
     func togglePlayPause() {
         guard StatusItemManager.shared?.currentMode != .youtube else { return }
@@ -66,6 +150,10 @@ extension NowPlayingManager {
 
         if let mainVC = StatusItemManager.shared?.mainViewController {
             let currentUrl = mainVC.webViewContainer.webView.url?.absoluteString ?? ""
+            if currentUrl.contains("accounts.google.com") {
+                CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "Finish Google sign-in first")
+                return
+            }
             if !currentUrl.contains("music.youtube.com") {
                 mainVC.webViewContainer.loadMusicHome(autoPlayRandom: true)
                 return
@@ -101,65 +189,18 @@ extension NowPlayingManager {
                 }
             }
 
-            function triggerClick(element) {
-                if (!element) return false;
-                try {
-                    element.scrollIntoView({ behavior: 'instant', block: 'center' });
-                    var opts = { bubbles: true, cancelable: true, view: window };
-                    element.dispatchEvent(new MouseEvent('mousedown', opts));
-                    element.dispatchEvent(new MouseEvent('mouseup', opts));
-                    element.dispatchEvent(new MouseEvent('click', opts));
-                    if (typeof element.click === 'function') { element.click(); }
-                    return true;
-                } catch(e) {
-                    try { element.click(); return true; } catch(err) { return false; }
-                }
-            }
-
-            function playRandomFromPage() {
-                var playBtns = Array.from(document.querySelectorAll(
-                    'ytmusic-responsive-list-item-renderer ytmusic-play-button-renderer #button, ' +
-                    'ytmusic-two-row-item-renderer ytmusic-play-button-renderer #button, ' +
-                    'ytmusic-card-shelf-renderer ytmusic-play-button-renderer #button, ' +
-                    'ytmusic-shelf-renderer ytmusic-play-button-renderer #button, ' +
-                    'ytmusic-item-section-renderer ytmusic-play-button-renderer #button, ' +
-                    'ytmusic-carousel-shelf-basic-header-renderer ytmusic-play-button-renderer #button, ' +
-                    'ytmusic-play-button-renderer #button, ' +
-                    'ytmusic-play-button-renderer, ' +
-                    '.play-button'
-                )).filter(function(el) {
-                    return (el.offsetWidth > 0 || el.offsetHeight > 0 || el.offsetParent !== null);
-                });
-
-                if (playBtns.length > 0) {
-                    var idx = Math.floor(Math.random() * playBtns.length);
-                    if (triggerClick(playBtns[idx])) return true;
-                }
-
-                var links = Array.from(document.querySelectorAll(
-                    'ytmusic-responsive-list-item-renderer a.yt-simple-endpoint, ' +
-                    'ytmusic-two-row-item-renderer a.yt-simple-endpoint, ' +
-                    'a[href*="watch?v="]'
-                )).filter(function(el) {
-                    return (el.offsetWidth > 0 || el.offsetHeight > 0 || el.offsetParent !== null);
-                });
-
-                if (links.length > 0) {
-                    var lIdx = Math.floor(Math.random() * links.length);
-                    if (triggerClick(links[lIdx])) return true;
-                }
-
-                return false;
-            }
+            \(Self.playFromPageJS)
 
             try {
                 var player = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
                 if (player && typeof player.getPlayerState === 'function') {
                     var state = player.getPlayerState();
+                    var vidData = (typeof player.getVideoData === 'function') ? player.getVideoData() : null;
+                    var hasVid = !!(vidData && vidData.video_id);
                     if (state === 1) {
                         player.pauseVideo();
                         return;
-                    } else if (state === 2 || state === 3 || state === 5) {
+                    } else if (hasVid && (state === 2 || state === 3 || state === 5 || state === -1)) {
                         player.playVideo();
                         return;
                     }
@@ -192,7 +233,7 @@ extension NowPlayingManager {
                 var attempts = 0;
                 var timer = setInterval(function() {
                     attempts++;
-                    if (playRandomFromPage() || attempts > 15) {
+                    if (playRandomFromPage() || attempts > 25) {
                         clearInterval(timer);
                     }
                 }, 200);
@@ -341,62 +382,15 @@ extension NowPlayingManager {
                 window.__mooziacAttemptAutoplayRecovery(video, btn);
             }
 
-            function triggerClick(element) {
-                if (!element) return false;
-                try {
-                    element.scrollIntoView({ behavior: 'instant', block: 'center' });
-                    var opts = { bubbles: true, cancelable: true, view: window };
-                    element.dispatchEvent(new MouseEvent('mousedown', opts));
-                    element.dispatchEvent(new MouseEvent('mouseup', opts));
-                    element.dispatchEvent(new MouseEvent('click', opts));
-                    if (typeof element.click === 'function') { element.click(); }
-                    return true;
-                } catch(e) {
-                    try { element.click(); return true; } catch(err) { return false; }
-                }
-            }
-
-            function playRandomFromPage() {
-                var playBtns = Array.from(document.querySelectorAll(
-                    'ytmusic-responsive-list-item-renderer ytmusic-play-button-renderer #button, ' +
-                    'ytmusic-two-row-item-renderer ytmusic-play-button-renderer #button, ' +
-                    'ytmusic-card-shelf-renderer ytmusic-play-button-renderer #button, ' +
-                    'ytmusic-shelf-renderer ytmusic-play-button-renderer #button, ' +
-                    'ytmusic-item-section-renderer ytmusic-play-button-renderer #button, ' +
-                    'ytmusic-carousel-shelf-basic-header-renderer ytmusic-play-button-renderer #button, ' +
-                    'ytmusic-play-button-renderer #button, ' +
-                    'ytmusic-play-button-renderer, ' +
-                    '.play-button'
-                )).filter(function(el) {
-                    return (el.offsetWidth > 0 || el.offsetHeight > 0 || el.offsetParent !== null);
-                });
-
-                if (playBtns.length > 0) {
-                    var idx = Math.floor(Math.random() * playBtns.length);
-                    if (triggerClick(playBtns[idx])) return true;
-                }
-
-                var links = Array.from(document.querySelectorAll(
-                    'ytmusic-responsive-list-item-renderer a.yt-simple-endpoint, ' +
-                    'ytmusic-two-row-item-renderer a.yt-simple-endpoint, ' +
-                    'a[href*="watch?v="]'
-                )).filter(function(el) {
-                    return (el.offsetWidth > 0 || el.offsetHeight > 0 || el.offsetParent !== null);
-                });
-
-                if (links.length > 0) {
-                    var lIdx = Math.floor(Math.random() * links.length);
-                    if (triggerClick(links[lIdx])) return true;
-                }
-
-                return false;
-            }
+            \(Self.playFromPageJS)
 
             try {
                 var player = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
                 if (player && typeof player.getPlayerState === 'function') {
                     var state = player.getPlayerState();
-                    if (state === 2 || state === 3 || state === 5 || state === -1) {
+                    var vidData = (typeof player.getVideoData === 'function') ? player.getVideoData() : null;
+                    var hasVid = !!(vidData && vidData.video_id);
+                    if (hasVid && (state === 2 || state === 3 || state === 5 || state === -1)) {
                         player.playVideo();
                         return;
                     } else if (state === 1) {
@@ -415,7 +409,7 @@ extension NowPlayingManager {
                 var attempts = 0;
                 var timer = setInterval(function() {
                     attempts++;
-                    if (playRandomFromPage() || attempts > 15) {
+                    if (playRandomFromPage() || attempts > 25) {
                         clearInterval(timer);
                     }
                 }, 200);

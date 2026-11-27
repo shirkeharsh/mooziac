@@ -474,13 +474,33 @@ public final class YouTubeDownloadSheetController: NSViewController {
         completedContainer.isHidden = true
         errorContainer.isHidden = true
 
-        Task {
+        loadingLabel.stringValue = "Fetching video formats…"
+
+        Task { [weak self] in
+            guard let self else { return }
+            if !YouTubeDownloadService.shared.isAvailable {
+                self.loadingLabel.stringValue = "Installing yt-dlp helper…"
+                let (installed, installError) = await YouTubeDownloadService.shared.ensureHelperInstalled { [weak self] pct in
+                    DispatchQueue.main.async {
+                        self?.loadingLabel.stringValue = "Installing yt-dlp helper… \(Int(pct * 100))%"
+                    }
+                }
+                if !installed {
+                    self.loadingContainer.isHidden = true
+                    let detail = installError.map { "\n(\($0))" } ?? ""
+                    self.errorMessageLabel.stringValue = "Could not install the yt-dlp helper.\nCheck your connection, or run: brew install yt-dlp\(detail)"
+                    self.errorContainer.isHidden = false
+                    return
+                }
+                self.loadingLabel.stringValue = "Fetching video formats…"
+            }
+
             let fetched = await YouTubeDownloadService.shared.fetchFormats(videoId: videoId)
             self.formats = fetched
             self.loadingContainer.isHidden = true
 
             if fetched.isEmpty {
-                self.errorMessageLabel.stringValue = "The yt-dlp helper is not installed yet.\nDownload any song in Mooziac once (it installs automatically),\nor run: brew install yt-dlp"
+                self.errorMessageLabel.stringValue = "The yt-dlp helper is not installed yet.\nCheck your connection, or run: brew install yt-dlp"
                 self.errorContainer.isHidden = false
             } else {
                 self.populateFormatList(fetched)

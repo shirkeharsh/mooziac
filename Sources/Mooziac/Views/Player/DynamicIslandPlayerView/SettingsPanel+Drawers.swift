@@ -63,13 +63,13 @@ extension DynamicIslandPlayerView {
                     search.placeholderString = "Search all songs..."
                 }
             } else {
-                playlistDetailDeleteButton.isHidden = false
-                playlistDetailAddButton.isHidden = false
-                playlistDetailRenameButton.isHidden = false
+                playlistDetailDeleteButton.isHidden = playlist.isSmart
+                playlistDetailAddButton.isHidden = playlist.isSmart
+                playlistDetailRenameButton.isHidden = playlist.isSmart
                 playlistDetailExportButton.isHidden = false
                 playlistDetailPlayAllButton.isHidden = false
                 playlistDetailShuffleButton.isHidden = false
-                playlistDetailDownloadAllButton.isHidden = false
+                playlistDetailDownloadAllButton.isHidden = playlist.isSmart
                 if let search = playlistSearchField {
                     search.placeholderString = "Search \(playlist.name)..."
                 }
@@ -422,7 +422,7 @@ extension DynamicIslandPlayerView {
 
         switch activeLibraryTab {
         case .playlists:
-            var playlists = PlaylistManager.shared.fetchPlaylists()
+            var playlists = PlaylistManager.shared.fetchPlaylists() + PlaylistManager.shared.fetchSmartPlaylists()
             if !trimmedQuery.isEmpty {
                 playlists = playlists.filter { $0.name.lowercased().contains(trimmedQuery) }
             }
@@ -965,9 +965,18 @@ extension DynamicIslandPlayerView {
             }
         }
 
-        if isPlaylistSelectionMode {
+        if isPlaylistSelectionMode || playlist.isSmart {
             swipeContainer.onDelete = nil
-            swipeContainer.onRightSwipePlay = nil
+            swipeContainer.onRightSwipePlay = playlist.isSmart ? { [weak self] in
+                guard let self = self else { return false }
+                let items = PlaylistManager.shared.fetchPlaylistItems(playlistID: playlist.id)
+                if items.isEmpty {
+                    self.showToastBanner(message: "⚠️ \"\(playlist.name)\" is empty", isWarning: true)
+                    return false
+                }
+                PlaylistManager.shared.startPlaylist(playlistID: playlist.id, startingAt: nil, shuffle: false)
+                return true
+            } : nil
         } else {
             swipeContainer.onDelete = { [weak self] in
                 self?.confirmAndDeletePlaylistFromRow(playlist)
@@ -992,7 +1001,15 @@ extension DynamicIslandPlayerView {
         artworkView.layer?.cornerRadius = 7
         artworkView.layer?.masksToBounds = true
         artworkView.layer?.backgroundColor = (tone == .light ? NSColor(white: 0.0, alpha: 0.06) : NSColor(white: 1.0, alpha: 0.08)).cgColor
-        if let firstTrack = playlistFirstTrack(playlist), let art = firstTrack.artwork {
+        if !playlist.artworkPath.isEmpty,
+           FileManager.default.fileExists(atPath: playlist.artworkPath),
+           let customImg = NSImage(contentsOfFile: playlist.artworkPath) {
+            artworkView.image = customImg
+        } else if playlist.isSmart {
+            let smartConfig = NSImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
+            artworkView.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: "Smart Playlist")?.withSymbolConfiguration(smartConfig)
+            artworkView.contentTintColor = settingsAccentColor(tone: tone)
+        } else if let firstTrack = playlistFirstTrack(playlist), let art = firstTrack.artwork {
             artworkView.image = art
         } else if let firstItem = playlistFirstItem(playlist), !firstItem.artworkUrl.isEmpty {
             if FileManager.default.fileExists(atPath: firstItem.artworkUrl),
@@ -1443,9 +1460,13 @@ extension DynamicIslandPlayerView {
 
         panel.begin { [weak self] response in
             if response == .OK {
-                LocalLibraryManager.shared.importFiles(from: panel.urls) { count in
+                LocalLibraryManager.shared.importLocalItems(from: panel.urls) { result in
                     DispatchQueue.main.async {
-                        self?.showToastBanner(message: "Imported \(count) audio track(s)")
+                        if let first = result.createdPlaylists.first {
+                            self?.showToastBanner(message: "✓ Added playlist \"\(first.name)\" (\(first.trackCount) songs)")
+                        } else {
+                            self?.showToastBanner(message: "Imported \(result.importedDownloadFiles) audio track(s)")
+                        }
                         self?.refreshPlaylistsSection()
                         self?.updateDownloadButtonState()
                     }

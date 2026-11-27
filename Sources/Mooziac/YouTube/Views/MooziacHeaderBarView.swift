@@ -8,6 +8,7 @@ public protocol MooziacHeaderBarDelegate: AnyObject {
     func headerBarDidTapBack()
     func headerBarDidTapForward()
     func headerBarDidTapReload()
+    func headerBarDidTapShorts()
     func headerBarDidTapCaptions()
     func headerBarDidTapLike()
     func headerBarDidTapPlaylists(from sender: NSButton)
@@ -32,6 +33,7 @@ public class MooziacHeaderBarView: NSVisualEffectView {
     private let forwardButton = ReactiveIconButton()
     private let reloadButton = ReactiveIconButton()
 
+    let shortsButton = ReactiveIconButton()
     let captionButton = ReactiveIconButton()
     let qualityButton = ReactiveIconButton()
     let playlistsButton = ReactiveIconButton()
@@ -97,6 +99,7 @@ public class MooziacHeaderBarView: NSVisualEffectView {
             backButton.contentTintColor = btnTint
             forwardButton.contentTintColor = btnTint
             reloadButton.contentTintColor = btnTint
+            shortsButton.contentTintColor = btnTint
             captionButton.contentTintColor = btnTint
             qualityButton.contentTintColor = btnTint
             playlistsButton.contentTintColor = btnTint
@@ -142,7 +145,10 @@ public class MooziacHeaderBarView: NSVisualEffectView {
         leftStack.translatesAutoresizingMaskIntoConstraints = false
         leftStack.setCustomSpacing(10, after: fullscreenButton)
 
-        // 3. Setup Captions Button (Placed directly beside qualityButton)
+        // 3. Setup Shorts Button (Placed directly before captionButton)
+        setupNavButton(shortsButton, systemName: "bolt.fill", toolTip: "YouTube Shorts", action: #selector(shortsTapped))
+
+        // 4. Setup Captions Button (Placed directly beside qualityButton)
         setupNavButton(captionButton, systemName: "captions.bubble", toolTip: "Live Captions / Lyrics in Title Bar (C)", action: #selector(captionTapped))
         captionButton.isEnabled = false
 
@@ -166,7 +172,7 @@ public class MooziacHeaderBarView: NSVisualEffectView {
         setupNavButton(pipButton, systemName: "pip.enter", toolTip: "Picture-in-Picture", action: #selector(pipTapped))
         setupNavButton(theaterButton, systemName: "rectangle.inset.filled.and.person.filled", toolTip: "Theater Mode (T)", action: #selector(theaterTapped))
 
-        let rightStack = NSStackView(views: [captionButton, qualityButton, playlistsButton, downloadButton, speedButton, shieldButton, pipButton, theaterButton])
+        let rightStack = NSStackView(views: [shortsButton, captionButton, qualityButton, playlistsButton, downloadButton, speedButton, shieldButton, pipButton, theaterButton])
         rightStack.orientation = .horizontal
         rightStack.spacing = 7
         rightStack.alignment = .centerY
@@ -317,6 +323,7 @@ public class MooziacHeaderBarView: NSVisualEffectView {
     @objc private func backTapped() { delegate?.headerBarDidTapBack() }
     @objc private func forwardTapped() { delegate?.headerBarDidTapForward() }
     @objc private func reloadTapped() { delegate?.headerBarDidTapReload() }
+    @objc private func shortsTapped() { delegate?.headerBarDidTapShorts() }
     @objc private func captionTapped() { delegate?.headerBarDidTapCaptions() }
     @objc private func playlistsTapped() { delegate?.headerBarDidTapPlaylists(from: playlistsButton) }
     @objc private func historyTapped() { delegate?.headerBarDidTapHistory(from: historyButton) }

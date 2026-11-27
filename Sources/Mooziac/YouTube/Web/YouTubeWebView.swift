@@ -4,13 +4,10 @@ import WebKit
 public class YouTubeWebView: WKWebView {
     public static let desktopUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
 
+    /// Uses the single shared default data store so YouTube Mode and
+    /// YouTube Music share one Google account login.
     public static var isolatedDataStore: WKWebsiteDataStore {
-        if #available(macOS 14.0, *) {
-            let youtubeStoreUUID = UUID(uuidString: "9A4C6262-63BE-4D88-8DF6-17C17B9D79F1")!
-            return WKWebsiteDataStore(forIdentifier: youtubeStoreUUID)
-        } else {
-            return WKWebsiteDataStore.default()
-        }
+        return WKWebsiteDataStore.default()
     }
 
     // Codec optimization: On systems without dedicated hardware AV1 decode (Intel & Apple M1/M2),

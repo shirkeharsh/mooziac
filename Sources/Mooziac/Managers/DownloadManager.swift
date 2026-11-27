@@ -642,7 +642,7 @@ public final class DownloadManager: NSObject {
             "--extractor-args", "youtube:player_client=android,web,web_safari",
             "--no-playlist"
         ]
-        if let ffmpegLoc = resolveFFmpegLocation() {
+        if let ffmpegLoc = DownloadManager.resolveFFmpegLocation() {
             arguments.append(contentsOf: [
                 "-x",
                 "--audio-format", "m4a",
@@ -1099,7 +1099,7 @@ public final class DownloadManager: NSObject {
         return nil
     }
 
-    private func resolveFFmpegLocation() -> String? {
+    public static func resolveFFmpegLocation() -> String? {
         if let shellFound = DownloadManager.runShellPathResolution("command -v ffmpeg || which ffmpeg") {
             return URL(fileURLWithPath: shellFound).deletingLastPathComponent().path
         }

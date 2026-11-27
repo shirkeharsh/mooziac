@@ -43,10 +43,14 @@ public final class YouTubeDownloadService {
            FileManager.default.isExecutableFile(atPath: path) {
             return path
         }
-        // 3. Homebrew & standard paths
+        // 3. Homebrew, user, & standard paths
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
         let standardPaths = [
+            "\(home)/.local/bin/yt-dlp",
+            "\(home)/.pyenv/shims/yt-dlp",
             "/opt/homebrew/bin/yt-dlp",
             "/usr/local/bin/yt-dlp",
+            "\(home)/.cargo/bin/yt-dlp",
             "/usr/bin/yt-dlp"
         ]
         for p in standardPaths {
@@ -60,6 +64,23 @@ public final class YouTubeDownloadService {
     public var isAvailable: Bool {
         guard let path = ytdlpPath else { return false }
         return FileManager.default.isExecutableFile(atPath: path)
+    }
+
+    /// Installs the standalone `yt-dlp` helper via `DependencyManager` if not already available.
+    public func ensureHelperInstalled(
+        progress: ((Double) -> Void)? = nil
+    ) async -> (Bool, String?) {
+        if isAvailable {
+            return (true, nil)
+        }
+        return await withCheckedContinuation { continuation in
+            DownloadManager.shared.dependencyManager.installHelper(
+                progress: progress,
+                completion: { success, error in
+                    continuation.resume(returning: (success, error))
+                }
+            )
+        }
     }
 
     // MARK: - Formats
@@ -97,6 +118,7 @@ public final class YouTubeDownloadService {
         return await Task.detached(priority: .userInitiated) {
             let proc = Process()
             proc.executableURL = URL(fileURLWithPath: execPath)
+            proc.environment = DownloadManager.makeProcessEnvironment()
             proc.arguments = [
                 "-J",
                 "--no-playlist",
@@ -130,6 +152,10 @@ public final class YouTubeDownloadService {
         }.value
     }
 
+    private nonisolated static func videoFormatSelector(maxHeight: Int) -> String {
+        "bestvideo[height<=\(maxHeight)][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=\(maxHeight)]+bestaudio[ext=m4a]/bestvideo[height<=\(maxHeight)]+bestaudio/best[height<=\(maxHeight)]"
+    }
+
     public nonisolated static func defaultFallbackFormats() -> [DownloadFormat] {
         [
             DownloadFormat(
@@ -138,31 +164,31 @@ public final class YouTubeDownloadService {
                 isAudioOnly: true
             ),
             DownloadFormat(
-                id: "bestvideo[height<=2160]+bestaudio/best",
+                id: videoFormatSelector(maxHeight: 2160),
                 label: "4K Ultra HD (2160p)",
                 isAudioOnly: false,
                 height: 2160
             ),
             DownloadFormat(
-                id: "bestvideo[height<=1440]+bestaudio/best",
+                id: videoFormatSelector(maxHeight: 1440),
                 label: "1440p QHD (2K)",
                 isAudioOnly: false,
                 height: 1440
             ),
             DownloadFormat(
-                id: "bestvideo[height<=1080]+bestaudio/best",
+                id: videoFormatSelector(maxHeight: 1080),
                 label: "1080p Full HD (MP4)",
                 isAudioOnly: false,
                 height: 1080
             ),
             DownloadFormat(
-                id: "bestvideo[height<=720]+bestaudio/best",
+                id: videoFormatSelector(maxHeight: 720),
                 label: "720p HD (MP4)",
                 isAudioOnly: false,
                 height: 720
             ),
             DownloadFormat(
-                id: "bestvideo[height<=480]+bestaudio/best",
+                id: videoFormatSelector(maxHeight: 480),
                 label: "480p SD (MP4)",
                 isAudioOnly: false,
                 height: 480
@@ -207,7 +233,7 @@ public final class YouTubeDownloadService {
             default: label = "\(height)p (MP4)"
             }
 
-            let selector = "bestvideo[height<=\(height)]+bestaudio/best[height<=\(height)]"
+            let selector = Self.videoFormatSelector(maxHeight: height)
             results.append(DownloadFormat(
                 id: selector,
                 label: label,
@@ -259,7 +285,9 @@ public final class YouTubeDownloadService {
         let proc = Process()
         self.activeProcess = proc
         proc.executableURL = URL(fileURLWithPath: execPath)
+        proc.environment = DownloadManager.makeProcessEnvironment()
 
+        let ffmpegLoc = DownloadManager.resolveFFmpegLocation()
         let targetDir = self.downloadsDir
         var args = [
             "--newline",
@@ -269,17 +297,34 @@ public final class YouTubeDownloadService {
             "-o", "\(targetDir.path)/%(title)s.%(ext)s"
         ]
 
+        if let ffmpegLoc {
+            args.append(contentsOf: ["--ffmpeg-location", ffmpegLoc])
+        }
+
         if format.isAudioOnly {
-            args.append(contentsOf: [
-                "-x",
-                "--audio-format", "mp3",
-                "--audio-quality", "0",
-                "--embed-thumbnail"
-            ])
-        } else {
+            if ffmpegLoc != nil {
+                args.append(contentsOf: [
+                    "-x",
+                    "--audio-format", "mp3",
+                    "--audio-quality", "0",
+                    "--embed-thumbnail"
+                ])
+            } else {
+                args.append(contentsOf: [
+                    "-f", "ba[ext=m4a]/ba/b"
+                ])
+            }
+        } else if ffmpegLoc != nil {
             args.append(contentsOf: [
                 "-f", format.id,
                 "--merge-output-format", "mp4"
+            ])
+        } else {
+            // Without ffmpeg, yt-dlp cannot merge separate video+audio DASH streams;
+            // fall back to a combined muxed stream so the downloaded video still has audio.
+            let maxH = format.height ?? 1080
+            args.append(contentsOf: [
+                "-f", "best[height<=\(maxH)][ext=mp4]/best[ext=mp4]/best"
             ])
         }
 

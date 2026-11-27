@@ -23,11 +23,19 @@ public final class YTMClient {
     private static let clientContext: [String: Any] = [
         "client": [
             "clientName": "WEB_REMIX",
-            "clientVersion": "1.20240902.01.00",
+            "clientVersion": "1.20250101.01.00",
             "hl": "en",
             "gl": "US"
         ]
     ]
+
+    private static let cookieSession: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.httpShouldSetCookies = false
+        config.httpCookieAcceptPolicy = .never
+        config.httpCookieStorage = nil
+        return URLSession(configuration: config)
+    }()
 
     public struct PlaylistSummary {
         public let playlistId: String
@@ -49,8 +57,9 @@ public final class YTMClient {
         public let artworkUrl: String
         public let duration: String
         public let isVideo: Bool
+        public let setVideoId: String?
 
-        public init(videoId: String, title: String, artist: String, album: String, artworkUrl: String, duration: String, isVideo: Bool = false) {
+        public init(videoId: String, title: String, artist: String, album: String, artworkUrl: String, duration: String, isVideo: Bool = false, setVideoId: String? = nil) {
             self.videoId = videoId
             self.title = title
             self.artist = artist
@@ -58,6 +67,7 @@ public final class YTMClient {
             self.artworkUrl = artworkUrl
             self.duration = duration
             self.isVideo = isVideo
+            self.setVideoId = setVideoId
         }
     }
 
@@ -105,33 +115,60 @@ public final class YTMClient {
         let cookie: String
     }
 
-    /// Reads the session cookies from the shared WKWebView data store and returns
-    /// the `Authorization` header value and `Cookie` string for InnerTube requests.
+    /// Reads the session cookies from the active WKWebView data store and returns
+    /// the combined `Authorization` header (`SAPISIDHASH` / `SAPISID1PHASH` / `SAPISID3PHASH`)
+    /// and deduplicated `Cookie` string scoped strictly to `music.youtube.com`.
     private func authCredentials(completion: @escaping (Result<AuthCredentials, Error>) -> Void) {
-        WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
-            let sapisid = cookies.first(where: { $0.name == "SAPISID" && $0.domain.contains("youtube.com") && !$0.value.isEmpty })?.value
-            let apiSID = cookies.first(where: {
-                $0.name == "__Secure-1PAPISID" && $0.domain.contains("youtube.com") && !$0.value.isEmpty
-            })?.value
+        DispatchQueue.main.async {
+            WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
+                let now = Date()
+                let ytmCookies = cookies.filter { cookie in
+                    let d = cookie.domain.lowercased()
+                    let domainMatches = (d == ".youtube.com" || d == "youtube.com" || d == "music.youtube.com")
+                    let notExpired = (cookie.expiresDate == nil || cookie.expiresDate! > now)
+                    return domainMatches && notExpired && !cookie.value.isEmpty
+                }
 
-            let authValue = sapisid ?? apiSID
-            guard let authValue = authValue, !authValue.isEmpty else {
-                completion(.failure(YTMError.notSignedIn))
-                return
+                // Deduplicate by cookie name, preferring exact host `music.youtube.com` over `.youtube.com`
+                var cookieByName: [String: HTTPCookie] = [:]
+                for cookie in ytmCookies {
+                    if let existing = cookieByName[cookie.name] {
+                        if cookie.domain.lowercased() == "music.youtube.com" && existing.domain.lowercased() != "music.youtube.com" {
+                            cookieByName[cookie.name] = cookie
+                        }
+                    } else {
+                        cookieByName[cookie.name] = cookie
+                    }
+                }
+
+                let origin = "https://music.youtube.com"
+                let timestamp = Int(Date().timeIntervalSince1970)
+                var authParts: [String] = []
+                if let val = cookieByName["SAPISID"]?.value, !val.isEmpty {
+                    authParts.append("SAPISIDHASH \(timestamp)_\(Self.sha1Hex("\(timestamp) \(val) \(origin)"))")
+                }
+                if let val = cookieByName["__Secure-1PAPISID"]?.value, !val.isEmpty {
+                    authParts.append("SAPISID1PHASH \(timestamp)_\(Self.sha1Hex("\(timestamp) \(val) \(origin)"))")
+                }
+                if let val = cookieByName["__Secure-3PAPISID"]?.value, !val.isEmpty {
+                    authParts.append("SAPISID3PHASH \(timestamp)_\(Self.sha1Hex("\(timestamp) \(val) \(origin)"))")
+                }
+
+                guard !authParts.isEmpty else {
+                    completion(.failure(YTMError.notSignedIn))
+                    return
+                }
+
+                let cookieString = cookieByName.values
+                    .sorted { $0.name < $1.name }
+                    .map { "\($0.name)=\($0.value)" }
+                    .joined(separator: "; ")
+
+                completion(.success(AuthCredentials(
+                    authorization: authParts.joined(separator: " "),
+                    cookie: cookieString
+                )))
             }
-
-            let origin = "https://music.youtube.com"
-            let timestamp = Int(Date().timeIntervalSince1970)
-            let msg = "\(timestamp) \(authValue) \(origin)"
-            let hash = Self.sha1Hex(msg)
-            let header = "SAPISIDHASH \(timestamp)_\(hash)"
-
-            let cookieString = cookies
-                .filter { $0.domain.contains("youtube.com") || $0.domain.contains("google.com") }
-                .map { "\($0.name)=\($0.value)" }
-                .joined(separator: "; ")
-
-            completion(.success(AuthCredentials(authorization: header, cookie: cookieString)))
         }
     }
 
@@ -142,6 +179,127 @@ public final class YTMClient {
     }
 
     // MARK: - Core request
+
+    private static func isResponseLoggedIn(_ json: [String: Any]) -> Bool {
+        guard let ctx = json["responseContext"] as? [String: Any],
+              let paramsList = ctx["serviceTrackingParams"] as? [[String: Any]] else {
+            return true
+        }
+        for service in paramsList {
+            if let params = service["params"] as? [[String: Any]] {
+                for p in params {
+                    let key = p["key"] as? String
+                    let val = p["value"] as? String
+                    if key == "logged_in" || key == "yt_li" {
+                        return val == "1"
+                    }
+                }
+            }
+        }
+        return true
+    }
+
+    private func postViaWebViewIfReady(
+        endpoint: String,
+        payload: [String: Any],
+        authorization: String,
+        token: RequestToken,
+        completion: @escaping (Result<[String: Any], Error>?) -> Void
+    ) {
+        DispatchQueue.main.async {
+            guard !token.isCancelled else { return }
+            guard let webView = StatusItemManager.shared?.mainViewController.webViewContainer.webView,
+                  let host = webView.url?.host?.lowercased(),
+                  host == "music.youtube.com" else {
+                completion(nil)
+                return
+            }
+
+            guard let payloadData = try? JSONSerialization.data(withJSONObject: payload),
+                  let payloadJSON = String(data: payloadData, encoding: .utf8) else {
+                completion(nil)
+                return
+            }
+
+            let js = """
+            try {
+                if (!window.ytcfg || typeof window.ytcfg.get !== 'function' || !window.ytcfg.get('LOGGED_IN')) {
+                    return JSON.stringify({ __mooziacFallback: true });
+                }
+                const apiKey = window.ytcfg.get('INNERTUBE_API_KEY') || fallbackApiKey;
+                const ctx = window.ytcfg.get('INNERTUBE_CONTEXT');
+                if (!apiKey || !ctx) {
+                    return JSON.stringify({ __mooziacFallback: true });
+                }
+                const body = Object.assign({}, JSON.parse(payloadJSON), { context: ctx });
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'X-Origin': 'https://music.youtube.com'
+                };
+                if (authHeader) { headers['Authorization'] = authHeader; }
+                const sessionIdx = window.ytcfg.get('SESSION_INDEX');
+                headers['X-Goog-AuthUser'] = (sessionIdx !== undefined && sessionIdx !== null) ? String(sessionIdx) : '0';
+                const pageId = window.ytcfg.get('DELEGATED_SESSION_ID');
+                if (pageId) { headers['X-Goog-PageId'] = String(pageId); }
+                const idToken = window.ytcfg.get('ID_TOKEN');
+                if (idToken) { headers['X-Youtube-Identity-Token'] = String(idToken); }
+                const visitor = window.ytcfg.get('VISITOR_DATA');
+                if (visitor) { headers['X-Goog-Visitor-Id'] = String(visitor); }
+
+                const resp = await fetch('/youtubei/v1/' + endpoint + '?alt=json&key=' + encodeURIComponent(apiKey), {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: headers,
+                    body: JSON.stringify(body)
+                });
+                const text = await resp.text();
+                return JSON.stringify({ status: resp.status, text: text });
+            } catch (err) {
+                return JSON.stringify({ __mooziacFallback: true, error: String(err) });
+            }
+            """
+
+            webView.callAsyncJavaScript(
+                js,
+                arguments: [
+                    "endpoint": endpoint,
+                    "payloadJSON": payloadJSON,
+                    "authHeader": authorization,
+                    "fallbackApiKey": Self.innerTubeAPIKey
+                ],
+                in: nil,
+                in: .page
+            ) { result in
+                guard !token.isCancelled else { return }
+                switch result {
+                case .failure:
+                    completion(nil)
+                case .success(let value):
+                    guard let wrapperStr = value as? String,
+                          let wrapperData = wrapperStr.data(using: .utf8),
+                          let wrapper = try? JSONSerialization.jsonObject(with: wrapperData) as? [String: Any] else {
+                        completion(nil)
+                        return
+                    }
+                    if wrapper["__mooziacFallback"] as? Bool == true {
+                        completion(nil)
+                        return
+                    }
+                    let status = wrapper["status"] as? Int ?? 0
+                    guard (200...299).contains(status),
+                          let bodyText = wrapper["text"] as? String,
+                          let bodyData = bodyText.data(using: .utf8),
+                          let json = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any] else {
+                        completion(nil)
+                        return
+                    }
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        completion(.success(json))
+                    }
+                }
+            }
+        }
+    }
 
     @discardableResult
     private func post(
@@ -155,55 +313,73 @@ public final class YTMClient {
             return token
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("https://music.youtube.com", forHTTPHeaderField: "Origin")
-        request.setValue(YTMWebViewContainer.userAgent, forHTTPHeaderField: "User-Agent")
-        request.setValue("0", forHTTPHeaderField: "X-Goog-AuthUser")
-
         var body = payload
         body["context"] = Self.clientContext
 
-        authCredentials { result in
-            guard !token.isCancelled else { return }
-            if case .success(let creds) = result {
-                request.setValue(creds.authorization, forHTTPHeaderField: "Authorization")
-                if !creds.cookie.isEmpty {
-                    request.setValue(creds.cookie, forHTTPHeaderField: "Cookie")
-                }
-            }
-            do {
-                request.httpBody = try JSONSerialization.data(withJSONObject: body)
-            } catch {
-                completion(.failure(error))
-                return
-            }
-            let task = URLSession.shared.dataTask(with: request) { data, response, error in
+        authCredentials { [weak self] result in
+            guard let self = self, !token.isCancelled else { return }
+            let creds = try? result.get()
+
+            self.postViaWebViewIfReady(
+                endpoint: endpoint,
+                payload: payload,
+                authorization: creds?.authorization ?? "",
+                token: token
+            ) { webResult in
                 guard !token.isCancelled else { return }
-                if let error = error {
-                    completion(.failure(YTMError.network(error.localizedDescription)))
+                if let webResult = webResult {
+                    completion(webResult)
                     return
                 }
-                guard let http = response as? HTTPURLResponse,
-                      (200...299).contains(http.statusCode),
-                      let data = data else {
-                    completion(.failure(YTMError.badResponse))
-                    return
+
+                var request = URLRequest(url: url)
+                request.httpMethod = "POST"
+                request.httpShouldHandleCookies = false
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.setValue("https://music.youtube.com", forHTTPHeaderField: "Origin")
+                request.setValue("https://music.youtube.com", forHTTPHeaderField: "X-Origin")
+                request.setValue("https://music.youtube.com/", forHTTPHeaderField: "Referer")
+                request.setValue(YTMWebViewContainer.userAgent, forHTTPHeaderField: "User-Agent")
+                request.setValue("0", forHTTPHeaderField: "X-Goog-AuthUser")
+
+                if let creds = creds {
+                    request.setValue(creds.authorization, forHTTPHeaderField: "Authorization")
+                    if !creds.cookie.isEmpty {
+                        request.setValue(creds.cookie, forHTTPHeaderField: "Cookie")
+                    }
                 }
                 do {
-                    guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    request.httpBody = try JSONSerialization.data(withJSONObject: body)
+                } catch {
+                    completion(.failure(error))
+                    return
+                }
+                let task = Self.cookieSession.dataTask(with: request) { data, response, error in
+                    guard !token.isCancelled else { return }
+                    if let error = error {
+                        completion(.failure(YTMError.network(error.localizedDescription)))
+                        return
+                    }
+                    guard let http = response as? HTTPURLResponse,
+                          (200...299).contains(http.statusCode),
+                          let data = data else {
                         completion(.failure(YTMError.badResponse))
                         return
                     }
-                    completion(.success(json))
-                } catch {
-                    Log.sync.error("YTM JSON parse error: \(error.localizedDescription)")
-                    completion(.failure(YTMError.badResponse))
+                    do {
+                        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                            completion(.failure(YTMError.badResponse))
+                            return
+                        }
+                        completion(.success(json))
+                    } catch {
+                        Log.sync.error("YTM JSON parse error: \(error.localizedDescription)")
+                        completion(.failure(YTMError.badResponse))
+                    }
                 }
+                token.attach(task)
+                task.resume()
             }
-            token.attach(task)
-            task.resume()
         }
         return token
     }
@@ -228,6 +404,11 @@ public final class YTMClient {
             case .failure(let error):
                 completion(.failure(error))
             case .success(let pages):
+                if let firstPage = pages.first, !Self.isResponseLoggedIn(firstPage) {
+                    Log.sync.error("Pull: FEmusic_liked_playlists returned logged_in=0")
+                    completion(.failure(YTMError.notSignedIn))
+                    return
+                }
                 var seen = Set<String>()
                 var playlists: [PlaylistSummary] = []
                 for page in pages {
@@ -539,12 +720,19 @@ public final class YTMClient {
 
     // MARK: - Playlist mutation
 
-    public func createPlaylist(title: String, videoIds: [String],
+    public func createPlaylist(title: String,
+                               description: String = "",
+                               privacyStatus: String = "PRIVATE",
+                               videoIds: [String],
                                completion: @escaping (Result<String, Error>) -> Void) {
-        let payload: [String: Any] = [
+        var payload: [String: Any] = [
             "title": title,
+            "privacyStatus": privacyStatus.uppercased(),
             "videoIds": videoIds
         ]
+        if !description.isEmpty {
+            payload["description"] = description
+        }
         post(endpoint: "playlist/create", payload: payload) { result in
             switch result {
             case .failure(let error):
@@ -557,6 +745,69 @@ public final class YTMClient {
                 } else {
                     completion(.failure(YTMError.api("Playlist created but no id returned")))
                 }
+            }
+        }
+    }
+
+    public func editPlaylist(playlistId: String,
+                             actions: [[String: Any]],
+                             completion: @escaping (Result<Void, Error>) -> Void) {
+        guard !actions.isEmpty else {
+            completion(.success(()))
+            return
+        }
+        let payload: [String: Any] = [
+            "playlistId": playlistId,
+            "actions": actions
+        ]
+        post(endpoint: "browse/edit_playlist", payload: payload) { result in
+            switch result {
+            case .failure(let error):
+                completion(.failure(error))
+            case .success:
+                completion(.success(()))
+            }
+        }
+    }
+
+    public func editPlaylistMetadata(playlistId: String,
+                                     title: String?,
+                                     description: String?,
+                                     privacyStatus: String?,
+                                     completion: @escaping (Result<Void, Error>) -> Void) {
+        var actions: [[String: Any]] = []
+        if let title = title, !title.isEmpty {
+            actions.append(["action": "ACTION_SET_PLAYLIST_NAME", "playlistName": title])
+        }
+        if let description = description {
+            actions.append(["action": "ACTION_SET_PLAYLIST_DESCRIPTION", "playlistDescription": description])
+        }
+        if let privacy = privacyStatus, !privacy.isEmpty {
+            actions.append(["action": "ACTION_SET_PLAYLIST_PRIVACY", "playlistPrivacy": privacy.uppercased()])
+        }
+        editPlaylist(playlistId: playlistId, actions: actions, completion: completion)
+    }
+
+    public func removeFromPlaylist(playlistId: String,
+                                   videoId: String,
+                                   setVideoId: String,
+                                   completion: @escaping (Result<Void, Error>) -> Void) {
+        let actions: [[String: Any]] = [[
+            "action": "ACTION_REMOVE_VIDEO",
+            "removedVideoId": videoId,
+            "setVideoId": setVideoId
+        ]]
+        editPlaylist(playlistId: playlistId, actions: actions, completion: completion)
+    }
+
+    public func deletePlaylist(playlistId: String,
+                               completion: @escaping (Result<Void, Error>) -> Void) {
+        post(endpoint: "playlist/delete", payload: ["playlistId": playlistId]) { result in
+            switch result {
+            case .failure(let error):
+                completion(.failure(error))
+            case .success:
+                completion(.success(()))
             }
         }
     }
@@ -730,7 +981,11 @@ public final class YTMClient {
                 playlistId = p
                 browseId = "VL\(p)"
             }
-            guard let playlistId = playlistId, !playlistId.isEmpty, !seen.contains(playlistId) else { continue }
+            guard let playlistId = playlistId,
+                  !playlistId.isEmpty,
+                  playlistId != "LM",
+                  playlistId != "SE",
+                  !seen.contains(playlistId) else { continue }
             let title = listItemTitle(dict)
             guard !title.isEmpty else { continue }
             seen.insert(playlistId)
@@ -823,9 +1078,25 @@ public final class YTMClient {
                 artworkUrl = "https://i.ytimg.com/vi/\(videoId)/mqdefault.jpg"
             }
 
+            let setVideoId: String? = {
+                if let data = dict["playlistItemData"] as? [String: Any],
+                   let svid = data["playlistSetVideoId"] as? String, !svid.isEmpty {
+                    return svid
+                }
+                if let svid = dict["playlistSetVideoId"] as? String, !svid.isEmpty {
+                    return svid
+                }
+                if let nav = dict["navigationEndpoint"] as? [String: Any],
+                   let watch = nav["watchEndpoint"] as? [String: Any],
+                   let svid = watch["playlistSetVideoId"] as? String, !svid.isEmpty {
+                    return svid
+                }
+                return nil
+            }()
+
             seen.insert(videoId)
             results.append(Track(videoId: videoId, title: title, artist: artist,
-                                 album: album, artworkUrl: artworkUrl, duration: duration))
+                                 album: album, artworkUrl: artworkUrl, duration: duration, setVideoId: setVideoId))
         }
         return results
     }

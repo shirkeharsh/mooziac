@@ -64,6 +64,32 @@ public struct CachedTrackRecord {
     }
 }
 
+public struct PlaylistFolderRecord: Equatable {
+    public let id: String
+    public let name: String
+    public let sortOrder: Int
+    public let createdAt: Double
+    public let updatedAt: Double
+
+    public init(id: String = UUID().uuidString, name: String, sortOrder: Int = 0,
+                createdAt: Double = Date().timeIntervalSince1970, updatedAt: Double = Date().timeIntervalSince1970) {
+        self.id = id
+        self.name = name
+        self.sortOrder = sortOrder
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}
+
+public struct PlaylistSyncTombstone: Equatable {
+    public let id: String
+    public let entityType: String // "playlist" or "item"
+    public let ytPlaylistId: String
+    public let ytVideoId: String?
+    public let ytSetVideoId: String?
+    public let createdAt: Double
+}
+
 public struct PlaylistRecord {
     public let id: String
     public let name: String
@@ -73,9 +99,19 @@ public struct PlaylistRecord {
     public let ytPlaylistId: String?
     public let synced: Bool
     public let dirty: Bool
+    public let descriptionText: String
+    public let artworkPath: String
+    public let privacyStatus: String
+    public let sortMode: String
+    public let folderId: String?
+    public let isSmart: Bool
+    public let smartRule: String?
 
     public init(id: String, name: String, createdAt: Double, updatedAt: Double, itemCount: Int,
-                ytPlaylistId: String? = nil, synced: Bool = false, dirty: Bool = false) {
+                ytPlaylistId: String? = nil, synced: Bool = false, dirty: Bool = false,
+                descriptionText: String = "", artworkPath: String = "",
+                privacyStatus: String = "private", sortMode: String = "custom",
+                folderId: String? = nil, isSmart: Bool = false, smartRule: String? = nil) {
         self.id = id
         self.name = name
         self.createdAt = createdAt
@@ -84,6 +120,13 @@ public struct PlaylistRecord {
         self.ytPlaylistId = ytPlaylistId
         self.synced = synced
         self.dirty = dirty
+        self.descriptionText = descriptionText
+        self.artworkPath = artworkPath
+        self.privacyStatus = privacyStatus
+        self.sortMode = sortMode
+        self.folderId = folderId
+        self.isSmart = isSmart
+        self.smartRule = smartRule
     }
 }
 
@@ -94,6 +137,7 @@ public struct PlaylistItemRecord {
     public let refType: String
     public let refID: String
     public let ytVideoId: String?
+    public let ytSetVideoId: String?
     public let title: String
     public let artist: String
     public let artworkUrl: String
@@ -108,6 +152,7 @@ public struct PlaylistItemRecord {
         refType: String,
         refID: String,
         ytVideoId: String? = nil,
+        ytSetVideoId: String? = nil,
         title: String,
         artist: String = "",
         artworkUrl: String = "",
@@ -121,6 +166,7 @@ public struct PlaylistItemRecord {
         self.refType = refType
         self.refID = refID
         self.ytVideoId = ytVideoId
+        self.ytSetVideoId = ytSetVideoId
         self.title = title
         self.artist = artist
         self.artworkUrl = artworkUrl
@@ -345,6 +391,18 @@ public final class LocalDatabaseManager {
         if userVersion < 5 {
             migrateToV5()
         }
+
+        if userVersion < 6 {
+            migrateToV6()
+        }
+
+        if userVersion < 7 {
+            migrateToV7()
+        }
+
+        if userVersion < 8 {
+            migrateToSingleAccountV8()
+        }
     }
 
     private func columnExists(table: String, column: String) -> Bool {
@@ -465,6 +523,95 @@ public final class LocalDatabaseManager {
         executeRaw(sql: "CREATE INDEX IF NOT EXISTS idx_playlists_yt_playlist_id ON playlists(yt_playlist_id);")
         setUserVersion(5)
         Log.database.info("Schema migrated to v5 (YTM sync columns)")
+    }
+
+    private func migrateToV6() {
+        let folderSchema = """
+        CREATE TABLE IF NOT EXISTS playlist_folders (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS playlist_sync_tombstones (
+            id TEXT PRIMARY KEY,
+            entity_type TEXT NOT NULL,
+            yt_playlist_id TEXT NOT NULL,
+            yt_video_id TEXT,
+            yt_set_video_id TEXT,
+            created_at REAL NOT NULL
+        );
+        """
+        executeRaw(sql: folderSchema)
+
+        if !columnExists(table: "playlists", column: "description_text") {
+            executeRaw(sql: "ALTER TABLE playlists ADD COLUMN description_text TEXT NOT NULL DEFAULT '';")
+        }
+        if !columnExists(table: "playlists", column: "artwork_path") {
+            executeRaw(sql: "ALTER TABLE playlists ADD COLUMN artwork_path TEXT NOT NULL DEFAULT '';")
+        }
+        if !columnExists(table: "playlists", column: "privacy_status") {
+            executeRaw(sql: "ALTER TABLE playlists ADD COLUMN privacy_status TEXT NOT NULL DEFAULT 'private';")
+        }
+        if !columnExists(table: "playlists", column: "sort_mode") {
+            executeRaw(sql: "ALTER TABLE playlists ADD COLUMN sort_mode TEXT NOT NULL DEFAULT 'custom';")
+        }
+        if !columnExists(table: "playlists", column: "folder_id") {
+            executeRaw(sql: "ALTER TABLE playlists ADD COLUMN folder_id TEXT;")
+        }
+        if !columnExists(table: "playlist_items", column: "yt_set_video_id") {
+            executeRaw(sql: "ALTER TABLE playlist_items ADD COLUMN yt_set_video_id TEXT;")
+        }
+        setUserVersion(6)
+        Log.database.info("Schema migrated to v6 (metadata, sort, folders, two-way YTM sync)")
+    }
+
+    private func migrateToV7() {
+        setUserVersion(7)
+    }
+
+    private func migrateToSingleAccountV8() {
+        executeRaw(sql: """
+        DROP INDEX IF EXISTS idx_playlists_account;
+        DROP INDEX IF EXISTS idx_folders_account;
+        DROP INDEX IF EXISTS idx_tombstones_account;
+        DROP INDEX IF EXISTS idx_history_account;
+        DROP INDEX IF EXISTS idx_liked_songs_account_date;
+        """)
+
+        if columnExists(table: "liked_songs", column: "account_id") {
+            let consolidateLiked = """
+            BEGIN TRANSACTION;
+            CREATE TABLE IF NOT EXISTS liked_songs_v8 (
+                video_id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                artist TEXT NOT NULL DEFAULT '',
+                album TEXT NOT NULL DEFAULT '',
+                artwork_url TEXT NOT NULL DEFAULT '',
+                duration REAL NOT NULL DEFAULT 0.0,
+                date_liked REAL NOT NULL,
+                synced INTEGER NOT NULL DEFAULT 0,
+                source_type TEXT NOT NULL DEFAULT 'ytm'
+            );
+            INSERT OR IGNORE INTO liked_songs_v8 (video_id, title, artist, album, artwork_url, duration, date_liked, synced, source_type)
+            SELECT video_id, title, artist, album, artwork_url, duration, date_liked, synced, source_type FROM liked_songs ORDER BY date_liked DESC;
+            DROP TABLE liked_songs;
+            ALTER TABLE liked_songs_v8 RENAME TO liked_songs;
+            CREATE INDEX IF NOT EXISTS idx_liked_songs_date ON liked_songs(date_liked DESC);
+            COMMIT;
+            """
+            executeRaw(sql: consolidateLiked)
+        }
+
+        for table in ["playlists", "playlist_folders", "playlist_sync_tombstones", "listening_history"] {
+            if columnExists(table: table, column: "account_id") {
+                executeRaw(sql: "ALTER TABLE \(table) DROP COLUMN account_id;")
+            }
+        }
+
+        setUserVersion(8)
+        Log.database.info("Schema migrated to v8 (clean single-account library)")
     }
 
     private func getUserVersion() -> Int32 {
@@ -937,7 +1084,10 @@ public final class LocalDatabaseManager {
         guard let db = db else { return result }
         let query = """
         SELECT p.id, p.name, p.created_at, p.updated_at, COUNT(pi.id) AS item_count,
-               p.yt_playlist_id, p.synced, p.dirty
+               p.yt_playlist_id, p.synced, p.dirty,
+               COALESCE(p.description_text, ''), COALESCE(p.artwork_path, ''),
+               COALESCE(p.privacy_status, 'private'), COALESCE(p.sort_mode, 'custom'),
+               p.folder_id
         FROM playlists p
         LEFT JOIN playlist_items pi ON pi.playlist_id = p.id
         GROUP BY p.id
@@ -954,12 +1104,146 @@ public final class LocalDatabaseManager {
                 let ytPlaylistId = sqlite3_column_text(stmt, 5).map { String(cString: $0) }
                 let synced = sqlite3_column_int(stmt, 6) == 1
                 let dirty = sqlite3_column_int(stmt, 7) == 1
+                let descText = sqlite3_column_text(stmt, 8).map { String(cString: $0) } ?? ""
+                let artPath = sqlite3_column_text(stmt, 9).map { String(cString: $0) } ?? ""
+                let privacy = sqlite3_column_text(stmt, 10).map { String(cString: $0) } ?? "private"
+                let sortMode = sqlite3_column_text(stmt, 11).map { String(cString: $0) } ?? "custom"
+                let folderIdRaw = sqlite3_column_text(stmt, 12).map { String(cString: $0) }
+                let folderId = (folderIdRaw?.isEmpty == false) ? folderIdRaw : nil
                 result.append(PlaylistRecord(id: id, name: name, createdAt: createdAt, updatedAt: updatedAt, itemCount: itemCount,
-                                             ytPlaylistId: ytPlaylistId, synced: synced, dirty: dirty))
+                                             ytPlaylistId: ytPlaylistId, synced: synced, dirty: dirty,
+                                             descriptionText: descText, artworkPath: artPath,
+                                             privacyStatus: privacy, sortMode: sortMode, folderId: folderId))
             }
         }
         sqlite3_finalize(stmt)
         return result
+    }
+
+    public func updatePlaylistMetadata(id: String, name: String, descriptionText: String, artworkPath: String, privacyStatus: String) {
+        guard let db = db else { return }
+        let sql = """
+        UPDATE playlists
+        SET name = ?, description_text = ?, artwork_path = ?, privacy_status = ?, updated_at = ?
+        WHERE id = ?;
+        """
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+            sqlite3_bind_text(stmt, 1, (name as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(stmt, 2, (descriptionText as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(stmt, 3, (artworkPath as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(stmt, 4, (privacyStatus as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_double(stmt, 5, Date().timeIntervalSince1970)
+            sqlite3_bind_text(stmt, 6, (id as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            sqlite3_step(stmt)
+        }
+        sqlite3_finalize(stmt)
+    }
+
+    public func setPlaylistSortMode(id: String, sortMode: String) {
+        guard let db = db else { return }
+        let sql = "UPDATE playlists SET sort_mode = ? WHERE id = ?;"
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+            sqlite3_bind_text(stmt, 1, (sortMode as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(stmt, 2, (id as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            sqlite3_step(stmt)
+        }
+        sqlite3_finalize(stmt)
+    }
+
+    public func setPlaylistFolder(id: String, folderId: String?) {
+        guard let db = db else { return }
+        let sql = "UPDATE playlists SET folder_id = ?, updated_at = ? WHERE id = ?;"
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+            if let fid = folderId, !fid.isEmpty {
+                sqlite3_bind_text(stmt, 1, (fid as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            } else {
+                sqlite3_bind_null(stmt, 1)
+            }
+            sqlite3_bind_double(stmt, 2, Date().timeIntervalSince1970)
+            sqlite3_bind_text(stmt, 3, (id as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            sqlite3_step(stmt)
+        }
+        sqlite3_finalize(stmt)
+    }
+
+    // MARK: - Playlist Folders
+    public func fetchPlaylistFolders() -> [PlaylistFolderRecord] {
+        var result: [PlaylistFolderRecord] = []
+        guard let db = db else { return result }
+        let sql = "SELECT id, name, sort_order, created_at, updated_at FROM playlist_folders ORDER BY sort_order ASC, name COLLATE NOCASE ASC;"
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                let id = String(cString: sqlite3_column_text(stmt, 0))
+                let name = String(cString: sqlite3_column_text(stmt, 1))
+                let sortOrder = Int(sqlite3_column_int(stmt, 2))
+                let createdAt = sqlite3_column_double(stmt, 3)
+                let updatedAt = sqlite3_column_double(stmt, 4)
+                result.append(PlaylistFolderRecord(id: id, name: name, sortOrder: sortOrder, createdAt: createdAt, updatedAt: updatedAt))
+            }
+        }
+        sqlite3_finalize(stmt)
+        return result
+    }
+
+    @discardableResult
+    public func createPlaylistFolder(name: String) -> String? {
+        guard let db = db else { return nil }
+        let id = UUID().uuidString
+        let now = Date().timeIntervalSince1970
+        let sql = "INSERT INTO playlist_folders (id, name, sort_order, created_at, updated_at) VALUES (?, ?, 0, ?, ?);"
+        var stmt: OpaquePointer?
+        var ok = false
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+            sqlite3_bind_text(stmt, 1, (id as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(stmt, 2, (name as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_double(stmt, 3, now)
+            sqlite3_bind_double(stmt, 4, now)
+            ok = sqlite3_step(stmt) == SQLITE_DONE
+        }
+        sqlite3_finalize(stmt)
+        return ok ? id : nil
+    }
+
+    public func renamePlaylistFolder(id: String, name: String) {
+        guard let db = db else { return }
+        let sql = "UPDATE playlist_folders SET name = ?, updated_at = ? WHERE id = ?;"
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+            sqlite3_bind_text(stmt, 1, (name as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_double(stmt, 2, Date().timeIntervalSince1970)
+            sqlite3_bind_text(stmt, 3, (id as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            sqlite3_step(stmt)
+        }
+        sqlite3_finalize(stmt)
+    }
+
+    public func deletePlaylistFolder(id: String) {
+        guard let db = db else { return }
+        let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+        let unassign = "UPDATE playlists SET folder_id = NULL WHERE folder_id = ?;"
+        var st1: OpaquePointer?
+        if sqlite3_prepare_v2(db, unassign, -1, &st1, nil) == SQLITE_OK {
+            sqlite3_bind_text(st1, 1, (id as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            sqlite3_step(st1)
+        }
+        sqlite3_finalize(st1)
+
+        let del = "DELETE FROM playlist_folders WHERE id = ?;"
+        var st2: OpaquePointer?
+        if sqlite3_prepare_v2(db, del, -1, &st2, nil) == SQLITE_OK {
+            sqlite3_bind_text(st2, 1, (id as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            sqlite3_step(st2)
+        }
+        sqlite3_finalize(st2)
     }
 
     @discardableResult
@@ -1026,7 +1310,7 @@ public final class LocalDatabaseManager {
         var result: [PlaylistItemRecord] = []
         guard let db = db else { return result }
         let query = """
-        SELECT id, playlist_id, sort_order, ref_type, ref_id, yt_video_id, title, artist, artwork_url, duration, is_liked, date_added
+        SELECT id, playlist_id, sort_order, ref_type, ref_id, yt_video_id, yt_set_video_id, title, artist, artwork_url, duration, is_liked, date_added
         FROM playlist_items
         WHERE playlist_id = ?
         ORDER BY sort_order ASC;
@@ -1046,15 +1330,20 @@ public final class LocalDatabaseManager {
                     let vid = String(cString: cVid)
                     if !vid.isEmpty { ytVideoId = vid }
                 }
-                let title = String(cString: sqlite3_column_text(stmt, 6))
-                let artist = String(cString: sqlite3_column_text(stmt, 7))
-                let artworkUrl = String(cString: sqlite3_column_text(stmt, 8))
-                let duration = String(cString: sqlite3_column_text(stmt, 9))
-                let isLiked = sqlite3_column_int(stmt, 10) == 1
-                let dateAdded = sqlite3_column_double(stmt, 11)
+                var ytSetVideoId: String? = nil
+                if let cSetVid = sqlite3_column_text(stmt, 6) {
+                    let svid = String(cString: cSetVid)
+                    if !svid.isEmpty { ytSetVideoId = svid }
+                }
+                let title = String(cString: sqlite3_column_text(stmt, 7))
+                let artist = String(cString: sqlite3_column_text(stmt, 8))
+                let artworkUrl = String(cString: sqlite3_column_text(stmt, 9))
+                let duration = String(cString: sqlite3_column_text(stmt, 10))
+                let isLiked = sqlite3_column_int(stmt, 11) == 1
+                let dateAdded = sqlite3_column_double(stmt, 12)
                 result.append(PlaylistItemRecord(
                     id: id, playlistID: playlistID, sortOrder: sortOrder,
-                    refType: refType, refID: refID, ytVideoId: ytVideoId,
+                    refType: refType, refID: refID, ytVideoId: ytVideoId, ytSetVideoId: ytSetVideoId,
                     title: title, artist: artist, artworkUrl: artworkUrl,
                     duration: duration, isLiked: isLiked, dateAdded: dateAdded
                 ))
@@ -1068,8 +1357,8 @@ public final class LocalDatabaseManager {
         guard let db = db else { return }
         let deleteSQL = "DELETE FROM playlist_items WHERE playlist_id = ?;"
         let insertSQL = """
-        INSERT INTO playlist_items (id, playlist_id, sort_order, ref_type, ref_id, yt_video_id, title, artist, artwork_url, duration, is_liked, date_added)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        INSERT INTO playlist_items (id, playlist_id, sort_order, ref_type, ref_id, yt_video_id, yt_set_video_id, title, artist, artwork_url, duration, is_liked, date_added)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         let now = Date().timeIntervalSince1970
         let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
@@ -1101,12 +1390,17 @@ public final class LocalDatabaseManager {
                 } else {
                     sqlite3_bind_null(insStmt, 6)
                 }
-                sqlite3_bind_text(insStmt, 7, (item.title as NSString).utf8String, -1, SQLITE_TRANSIENT)
-                sqlite3_bind_text(insStmt, 8, (item.artist as NSString).utf8String, -1, SQLITE_TRANSIENT)
-                sqlite3_bind_text(insStmt, 9, (item.artworkUrl as NSString).utf8String, -1, SQLITE_TRANSIENT)
-                sqlite3_bind_text(insStmt, 10, (item.duration as NSString).utf8String, -1, SQLITE_TRANSIENT)
-                sqlite3_bind_int(insStmt, 11, item.isLiked ? 1 : 0)
-                sqlite3_bind_double(insStmt, 12, item.dateAdded)
+                if let svid = item.ytSetVideoId, !svid.isEmpty {
+                    sqlite3_bind_text(insStmt, 7, (svid as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                } else {
+                    sqlite3_bind_null(insStmt, 7)
+                }
+                sqlite3_bind_text(insStmt, 8, (item.title as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(insStmt, 9, (item.artist as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(insStmt, 10, (item.artworkUrl as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(insStmt, 11, (item.duration as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_int(insStmt, 12, item.isLiked ? 1 : 0)
+                sqlite3_bind_double(insStmt, 13, item.dateAdded)
                 if sqlite3_step(insStmt) != SQLITE_DONE {
                     let msg = String(cString: sqlite3_errmsg(db))
                     Log.database.error("step failed: \(msg)")
@@ -1122,8 +1416,8 @@ public final class LocalDatabaseManager {
     public func appendPlaylistItem(_ item: PlaylistItemRecord) {
         guard let db = db else { return }
         let sql = """
-        INSERT INTO playlist_items (id, playlist_id, sort_order, ref_type, ref_id, yt_video_id, title, artist, artwork_url, duration, is_liked, date_added)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        INSERT INTO playlist_items (id, playlist_id, sort_order, ref_type, ref_id, yt_video_id, yt_set_video_id, title, artist, artwork_url, duration, is_liked, date_added)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         var stmt: OpaquePointer?
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
@@ -1138,16 +1432,101 @@ public final class LocalDatabaseManager {
             } else {
                 sqlite3_bind_null(stmt, 6)
             }
-            sqlite3_bind_text(stmt, 7, (item.title as NSString).utf8String, -1, SQLITE_TRANSIENT)
-            sqlite3_bind_text(stmt, 8, (item.artist as NSString).utf8String, -1, SQLITE_TRANSIENT)
-            sqlite3_bind_text(stmt, 9, (item.artworkUrl as NSString).utf8String, -1, SQLITE_TRANSIENT)
-            sqlite3_bind_text(stmt, 10, (item.duration as NSString).utf8String, -1, SQLITE_TRANSIENT)
-            sqlite3_bind_int(stmt, 11, item.isLiked ? 1 : 0)
-            sqlite3_bind_double(stmt, 12, item.dateAdded)
+            if let svid = item.ytSetVideoId, !svid.isEmpty {
+                sqlite3_bind_text(stmt, 7, (svid as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            } else {
+                sqlite3_bind_null(stmt, 7)
+            }
+            sqlite3_bind_text(stmt, 8, (item.title as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(stmt, 9, (item.artist as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(stmt, 10, (item.artworkUrl as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(stmt, 11, (item.duration as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_int(stmt, 12, item.isLiked ? 1 : 0)
+            sqlite3_bind_double(stmt, 13, item.dateAdded)
             sqlite3_step(stmt)
         }
         sqlite3_finalize(stmt)
         touchPlaylist(id: item.playlistID)
+    }
+
+    public func setPlaylistItemSetVideoId(itemID: String, setVideoId: String?) {
+        guard let db = db else { return }
+        let sql = "UPDATE playlist_items SET yt_set_video_id = ? WHERE id = ?;"
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+            if let svid = setVideoId, !svid.isEmpty {
+                sqlite3_bind_text(stmt, 1, (svid as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            } else {
+                sqlite3_bind_null(stmt, 1)
+            }
+            sqlite3_bind_text(stmt, 2, (itemID as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            sqlite3_step(stmt)
+        }
+        sqlite3_finalize(stmt)
+    }
+
+    // MARK: - Sync Tombstones
+    public func recordSyncTombstone(entityType: String, ytPlaylistId: String, ytVideoId: String? = nil, ytSetVideoId: String? = nil) {
+        guard let db = db, !ytPlaylistId.isEmpty else { return }
+        let id = UUID().uuidString
+        let sql = """
+        INSERT INTO playlist_sync_tombstones (id, entity_type, yt_playlist_id, yt_video_id, yt_set_video_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?);
+        """
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+            sqlite3_bind_text(stmt, 1, (id as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(stmt, 2, (entityType as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(stmt, 3, (ytPlaylistId as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            if let vid = ytVideoId, !vid.isEmpty {
+                sqlite3_bind_text(stmt, 4, (vid as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            } else {
+                sqlite3_bind_null(stmt, 4)
+            }
+            if let svid = ytSetVideoId, !svid.isEmpty {
+                sqlite3_bind_text(stmt, 5, (svid as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            } else {
+                sqlite3_bind_null(stmt, 5)
+            }
+            sqlite3_bind_double(stmt, 6, Date().timeIntervalSince1970)
+            sqlite3_step(stmt)
+        }
+        sqlite3_finalize(stmt)
+    }
+
+    public func fetchSyncTombstones() -> [PlaylistSyncTombstone] {
+        var result: [PlaylistSyncTombstone] = []
+        guard let db = db else { return result }
+        let sql = "SELECT id, entity_type, yt_playlist_id, yt_video_id, yt_set_video_id, created_at FROM playlist_sync_tombstones ORDER BY created_at ASC;"
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                let id = String(cString: sqlite3_column_text(stmt, 0))
+                let entityType = String(cString: sqlite3_column_text(stmt, 1))
+                let ytPlaylistId = String(cString: sqlite3_column_text(stmt, 2))
+                let ytVideoId = sqlite3_column_text(stmt, 3).map { String(cString: $0) }
+                let ytSetVideoId = sqlite3_column_text(stmt, 4).map { String(cString: $0) }
+                let createdAt = sqlite3_column_double(stmt, 5)
+                result.append(PlaylistSyncTombstone(id: id, entityType: entityType, ytPlaylistId: ytPlaylistId,
+                                                    ytVideoId: ytVideoId, ytSetVideoId: ytSetVideoId, createdAt: createdAt))
+            }
+        }
+        sqlite3_finalize(stmt)
+        return result
+    }
+
+    public func deleteSyncTombstone(id: String) {
+        guard let db = db else { return }
+        let sql = "DELETE FROM playlist_sync_tombstones WHERE id = ?;"
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+            sqlite3_bind_text(stmt, 1, (id as NSString).utf8String, -1, SQLITE_TRANSIENT)
+            sqlite3_step(stmt)
+        }
+        sqlite3_finalize(stmt)
     }
 
     public func removePlaylistItem(itemID: String, playlistID: String) {
@@ -1207,15 +1586,29 @@ public final class LocalDatabaseManager {
         sqlite3_finalize(lookupStmt)
 
         if let existingID = existingID {
-            let sql = "UPDATE playlists SET name = ?, synced = 1, dirty = 0, updated_at = ? WHERE id = ?;"
-            var stmt: OpaquePointer?
-            if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
-                sqlite3_bind_text(stmt, 1, (name as NSString).utf8String, -1, SQLITE_TRANSIENT)
-                sqlite3_bind_double(stmt, 2, now)
-                sqlite3_bind_text(stmt, 3, (existingID as NSString).utf8String, -1, SQLITE_TRANSIENT)
-                sqlite3_step(stmt)
+            // Preserve local name/edits if playlist has unsynced local changes (dirty = 1)
+            let checkSQL = "SELECT dirty FROM playlists WHERE id = ? LIMIT 1;"
+            var dirtyFlag = false
+            var chk: OpaquePointer?
+            if sqlite3_prepare_v2(db, checkSQL, -1, &chk, nil) == SQLITE_OK {
+                sqlite3_bind_text(chk, 1, (existingID as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                if sqlite3_step(chk) == SQLITE_ROW {
+                    dirtyFlag = sqlite3_column_int(chk, 0) == 1
+                }
             }
-            sqlite3_finalize(stmt)
+            sqlite3_finalize(chk)
+
+            if !dirtyFlag {
+                let sql = "UPDATE playlists SET name = ?, synced = 1, updated_at = ? WHERE id = ?;"
+                var stmt: OpaquePointer?
+                if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+                    sqlite3_bind_text(stmt, 1, (name as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                    sqlite3_bind_double(stmt, 2, now)
+                    sqlite3_bind_text(stmt, 3, (existingID as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                    sqlite3_step(stmt)
+                }
+                sqlite3_finalize(stmt)
+            }
             return existingID
         }
 

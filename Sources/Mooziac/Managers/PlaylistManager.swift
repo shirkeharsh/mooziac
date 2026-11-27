@@ -23,6 +23,24 @@ public struct PlaylistLibraryIndex {
     }
 }
 
+public enum PlaylistSortMode: String, CaseIterable {
+    case custom
+    case title
+    case artist
+    case duration
+    case dateAdded
+
+    public var displayName: String {
+        switch self {
+        case .custom: return "Custom Order"
+        case .title: return "Title (A–Z)"
+        case .artist: return "Artist (A–Z)"
+        case .duration: return "Duration"
+        case .dateAdded: return "Date Added (Newest)"
+        }
+    }
+}
+
 public final class PlaylistManager: NSObject {
 
     public static let shared = PlaylistManager()
@@ -75,6 +93,14 @@ public final class PlaylistManager: NSObject {
         summaryCacheLock.unlock()
     }
 
+    public func invalidateAllSummariesPublic() {
+        invalidateAllSummaries()
+    }
+
+    public func handleAccountDidChange() {
+        invalidateAllSummaries()
+    }
+
     private func invalidateAllSummaries() {
         summaryCacheLock.lock()
         summaryCache.removeAll()
@@ -122,15 +148,61 @@ public final class PlaylistManager: NSObject {
         return LocalDatabaseManager.shared.fetchPlaylists()
     }
 
+    public func fetchSmartPlaylists() -> [PlaylistRecord] {
+        let now = Date().timeIntervalSince1970
+        let allLocal = LocalLibraryManager.shared.allTracks
+        let recentCutoff = now - (30 * 86400)
+        let recentCount = min(50, allLocal.filter { $0.dateAdded.timeIntervalSince1970 >= recentCutoff }.count)
+        let recentlyAddedCount = recentCount > 0 ? recentCount : min(50, allLocal.count)
+        let historyCount = min(50, HistoryManager.shared.fetchHistory(limit: 50, offset: 0).count)
+
+        return [
+            PlaylistRecord(
+                id: "smart_recently_added",
+                name: "Recently Added",
+                createdAt: now,
+                updatedAt: now,
+                itemCount: recentlyAddedCount,
+                descriptionText: "Latest tracks in your local library",
+                isSmart: true,
+                smartRule: "recently_added"
+            ),
+            PlaylistRecord(
+                id: "smart_recently_played",
+                name: "Recently Played",
+                createdAt: now,
+                updatedAt: now,
+                itemCount: historyCount,
+                descriptionText: "Last 50 tracks you listened to",
+                isSmart: true,
+                smartRule: "recently_played"
+            ),
+            PlaylistRecord(
+                id: "smart_offline_ready",
+                name: "Offline Library",
+                createdAt: now,
+                updatedAt: now,
+                itemCount: allLocal.count,
+                descriptionText: "All downloaded & local tracks",
+                isSmart: true,
+                smartRule: "offline_ready"
+            )
+        ]
+    }
+
+    private func notifyPlaylistsChanged() {
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: NSNotification.Name("Mooziac_PlaylistsUpdated"), object: nil)
+            NotificationCenter.default.post(name: NSNotification.Name("Mooziac_LibraryUpdated"), object: nil)
+        }
+    }
+
     @discardableResult
     public func createPlaylist(name: String) -> String? {
         let id = LocalDatabaseManager.shared.createPlaylist(name: name)
         if let id = id {
             invalidateSummary(for: id)
-            DispatchQueue.main.async {
-                NotificationCenter.default.post(name: NSNotification.Name("Mooziac_PlaylistsUpdated"), object: nil)
-                NotificationCenter.default.post(name: NSNotification.Name("Mooziac_LibraryUpdated"), object: nil)
-            }
+            notifyPlaylistsChanged()
         }
         return id
     }
@@ -139,25 +211,234 @@ public final class PlaylistManager: NSObject {
         LocalDatabaseManager.shared.renamePlaylist(id: id, name: name)
         markSyncedDirtyIfNeeded(playlistID: id)
         invalidateSummary(for: id)
-        DispatchQueue.main.async {
-            NotificationCenter.default.post(name: NSNotification.Name("Mooziac_PlaylistsUpdated"), object: nil)
-            NotificationCenter.default.post(name: NSNotification.Name("Mooziac_LibraryUpdated"), object: nil)
-        }
+        notifyPlaylistsChanged()
     }
 
-    public func deletePlaylist(id: String) {
+    public func updatePlaylistMetadata(id: String, name: String, descriptionText: String, artworkPath: String, privacyStatus: String) {
+        let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanName.isEmpty else { return }
+        LocalDatabaseManager.shared.updatePlaylistMetadata(
+            id: id,
+            name: cleanName,
+            descriptionText: descriptionText.trimmingCharacters(in: .whitespacesAndNewlines),
+            artworkPath: artworkPath.trimmingCharacters(in: .whitespacesAndNewlines),
+            privacyStatus: privacyStatus
+        )
+        markSyncedDirtyIfNeeded(playlistID: id)
+        invalidateSummary(for: id)
+        notifyPlaylistsChanged()
+    }
+
+    public func setSortMode(_ mode: PlaylistSortMode, for playlistID: String) {
+        LocalDatabaseManager.shared.setPlaylistSortMode(id: playlistID, sortMode: mode.rawValue)
+        notifyPlaylistsChanged()
+    }
+
+    public func deletePlaylist(id: String, deleteFromYTM: Bool = false) {
+        if deleteFromYTM,
+           let pl = LocalDatabaseManager.shared.fetchPlaylists().first(where: { $0.id == id }),
+           let ytId = pl.ytPlaylistId, !ytId.isEmpty {
+            LocalDatabaseManager.shared.recordSyncTombstone(entityType: "playlist", ytPlaylistId: ytId)
+        }
         LocalDatabaseManager.shared.deletePlaylist(id: id)
         invalidateSummary(for: id)
-        DispatchQueue.main.async {
-            NotificationCenter.default.post(name: NSNotification.Name("Mooziac_PlaylistsUpdated"), object: nil)
-            NotificationCenter.default.post(name: NSNotification.Name("Mooziac_LibraryUpdated"), object: nil)
+        notifyPlaylistsChanged()
+    }
+
+    @discardableResult
+    public func duplicatePlaylist(id: String, newName: String? = nil) -> String? {
+        guard let source = fetchPlaylists().first(where: { $0.id == id }) else { return nil }
+        let targetName = (newName?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 } ?? "\(source.name) Copy"
+        guard let newID = LocalDatabaseManager.shared.createPlaylist(name: targetName) else { return nil }
+
+        let sourceItems = fetchPlaylistItems(playlistID: id)
+        let copied = sourceItems.enumerated().map { idx, item in
+            PlaylistItemRecord(
+                playlistID: newID,
+                sortOrder: idx,
+                refType: item.refType,
+                refID: item.refID,
+                ytVideoId: item.ytVideoId,
+                title: item.title,
+                artist: item.artist,
+                artworkUrl: item.artworkUrl,
+                duration: item.duration,
+                isLiked: item.isLiked
+            )
         }
+        LocalDatabaseManager.shared.replacePlaylistItems(playlistID: newID, items: copied)
+        LocalDatabaseManager.shared.updatePlaylistMetadata(
+            id: newID,
+            name: targetName,
+            descriptionText: source.descriptionText,
+            artworkPath: source.artworkPath,
+            privacyStatus: source.privacyStatus
+        )
+        invalidateSummary(for: newID)
+        notifyPlaylistsChanged()
+        return newID
+    }
+
+    @discardableResult
+    public func mergePlaylists(sourceID: String, into targetID: String) -> Int {
+        guard sourceID != targetID else { return 0 }
+        let sourceItems = fetchPlaylistItems(playlistID: sourceID)
+        let added = copyItems(sourceItems, to: targetID)
+        return added
+    }
+
+    // MARK: - Folders
+    public func fetchFolders() -> [PlaylistFolderRecord] {
+        LocalDatabaseManager.shared.fetchPlaylistFolders()
+    }
+
+    @discardableResult
+    public func createFolder(name: String) -> String? {
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return nil }
+        let id = LocalDatabaseManager.shared.createPlaylistFolder(name: clean)
+        if id != nil { notifyPlaylistsChanged() }
+        return id
+    }
+
+    public func renameFolder(id: String, name: String) {
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return }
+        LocalDatabaseManager.shared.renamePlaylistFolder(id: id, name: clean)
+        notifyPlaylistsChanged()
+    }
+
+    public func deleteFolder(id: String) {
+        LocalDatabaseManager.shared.deletePlaylistFolder(id: id)
+        notifyPlaylistsChanged()
+    }
+
+    public func movePlaylist(id: String, toFolder folderID: String?) {
+        LocalDatabaseManager.shared.setPlaylistFolder(id: id, folderId: folderID)
+        notifyPlaylistsChanged()
     }
 
     // MARK: - Items
 
     public func fetchPlaylistItems(playlistID: String) -> [PlaylistItemRecord] {
-        return LocalDatabaseManager.shared.fetchPlaylistItems(playlistID: playlistID)
+        if playlistID.hasPrefix("smart_") {
+            return fetchSmartPlaylistItems(smartID: playlistID)
+        }
+        let items = LocalDatabaseManager.shared.fetchPlaylistItems(playlistID: playlistID)
+        guard let pl = LocalDatabaseManager.shared.fetchPlaylists().first(where: { $0.id == playlistID }),
+              let sortMode = PlaylistSortMode(rawValue: pl.sortMode),
+              sortMode != .custom else {
+            return items
+        }
+        return sortItems(items, by: sortMode)
+    }
+
+    private func fetchSmartPlaylistItems(smartID: String) -> [PlaylistItemRecord] {
+        let tracks = LocalLibraryManager.shared.allTracks
+        switch smartID {
+        case "smart_recently_added":
+            let sorted = tracks.sorted { $0.dateAdded > $1.dateAdded }.prefix(50)
+            return sorted.enumerated().map { idx, t in
+                PlaylistItemRecord(
+                    id: "smart-recent-\(t.id)",
+                    playlistID: smartID,
+                    sortOrder: idx,
+                    refType: "local",
+                    refID: t.fileURL.path,
+                    ytVideoId: t.ytVideoId,
+                    title: t.title,
+                    artist: t.artist,
+                    artworkUrl: t.artworkURL?.path ?? "",
+                    duration: PlaylistManager.formattedDuration(t.duration),
+                    isLiked: t.isLiked,
+                    dateAdded: t.dateAdded.timeIntervalSince1970
+                )
+            }
+        case "smart_recently_played":
+            let history = HistoryManager.shared.fetchHistory(limit: 50, offset: 0)
+            return history.enumerated().map { idx, h in
+                let isLocal = h.sourceType == "local" || (h.filePath != nil && !h.filePath!.isEmpty)
+                return PlaylistItemRecord(
+                    id: "smart-hist-\(h.id)",
+                    playlistID: smartID,
+                    sortOrder: idx,
+                    refType: isLocal ? "local" : "yt",
+                    refID: isLocal ? (h.filePath ?? h.id) : (h.ytVideoId ?? h.id),
+                    ytVideoId: h.ytVideoId,
+                    title: h.title,
+                    artist: h.artist,
+                    artworkUrl: h.artworkUrl,
+                    duration: PlaylistManager.formattedDuration(h.duration),
+                    isLiked: false,
+                    dateAdded: h.playedAt
+                )
+            }
+        case "smart_offline_ready":
+            return tracks.enumerated().map { idx, t in
+                PlaylistItemRecord(
+                    id: "smart-off-\(t.id)",
+                    playlistID: smartID,
+                    sortOrder: idx,
+                    refType: "local",
+                    refID: t.fileURL.path,
+                    ytVideoId: t.ytVideoId,
+                    title: t.title,
+                    artist: t.artist,
+                    artworkUrl: t.artworkURL?.path ?? "",
+                    duration: PlaylistManager.formattedDuration(t.duration),
+                    isLiked: t.isLiked,
+                    dateAdded: t.dateAdded.timeIntervalSince1970
+                )
+            }
+        default:
+            return []
+        }
+    }
+
+    public func sortItems(_ items: [PlaylistItemRecord], by mode: PlaylistSortMode) -> [PlaylistItemRecord] {
+        switch mode {
+        case .custom:
+            return items.sorted { $0.sortOrder < $1.sortOrder }
+        case .title:
+            return items.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        case .artist:
+            return items.sorted {
+                let cmp = $0.artist.localizedCaseInsensitiveCompare($1.artist)
+                if cmp == .orderedSame {
+                    return $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
+                }
+                return cmp == .orderedAscending
+            }
+        case .duration:
+            return items.sorted { parseDurationSeconds($0.duration) < parseDurationSeconds($1.duration) }
+        case .dateAdded:
+            return items.sorted { $0.dateAdded > $1.dateAdded }
+        }
+    }
+
+    private func parseDurationSeconds(_ string: String) -> Int {
+        let parts = string.split(separator: ":").compactMap { Int($0) }
+        if parts.count == 2 { return parts[0] * 60 + parts[1] }
+        if parts.count == 3 { return parts[0] * 3600 + parts[1] * 60 + parts[2] }
+        return parts.first ?? 0
+    }
+
+    public func exportDocument(for playlist: PlaylistRecord) -> PlaylistFileCodec.Document {
+        let items = fetchPlaylistItems(playlistID: playlist.id)
+        let tracks = items.compactMap { item -> PlaylistFileCodec.Track? in
+            if item.refType == "local" {
+                return PlaylistFileCodec.Track(path: item.refID, title: item.title, artist: item.artist)
+            }
+            let vid = (item.ytVideoId?.isEmpty == false) ? item.ytVideoId! : item.refID
+            guard !vid.isEmpty else { return nil }
+            return PlaylistFileCodec.Track(
+                path: "https://music.youtube.com/watch?v=\(vid)",
+                title: item.title,
+                artist: item.artist,
+                ytVideoId: vid
+            )
+        }
+        return PlaylistFileCodec.Document(name: playlist.name, tracks: tracks)
     }
 
     /// Imports a playlist file as a new playlist without copying or moving its audio files.
@@ -169,6 +450,34 @@ public final class PlaylistManager: NSObject {
 
         let index = libraryIndex()
         let items = document.tracks.enumerated().map { order, track -> PlaylistItemRecord in
+            if let vid = track.ytVideoId, !vid.isEmpty {
+                let localMatch = index.byVideoId[vid]
+                if let local = localMatch {
+                    return PlaylistItemRecord(
+                        playlistID: playlistID,
+                        sortOrder: order,
+                        refType: "local",
+                        refID: local.fileURL.path,
+                        ytVideoId: vid,
+                        title: track.title.isEmpty ? local.title : track.title,
+                        artist: track.artist.isEmpty ? local.artist : track.artist,
+                        artworkUrl: local.artworkURL?.path ?? "",
+                        duration: PlaylistManager.formattedDuration(local.duration),
+                        isLiked: local.isLiked
+                    )
+                }
+                return PlaylistItemRecord(
+                    playlistID: playlistID,
+                    sortOrder: order,
+                    refType: "yt",
+                    refID: vid,
+                    ytVideoId: vid,
+                    title: track.title.isEmpty ? "YouTube Track" : track.title,
+                    artist: track.artist,
+                    artworkUrl: "https://i.ytimg.com/vi/\(vid)/hqdefault.jpg"
+                )
+            }
+
             let known = index.byFilePath[track.path]
             let resolvedTitle: String
             if !track.title.isEmpty {
@@ -214,7 +523,27 @@ public final class PlaylistManager: NSObject {
     }
 
     public func removeItem(itemID: String, from playlistID: String) {
-        LocalDatabaseManager.shared.removePlaylistItem(itemID: itemID, playlistID: playlistID)
+        removeItems(itemIDs: [itemID], from: playlistID)
+    }
+
+    public func removeItems(itemIDs: [String], from playlistID: String) {
+        guard !itemIDs.isEmpty, !playlistID.hasPrefix("smart_") else { return }
+        let playlist = LocalDatabaseManager.shared.fetchPlaylists().first(where: { $0.id == playlistID })
+        let existingItems = LocalDatabaseManager.shared.fetchPlaylistItems(playlistID: playlistID)
+        let idSet = Set(itemIDs)
+
+        for item in existingItems where idSet.contains(item.id) {
+            if let ytPid = playlist?.ytPlaylistId, !ytPid.isEmpty, let vid = item.ytVideoId, !vid.isEmpty {
+                LocalDatabaseManager.shared.recordSyncTombstone(
+                    entityType: "item",
+                    ytPlaylistId: ytPid,
+                    ytVideoId: vid,
+                    ytSetVideoId: item.ytSetVideoId
+                )
+            }
+            LocalDatabaseManager.shared.removePlaylistItem(itemID: item.id, playlistID: playlistID)
+        }
+
         markSyncedDirtyIfNeeded(playlistID: playlistID)
         invalidateSummary(for: playlistID)
         if var ctx = activeContext, ctx.playlistID == playlistID {
@@ -231,8 +560,45 @@ public final class PlaylistManager: NSObject {
         }
     }
 
+    @discardableResult
+    public func copyItems(_ items: [PlaylistItemRecord], to targetPlaylistID: String) -> Int {
+        guard !targetPlaylistID.hasPrefix("smart_") else { return 0 }
+        let existing = LocalDatabaseManager.shared.fetchPlaylistItems(playlistID: targetPlaylistID)
+        var nextOrder = existing.count
+        var added = 0
+        for item in items {
+            let isDuplicate = existing.contains(where: {
+                ($0.refID == item.refID && !item.refID.isEmpty) ||
+                (item.ytVideoId != nil && !item.ytVideoId!.isEmpty && $0.ytVideoId == item.ytVideoId) ||
+                (!item.title.isEmpty && $0.title.lowercased() == item.title.lowercased() && $0.artist.lowercased() == item.artist.lowercased())
+            })
+            if isDuplicate { continue }
+            LocalDatabaseManager.shared.appendPlaylistItem(PlaylistItemRecord(
+                playlistID: targetPlaylistID,
+                sortOrder: nextOrder,
+                refType: item.refType,
+                refID: item.refID,
+                ytVideoId: item.ytVideoId,
+                title: item.title,
+                artist: item.artist,
+                artworkUrl: item.artworkUrl,
+                duration: item.duration,
+                isLiked: item.isLiked
+            ))
+            nextOrder += 1
+            added += 1
+        }
+        if added > 0 {
+            markSyncedDirtyIfNeeded(playlistID: targetPlaylistID)
+            invalidateSummary(for: targetPlaylistID)
+            notifyPlaylistsChanged()
+        }
+        return added
+    }
+
     public func reorderItems(playlistID: String, orderedItemIDs: [String]) {
-        if playlistID != "liked_songs" && playlistID != "downloads" {
+        if playlistID != "liked_songs" && playlistID != "downloads" && !playlistID.hasPrefix("smart_") {
+            LocalDatabaseManager.shared.setPlaylistSortMode(id: playlistID, sortMode: PlaylistSortMode.custom.rawValue)
             LocalDatabaseManager.shared.reorderPlaylistItems(playlistID: playlistID, orderedItemIDs: orderedItemIDs)
             markSyncedDirtyIfNeeded(playlistID: playlistID)
             invalidateSummary(for: playlistID)
@@ -742,16 +1108,13 @@ public final class PlaylistManager: NSObject {
             }
             if FileManager.default.fileExists(atPath: item.refID) {
                 let url = URL(fileURLWithPath: item.refID)
-                let t = LocalTrack(
-                    id: item.id,
-                    title: item.title,
-                    artist: item.artist,
-                    album: "",
-                    duration: 0,
-                    fileURL: url,
-                    isLiked: item.isLiked,
-                    ytVideoId: item.ytVideoId
-                )
+                let t = LocalLibraryManager.shared.makeLocalTrack(forFileAt: url,
+                                                                  fallbackID: item.id,
+                                                                  fallbackTitle: item.title,
+                                                                  fallbackArtist: item.artist,
+                                                                  fallbackDurationString: item.duration,
+                                                                  isLiked: item.isLiked,
+                                                                  ytVideoId: item.ytVideoId)
                 return .local(t)
             }
             return .unavailable

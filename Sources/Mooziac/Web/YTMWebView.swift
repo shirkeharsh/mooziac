@@ -182,10 +182,7 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
     private var recoveryResumePlayback = false
     private var recoveryWatchdog: DispatchWorkItem?
     
-    override init(frame frameRect: NSRect) {
-        URLCache.shared.memoryCapacity = 512 * 1024
-        URLCache.shared.diskCapacity = 2 * 1024 * 1024
-        
+    private static func makeWebViewConfiguration() -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = WKWebsiteDataStore.default()
         config.allowsAirPlayForMediaPlayback = false
@@ -205,10 +202,12 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
         // Uses a Function.prototype.toString mask to remain undetected by YouTube's anti-adblock,
         // and prunes ad placements in-place from ytInitialPlayerResponse, Response.prototype.json,
         // and JSON.parse across SPA track transitions.
+        let initialAdBlock = YouTubeSettings.shared.isAdBlockEnabled ? "true" : "false"
         let adShieldScript = WKUserScript(
             source: """
             (function() {
                 'use strict';
+                window.__mooziacAdShieldEnabled = \(initialAdBlock);
                 try {
                     var _toString = Function.prototype.toString;
                     var _masks = new WeakMap();
@@ -226,6 +225,7 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
 
                     var AD_KEYS = ['adPlacements', 'playerAds', 'adSlots', 'adBreakHeartbeatParams', 'adPlacementConfig'];
                     function pruneObject(o) {
+                        if (window.__mooziacAdShieldEnabled === false) return o;
                         if (!o || typeof o !== 'object') return o;
                         if (Array.isArray(o)) {
                             if (o.length <= 10) {
@@ -689,35 +689,22 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
             forMainFrameOnly: true
         )
         config.userContentController.addUserScript(cssScript)
-        
+        return config
+    }
+
+    override init(frame frameRect: NSRect) {
+        URLCache.shared.memoryCapacity = 512 * 1024
+        URLCache.shared.diskCapacity = 2 * 1024 * 1024
+
+        let config = Self.makeWebViewConfiguration()
         self.webView = WKWebView(frame: .zero, configuration: config)
         self.webView.customUserAgent = YTMWebViewContainer.userAgent
-        
+
         super.init(frame: frameRect)
-        
+
         config.websiteDataStore.httpCookieStore.add(self)
-        
-        let blockRules = """
-        [
-            { "trigger": { "url-filter": ".*google-analytics\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
-            { "trigger": { "url-filter": ".*doubleclick\\\\.net.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
-            { "trigger": { "url-filter": ".*googletagmanager\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
-            { "trigger": { "url-filter": ".*googleadservices\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
-            { "trigger": { "url-filter": ".*googlesyndication\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
-            { "trigger": { "url-filter": ".*googletagservices\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
-            { "trigger": { "url-filter": ".*mobileads\\\\.google\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
-            { "trigger": { "url-filter": ".*adsafeprotected\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
-            { "trigger": { "url-filter": ".*scorecardresearch\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
-            { "trigger": { "url-filter": ".*quantserve\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } }
-        ]
-        """
-        
-        WKContentRuleListStore.default().compileContentRuleList(forIdentifier: "YTMBlockRules", encodedContentRuleList: blockRules) { [weak self] ruleList, error in
-            if let ruleList = ruleList {
-                self?.webView.configuration.userContentController.add(ruleList)
-            }
-        }
-        
+        applyContentRules(to: self.webView)
+
         setupViews()
         setupWebView()
         
@@ -740,6 +727,53 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
             self.hideOfflineOverlay()
             self.reloadPlayerEngine()
         }
+
+        NotificationCenter.default.addObserver(forName: YouTubeSettings.adBlockDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.syncAdShieldRuntimeFlag()
+        }
+
+        NotificationCenter.default.addObserver(forName: LikedSongsManager.signInStatusChangedNotification, object: nil, queue: .main) { [weak self] _ in
+            if LikedSongsManager.shared.isSignedIn {
+                YouTubeSettings.shared.applySignedInDefaultsIfNeeded()
+            } else {
+                YouTubeSettings.shared.restoreAdBlockDefaultOnSignOutIfNeeded()
+            }
+            self?.syncAdShieldRuntimeFlag()
+        }
+    }
+
+    private func applyContentRules(to targetWebView: WKWebView) {
+        let blockRules = """
+        [
+            { "trigger": { "url-filter": ".*google-analytics\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
+            { "trigger": { "url-filter": ".*doubleclick\\\\.net.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
+            { "trigger": { "url-filter": ".*googletagmanager\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
+            { "trigger": { "url-filter": ".*googleadservices\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
+            { "trigger": { "url-filter": ".*googlesyndication\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
+            { "trigger": { "url-filter": ".*googletagservices\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
+            { "trigger": { "url-filter": ".*mobileads\\\\.google\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
+            { "trigger": { "url-filter": ".*adsafeprotected\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
+            { "trigger": { "url-filter": ".*scorecardresearch\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } },
+            { "trigger": { "url-filter": ".*quantserve\\\\.com.*", "unless-domain": ["*accounts.google.com", "*myaccount.google.com"] }, "action": { "type": "block" } }
+        ]
+        """
+
+        WKContentRuleListStore.default().compileContentRuleList(forIdentifier: "YTMBlockRules", encodedContentRuleList: blockRules) { [weak targetWebView] ruleList, _ in
+            if let ruleList = ruleList {
+                targetWebView?.configuration.userContentController.add(ruleList)
+            }
+        }
+    }
+
+    public func loadGoogleSignIn() {
+        if let url = URL(string: "https://accounts.google.com/ServiceLogin?service=youtube&continue=https%3A%2F%2Fmusic.youtube.com%2F") {
+            webView.load(URLRequest(url: url))
+        }
+    }
+
+    private func syncAdShieldRuntimeFlag() {
+        let enabled = YouTubeSettings.shared.isAdBlockEnabled ? "true" : "false"
+        webView.evaluateJavaScript("window.__mooziacAdShieldEnabled = \(enabled);", completionHandler: nil)
     }
     
     deinit {
@@ -748,6 +782,11 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
     
     func cookiesDidChange(in cookieStore: WKHTTPCookieStore) {
         LikedSongsManager.shared.refreshSignInStatus()
+        if LikedSongsManager.shared.isSignedIn {
+            YouTubeSettings.shared.applySignedInDefaultsIfNeeded()
+        } else {
+            YouTubeSettings.shared.restoreAdBlockDefaultOnSignOutIfNeeded()
+        }
     }
     
     public func loadMusicHome(autoPlayRandom: Bool = false) {
@@ -954,6 +993,20 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
             setCompactModeEnabled(isCompactModeEnabled)
         }
         LikedSongsManager.shared.refreshSignInStatus()
+        if LikedSongsManager.shared.isSignedIn {
+            YouTubeSettings.shared.applySignedInDefaultsIfNeeded()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+                let identJS = "(window.ytcfg && window.ytcfg.get && (window.ytcfg.get('USER_DISPLAY_NAME') || window.ytcfg.get('ACCOUNT_NAME'))) || ''"
+                self?.webView.evaluateJavaScript(identJS) { res, _ in
+                    if let name = res as? String, !name.isEmpty {
+                        AccountSessionManager.shared.updateDisplayIdentity(name)
+                    }
+                }
+            }
+        } else {
+            YouTubeSettings.shared.restoreAdBlockDefaultOnSignOutIfNeeded()
+        }
+        syncAdShieldRuntimeFlag()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             self?.progressView.isHidden = true
         }
@@ -976,6 +1029,27 @@ class YTMWebViewContainer: NSView, WKNavigationDelegate, WKUIDelegate, WKHTTPCoo
             self?.selectSongTab()
         }
         
+        if StatusItemManager.shared?.currentMode == .youtube {
+            autoPlayOnHomeLoad = false
+            webView.evaluateJavaScript("""
+                window.__mooziacAutoplayPending = false;
+                window.__mooziacPlaybackSuppressed = true;
+                window.__mooziacBlockAutoplay = true;
+                try {
+                    var p = document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
+                    if (p && typeof p.pauseVideo === 'function') p.pauseVideo();
+                } catch(e) {}
+                try {
+                    var v = document.querySelector('video');
+                    if (v && !v.paused) v.pause();
+                } catch(e) {}
+            """, completionHandler: nil)
+            if #available(macOS 12.0, *) {
+                webView.pauseAllMediaPlayback()
+            }
+            return
+        }
+
         if autoPlayOnHomeLoad && currentUrl.contains("music.youtube.com") {
             autoPlayOnHomeLoad = false
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in

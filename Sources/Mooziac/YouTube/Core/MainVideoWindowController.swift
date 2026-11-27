@@ -1,4 +1,5 @@
 import AppKit
+import UniformTypeIdentifiers
 import WebKit
 
 final class MainVideoContainerView: NSView {}
@@ -310,6 +311,7 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
             }
         } else if wasInPictureInPicture {
             NSApp.presentationOptions = []
+            restoreWindowFromMinimizeOrHidden()
         }
         wasInPictureInPicture = state.isPictureInPicture
 
@@ -350,6 +352,8 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
 
     public override func showWindow(_ sender: Any?) {
         Self.isWindowVisible = true
+        window?.alphaValue = 1.0
+        window?.ignoresMouseEvents = false
         super.showWindow(sender)
     }
 
@@ -380,6 +384,8 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
         teardownWebView()
         isPlayerFullscreen = false
         wasWindowAlreadyInFullScreenBeforePlayer = false
+        window?.alphaValue = 1.0
+        window?.ignoresMouseEvents = false
         window?.orderOut(nil)
         StatusItemManager.shared?.resumeMooziacFromYouTube()
     }
@@ -579,6 +585,15 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
         }
     }
 
+    public var isPiPActive: Bool {
+        VideoPlayerCoordinator.shared.currentState.isPictureInPicture ||
+            NSApp.windows.contains { w in
+                guard w.isVisible else { return false }
+                let cls = String(describing: type(of: w))
+                return cls.contains("PIP") || cls.contains("PictureInPicture")
+            }
+    }
+
     public func performMinimize() {
         Self.isWindowVisible = false
         KeyboardShortcutHandler.shared.stopMonitoring()
@@ -589,6 +604,16 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
             if !isTransitioningFullScreen {
                 win.toggleFullScreen(nil)
             }
+            return
+        }
+        // When Picture-in-Picture is active, both miniaturize(nil) and orderOut(nil)
+        // mark the host NSWindow as off-screen/non-visible, causing macOS PIPViewController
+        // to reject the "Return to Window" button. Keep the window in the window list
+        // while making it completely transparent, click-through, and ordered behind other apps.
+        if isPiPActive {
+            win.alphaValue = 0.0
+            win.ignoresMouseEvents = true
+            win.orderBack(nil)
             return
         }
         let btn = win.standardWindowButton(.miniaturizeButton)
@@ -602,6 +627,28 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
         btn?.isHidden = wasHidden
     }
 
+    public func handleBridgePiPDidExit() {
+        NSApp.presentationOptions = []
+        wasInPictureInPicture = false
+        restoreWindowFromMinimizeOrHidden()
+    }
+
+    public func restoreWindowFromMinimizeOrHidden() {
+        guard let win = window else { return }
+        if win.isMiniaturized {
+            win.deminiaturize(nil)
+        }
+        let needsRestore = !win.isVisible || !Self.isWindowVisible || win.alphaValue < 0.99 || win.ignoresMouseEvents
+        win.alphaValue = 1.0
+        win.ignoresMouseEvents = false
+        if needsRestore {
+            showWindow(nil)
+            win.makeKeyAndOrderFront(nil)
+            KeyboardShortcutHandler.shared.startMonitoring()
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+
     public func headerBarDidTapBack() {
         goBack()
     }
@@ -612,6 +659,52 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
 
     public func headerBarDidTapReload() {
         reload()
+    }
+
+    public func headerBarDidTapShorts() {
+        if isPlayerFullscreen {
+            handleBridgeFullscreenRequest(wantsFullscreen: false)
+        }
+        let wv = ensureWebView()
+        guard wv.url?.host?.contains("youtube.com") == true else {
+            if let url = URL(string: "https://www.youtube.com/shorts") {
+                loadURL(url)
+            }
+            return
+        }
+
+        let js = """
+        (function() {
+            var shortsLink = document.querySelector('ytd-mini-guide-entry-renderer a[href="/shorts"], ytd-guide-entry-renderer a[href="/shorts"], a[title="Shorts"]');
+            if (shortsLink) {
+                shortsLink.click();
+                return true;
+            }
+            try {
+                var a = document.createElement('a');
+                a.href = '/shorts';
+                a.className = 'yt-simple-endpoint';
+                (document.querySelector('ytd-app') || document.body).appendChild(a);
+                a.click();
+                a.remove();
+            } catch(e) {}
+            setTimeout(function() {
+                if (window.location.pathname.indexOf('/shorts') !== 0) {
+                    window.location.href = 'https://www.youtube.com/shorts';
+                }
+            }, 250);
+            return true;
+        })();
+        """
+        wv.evaluateJavaScript(js) { [weak self] result, error in
+            DispatchQueue.main.async {
+                if error != nil || (result as? Bool) != true {
+                    if let url = URL(string: "https://www.youtube.com/shorts") {
+                        self?.loadURL(url)
+                    }
+                }
+            }
+        }
     }
 
     public func headerBarDidTapCaptions() {
@@ -667,13 +760,27 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
 
         menu.addItem(NSMenuItem.separator())
 
-        // 2. New Playlist Action
+        // 2. New & Import Playlist Actions
         let newPlaylistItem = NSMenuItem(title: "New Playlist…", action: #selector(didSelectCreatePlaylist), keyEquivalent: "")
         newPlaylistItem.target = self
         if let img = NSImage(systemSymbolName: "plus.rectangle.on.rectangle", accessibilityDescription: nil) {
             newPlaylistItem.image = img
         }
         menu.addItem(newPlaylistItem)
+
+        let importPlItem = NSMenuItem(title: "Import Playlist (M3U8 / JSON)…", action: #selector(didSelectImportYouTubePlaylistFile), keyEquivalent: "")
+        importPlItem.target = self
+        if let img = NSImage(systemSymbolName: "square.and.arrow.down", accessibilityDescription: nil) {
+            importPlItem.image = img
+        }
+        menu.addItem(importPlItem)
+
+        let searchPlItem = NSMenuItem(title: "Search Saved Videos…", action: #selector(didSelectSearchYouTubePlaylists), keyEquivalent: "")
+        searchPlItem.target = self
+        if let img = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: nil) {
+            searchPlItem.image = img
+        }
+        menu.addItem(searchPlItem)
 
         // 3. Add Current Video to Playlist (if a video is active)
         if !current.videoId.isEmpty {
@@ -720,22 +827,56 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
 
                 let items = YouTubeDatabaseManager.shared.fetchPlaylistVideos(playlistId: pl.id)
                 if !items.isEmpty {
-                    let playFirst = NSMenuItem(title: "Play First Video", action: #selector(didSelectPlayVideoById(_:)), keyEquivalent: "")
-                    playFirst.target = self
-                    playFirst.representedObject = items[0].videoId
+                    let playAll = NSMenuItem(title: "Play All (Queue)", action: #selector(didSelectPlayAllInYouTubePlaylist(_:)), keyEquivalent: "")
+                    playAll.target = self
+                    playAll.representedObject = ["playlistId": pl.id, "shuffle": false]
                     if let playImg = NSImage(systemSymbolName: "play.fill", accessibilityDescription: nil) {
-                        playFirst.image = playImg
+                        playAll.image = playImg
                     }
-                    plSubmenu.addItem(playFirst)
+                    plSubmenu.addItem(playAll)
+
+                    let shuffleAll = NSMenuItem(title: "Shuffle Play", action: #selector(didSelectPlayAllInYouTubePlaylist(_:)), keyEquivalent: "")
+                    shuffleAll.target = self
+                    shuffleAll.representedObject = ["playlistId": pl.id, "shuffle": true]
+                    if let shufImg = NSImage(systemSymbolName: "shuffle", accessibilityDescription: nil) {
+                        shuffleAll.image = shufImg
+                    }
+                    plSubmenu.addItem(shuffleAll)
                     plSubmenu.addItem(NSMenuItem.separator())
 
-                    for item in items.prefix(25) {
+                    for (idx, item) in items.prefix(25).enumerated() {
                         let title = item.title.isEmpty ? item.videoId : item.title
                         let cleanTitle = truncateText(title, maxLength: 42)
                         let vi = NSMenuItem(title: cleanTitle, action: #selector(didSelectPlayVideoById(_:)), keyEquivalent: "")
                         vi.target = self
                         vi.representedObject = item.videoId
                         vi.toolTip = title
+
+                        let itemSub = NSMenu(title: cleanTitle)
+                        let playNow = NSMenuItem(title: "Play Now", action: #selector(didSelectPlayVideoById(_:)), keyEquivalent: "")
+                        playNow.target = self
+                        playNow.representedObject = item.videoId
+                        itemSub.addItem(playNow)
+
+                        if idx > 0 {
+                            let moveUp = NSMenuItem(title: "Move Up", action: #selector(didSelectMoveYouTubePlaylistVideo(_:)), keyEquivalent: "")
+                            moveUp.target = self
+                            moveUp.representedObject = ["playlistId": pl.id, "videoId": item.videoId, "delta": -1]
+                            itemSub.addItem(moveUp)
+                        }
+                        if idx < items.count - 1 {
+                            let moveDown = NSMenuItem(title: "Move Down", action: #selector(didSelectMoveYouTubePlaylistVideo(_:)), keyEquivalent: "")
+                            moveDown.target = self
+                            moveDown.representedObject = ["playlistId": pl.id, "videoId": item.videoId, "delta": 1]
+                            itemSub.addItem(moveDown)
+                        }
+                        itemSub.addItem(NSMenuItem.separator())
+                        let removeVid = NSMenuItem(title: "Remove from Playlist", action: #selector(didSelectRemoveYouTubePlaylistVideo(_:)), keyEquivalent: "")
+                        removeVid.target = self
+                        removeVid.representedObject = ["playlistId": pl.id, "videoId": item.videoId]
+                        itemSub.addItem(removeVid)
+
+                        vi.submenu = itemSub
                         plSubmenu.addItem(vi)
                     }
                     plSubmenu.addItem(NSMenuItem.separator())
@@ -745,6 +886,21 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
                     plSubmenu.addItem(emptyVideos)
                     plSubmenu.addItem(NSMenuItem.separator())
                 }
+
+                let renamePl = NSMenuItem(title: "Rename \"\(pl.name)\"…", action: #selector(didSelectRenameYouTubePlaylist(_:)), keyEquivalent: "")
+                renamePl.target = self
+                renamePl.representedObject = pl
+                plSubmenu.addItem(renamePl)
+
+                let exportM3U = NSMenuItem(title: "Export as M3U8…", action: #selector(didSelectExportYouTubePlaylist(_:)), keyEquivalent: "")
+                exportM3U.target = self
+                exportM3U.representedObject = ["playlist": pl, "format": PlaylistFileCodec.Format.m3u8.rawValue]
+                plSubmenu.addItem(exportM3U)
+
+                let exportJSON = NSMenuItem(title: "Export as JSON…", action: #selector(didSelectExportYouTubePlaylist(_:)), keyEquivalent: "")
+                exportJSON.target = self
+                exportJSON.representedObject = ["playlist": pl, "format": PlaylistFileCodec.Format.json.rawValue]
+                plSubmenu.addItem(exportJSON)
 
                 let deletePl = NSMenuItem(title: "Delete \"\(pl.name)\"", action: #selector(didSelectDeletePlaylist(_:)), keyEquivalent: "")
                 deletePl.target = self
@@ -814,6 +970,158 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
         guard let playlistId = sender.representedObject as? String else { return }
         YouTubeDatabaseManager.shared.deletePlaylist(id: playlistId)
         FloatingHUDWindowController.shared.showCustomTextOverlay(text: "Playlist Deleted")
+    }
+
+    @objc private func didSelectRenameYouTubePlaylist(_ sender: NSMenuItem) {
+        guard let playlist = sender.representedObject as? LocalPlaylistRecord else { return }
+        let alert = NSAlert()
+        alert.messageText = "Rename Playlist"
+        alert.informativeText = "Enter a new name:"
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Rename")
+        alert.addButton(withTitle: "Cancel")
+
+        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        input.stringValue = playlist.name
+        alert.accessoryView = input
+
+        if alert.runModal() == .alertFirstButtonReturn {
+            let newName = input.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !newName.isEmpty else { return }
+            YouTubeDatabaseManager.shared.renamePlaylist(id: playlist.id, name: newName)
+            FloatingHUDWindowController.shared.showCustomTextOverlay(text: "Renamed to \"\(newName)\"")
+        }
+    }
+
+    @objc private func didSelectPlayAllInYouTubePlaylist(_ sender: NSMenuItem) {
+        guard let info = sender.representedObject as? [String: Any],
+              let pid = info["playlistId"] as? String else { return }
+        let shuffle = info["shuffle"] as? Bool ?? false
+        var videos = YouTubeDatabaseManager.shared.fetchPlaylistVideos(playlistId: pid).map { $0.videoId }
+        guard !videos.isEmpty else { return }
+        if shuffle { videos.shuffle() }
+        if videos.count == 1 {
+            playVideoById(videos[0])
+        } else if let url = URL(string: "https://www.youtube.com/watch_videos?video_ids=\(videos.prefix(50).joined(separator: ","))") {
+            loadURL(url)
+            FloatingHUDWindowController.shared.showCustomTextOverlay(text: shuffle ? "Shuffling Playlist" : "Playing Playlist Queue")
+        }
+    }
+
+    @objc private func didSelectMoveYouTubePlaylistVideo(_ sender: NSMenuItem) {
+        guard let info = sender.representedObject as? [String: Any],
+              let pid = info["playlistId"] as? String,
+              let vid = info["videoId"] as? String,
+              let delta = info["delta"] as? Int else { return }
+        var ids = YouTubeDatabaseManager.shared.fetchPlaylistVideos(playlistId: pid).map { $0.videoId }
+        guard let idx = ids.firstIndex(of: vid) else { return }
+        let target = idx + delta
+        guard target >= 0 && target < ids.count else { return }
+        ids.swapAt(idx, target)
+        YouTubeDatabaseManager.shared.reorderPlaylistItems(playlistId: pid, orderedVideoIds: ids)
+    }
+
+    @objc private func didSelectRemoveYouTubePlaylistVideo(_ sender: NSMenuItem) {
+        guard let info = sender.representedObject as? [String: String],
+              let pid = info["playlistId"],
+              let vid = info["videoId"] else { return }
+        YouTubeDatabaseManager.shared.removeVideoFromPlaylist(playlistId: pid, videoId: vid)
+        FloatingHUDWindowController.shared.showCustomTextOverlay(text: "Removed from Playlist")
+    }
+
+    @objc private func didSelectSearchYouTubePlaylists() {
+        let alert = NSAlert()
+        alert.messageText = "Search Offline Playlists"
+        alert.informativeText = "Enter a video or playlist title to play:"
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Find & Play")
+        alert.addButton(withTitle: "Cancel")
+
+        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        input.placeholderString = "Search keyword…"
+        alert.accessoryView = input
+
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let query = input.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !query.isEmpty else { return }
+
+        for pl in YouTubeDatabaseManager.shared.fetchPlaylists() {
+            let items = YouTubeDatabaseManager.shared.fetchPlaylistVideos(playlistId: pl.id)
+            if let match = items.first(where: { $0.title.lowercased().contains(query) || $0.channel.lowercased().contains(query) }) {
+                playVideoById(match.videoId)
+                FloatingHUDWindowController.shared.showCustomTextOverlay(text: "Playing \"\(match.title)\"")
+                return
+            }
+        }
+        FloatingHUDWindowController.shared.showCustomTextOverlay(text: "No matching saved video found")
+    }
+
+    @objc private func didSelectImportYouTubePlaylistFile() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [
+            UTType(filenameExtension: "m3u8") ?? .plainText,
+            UTType(filenameExtension: "m3u") ?? .plainText,
+            .json
+        ]
+        panel.prompt = "Import"
+        NSApp.activate(ignoringOtherApps: true)
+        panel.begin { resp in
+            guard resp == .OK, let fileURL = panel.url,
+                  let data = try? Data(contentsOf: fileURL),
+                  let decoded = try? PlaylistFileCodec.decode(data, from: fileURL) else { return }
+            let ytTracks = decoded.document.tracks.filter { $0.ytVideoId != nil && !$0.ytVideoId!.isEmpty }
+            guard !ytTracks.isEmpty else {
+                FloatingHUDWindowController.shared.showCustomTextOverlay(text: "No YouTube tracks found in file")
+                return
+            }
+            let pid = YouTubeDatabaseManager.shared.createPlaylist(name: decoded.document.name)
+            for t in ytTracks {
+                if let vid = t.ytVideoId {
+                    YouTubeDatabaseManager.shared.addVideoToPlaylist(
+                        playlistId: pid,
+                        videoId: vid,
+                        title: t.title.isEmpty ? vid : t.title,
+                        channel: t.artist,
+                        duration: 0
+                    )
+                }
+            }
+            FloatingHUDWindowController.shared.showCustomTextOverlay(text: "Imported \"\(decoded.document.name)\" (\(ytTracks.count) videos)")
+        }
+    }
+
+    @objc private func didSelectExportYouTubePlaylist(_ sender: NSMenuItem) {
+        guard let info = sender.representedObject as? [String: Any],
+              let pl = info["playlist"] as? LocalPlaylistRecord,
+              let rawFmt = info["format"] as? String,
+              let fmt = PlaylistFileCodec.Format(rawValue: rawFmt) else { return }
+        let items = YouTubeDatabaseManager.shared.fetchPlaylistVideos(playlistId: pl.id)
+        let tracks = items.map {
+            PlaylistFileCodec.Track(
+                path: "https://www.youtube.com/watch?v=\($0.videoId)",
+                title: $0.title,
+                artist: $0.channel,
+                ytVideoId: $0.videoId
+            )
+        }
+        guard !tracks.isEmpty,
+              let data = try? PlaylistFileCodec.encode(PlaylistFileCodec.Document(name: pl.name, tracks: tracks), as: fmt) else {
+            FloatingHUDWindowController.shared.showCustomTextOverlay(text: "Empty playlist")
+            return
+        }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [UTType(filenameExtension: fmt.fileExtension) ?? .data]
+        panel.nameFieldStringValue = "\(pl.name).\(fmt.fileExtension)"
+        panel.prompt = "Export"
+        NSApp.activate(ignoringOtherApps: true)
+        panel.begin { resp in
+            guard resp == .OK, let url = panel.url else { return }
+            try? data.write(to: url, options: .atomic)
+            FloatingHUDWindowController.shared.showCustomTextOverlay(text: "Exported \"\(pl.name)\"")
+        }
     }
 
     @objc private func didSelectPlayVideoById(_ sender: NSMenuItem) {
@@ -1073,16 +1381,23 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
             DispatchQueue.main.async {
                 let previous = self.isUserSignedIn
                 self.isUserSignedIn = signedIn
+                let wasAdBlockEnabled = AppSettings.shared.isAdBlockEnabled
                 if signedIn {
                     AppSettings.shared.applySignedInDefaultsIfNeeded()
+                } else {
+                    AppSettings.shared.restoreAdBlockDefaultOnSignOutIfNeeded()
                 }
+                let didAdBlockChange = (wasAdBlockEnabled != AppSettings.shared.isAdBlockEnabled)
 
                 // Notify webview DOM about authentication state
                 let js = "window.__mooziacUserSignedIn = \(signedIn); if (\(signedIn)) { document.documentElement.classList.add('mooziac-signed-in'); } else { document.documentElement.classList.remove('mooziac-signed-in'); }"
                 self.webView?.evaluateJavaScript(js, completionHandler: nil)
 
-                if previous != signedIn {
-                    Log.app.info("Authentication state transitioned: signedIn = \(signedIn). Reconfiguration triggered.")
+                if previous != signedIn || didAdBlockChange {
+                    if previous != signedIn {
+                        LikedSongsManager.shared.refreshSignInStatus()
+                    }
+                    Log.app.info("Authentication state transitioned: signedIn = \(signedIn), adBlock = \(AppSettings.shared.isAdBlockEnabled). Reconfiguration triggered.")
                     // Clear memory & disk caches to eliminate any lingering ad rules or cached responses
                     YouTubeWebView.isolatedDataStore.removeData(ofTypes: [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache], modifiedSince: .distantPast) {}
                     if #available(macOS 15.4, *) {
@@ -1100,23 +1415,28 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
         checkAuthenticationStatus()
         let menu = NSMenu(title: "Shield & Tools")
 
-        if isUserSignedIn {
-            let accountHeader = NSMenuItem(title: "Account: Signed In", action: nil, keyEquivalent: "")
-            accountHeader.isEnabled = false
-            menu.addItem(accountHeader)
+        let ident = AccountSessionManager.shared.displayIdentity.map { " (\($0))" } ?? ""
+        let statusStr = isUserSignedIn ? "Signed In\(ident)" : "Signed Out"
 
-            let signOutItem = NSMenuItem(title: "Sign Out of YouTube…", action: #selector(didSelectSignOut), keyEquivalent: "")
+        let activeSection = NSMenuItem(title: "Google Account (Shared)", action: nil, keyEquivalent: "")
+        activeSection.isEnabled = false
+        menu.addItem(activeSection)
+
+        let accountHeader = NSMenuItem(title: statusStr, action: nil, keyEquivalent: "")
+        accountHeader.isEnabled = false
+        menu.addItem(accountHeader)
+
+        if isUserSignedIn {
+            let signOutItem = NSMenuItem(title: "Sign Out…", action: #selector(didSelectSignOut), keyEquivalent: "")
             signOutItem.target = self
             menu.addItem(signOutItem)
-
-            menu.addItem(NSMenuItem.separator())
         } else {
             let signInItem = NSMenuItem(title: "Sign In with Google…", action: #selector(didSelectSignIn), keyEquivalent: "")
             signInItem.target = self
             menu.addItem(signInItem)
-
-            menu.addItem(NSMenuItem.separator())
         }
+
+        menu.addItem(NSMenuItem.separator())
 
         let adBlockItem = NSMenuItem(title: "Ad Blocker (Undetected)", action: #selector(didToggleShieldAdBlock), keyEquivalent: "")
         adBlockItem.target = self
@@ -1176,8 +1496,14 @@ public class MainVideoWindowController: NSWindowController, NSWindowDelegate, Mo
     }
 
     @objc private func didSelectSignOut() {
-        if let url = URL(string: "https://www.youtube.com/logout") {
-            ensureWebView().load(URLRequest(url: url))
+        AccountSessionManager.shared.clearSharedSession { [weak self] in
+            self?.lastVisitedURL = URL(string: "https://www.youtube.com")
+            self?.teardownWebView()
+            _ = self?.ensureWebView()
+            self?.checkAuthenticationStatus()
+            LikedSongsManager.shared.refreshSignInStatus()
+            StatusItemManager.shared?.mainViewController.webViewContainer.loadMusicHome(autoPlayRandom: false)
+            FloatingHUDWindowController.shared.showCustomTextOverlay(text: "Signed Out")
         }
     }
 

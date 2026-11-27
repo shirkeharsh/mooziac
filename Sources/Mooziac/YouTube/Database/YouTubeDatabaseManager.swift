@@ -223,6 +223,73 @@ public final class YouTubeDatabaseManager {
         if fetchPlaylists().isEmpty {
             _ = createPlaylist(name: "Favorites")
         }
+
+        // Additive migration: sort_order column on playlist_items
+        var hasSortOrder = false
+        var infoStmt: OpaquePointer?
+        if let db = db, sqlite3_prepare_v2(db, "PRAGMA table_info(playlist_items);", -1, &infoStmt, nil) == SQLITE_OK {
+            while sqlite3_step(infoStmt) == SQLITE_ROW {
+                if let cName = sqlite3_column_text(infoStmt, 1), String(cString: cName) == "sort_order" {
+                    hasSortOrder = true
+                    break
+                }
+            }
+        }
+        sqlite3_finalize(infoStmt)
+        if !hasSortOrder {
+            executeRaw(sql: "ALTER TABLE playlist_items ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;")
+        }
+
+        consolidateSingleAccountSchemaIfNeeded()
+    }
+
+    private func columnExists(table: String, column: String) -> Bool {
+        guard let db = db else { return false }
+        var stmt: OpaquePointer?
+        var found = false
+        if sqlite3_prepare_v2(db, "PRAGMA table_info(\(table));", -1, &stmt, nil) == SQLITE_OK {
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                if let cName = sqlite3_column_text(stmt, 1), String(cString: cName) == column {
+                    found = true
+                    break
+                }
+            }
+        }
+        sqlite3_finalize(stmt)
+        return found
+    }
+
+    private func consolidateSingleAccountSchemaIfNeeded() {
+        executeRaw(sql: """
+        DROP INDEX IF EXISTS idx_yt_playlists_account;
+        DROP INDEX IF EXISTS idx_yt_history_account;
+        DROP INDEX IF EXISTS idx_yt_liked_account;
+        """)
+        if columnExists(table: "liked_videos", column: "account_id") {
+            executeRaw(sql: """
+            BEGIN TRANSACTION;
+            CREATE TABLE IF NOT EXISTS liked_videos_single (
+                video_id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                channel TEXT DEFAULT '',
+                artwork_url TEXT DEFAULT '',
+                duration REAL DEFAULT 0,
+                date_liked REAL NOT NULL
+            );
+            INSERT OR IGNORE INTO liked_videos_single (video_id, title, channel, artwork_url, duration, date_liked)
+            SELECT video_id, title, channel, artwork_url, duration, date_liked FROM liked_videos ORDER BY date_liked DESC;
+            DROP TABLE liked_videos;
+            ALTER TABLE liked_videos_single RENAME TO liked_videos;
+            CREATE INDEX IF NOT EXISTS idx_liked_videos_date ON liked_videos(date_liked DESC);
+            COMMIT;
+            """)
+        }
+        if columnExists(table: "playlists", column: "account_id") {
+            executeRaw(sql: "ALTER TABLE playlists DROP COLUMN account_id;")
+        }
+        if columnExists(table: "history", column: "account_id") {
+            executeRaw(sql: "ALTER TABLE history DROP COLUMN account_id;")
+        }
     }
 
     // MARK: - History Operations
@@ -574,7 +641,7 @@ public final class YouTubeDatabaseManager {
         var results: [LocalPlaylistItemRecord] = []
         dbQueue.sync {
             guard let db = db else { return }
-            let sql = "SELECT id, playlist_id, video_id, title, channel, artwork_url, duration, date_added FROM playlist_items WHERE playlist_id = ? ORDER BY date_added DESC;"
+            let sql = "SELECT id, playlist_id, video_id, title, channel, artwork_url, duration, date_added FROM playlist_items WHERE playlist_id = ? ORDER BY sort_order ASC, date_added DESC;"
             var stmt: OpaquePointer?
             if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
                 sqlite3_bind_text(stmt, 1, (playlistId as NSString).utf8String, -1, SQLITE_TRANSIENT)
@@ -620,6 +687,59 @@ public final class YouTubeDatabaseManager {
             DispatchQueue.main.async {
                 NotificationCenter.default.post(name: Self.playlistsDidChangeNotification, object: nil)
             }
+        }
+    }
+
+    public func renamePlaylist(id: String, name: String) {
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !id.isEmpty, !clean.isEmpty else { return }
+        let now = Date().timeIntervalSince1970
+        dbQueue.sync { [weak self] in
+            guard let self = self, let db = self.db else { return }
+            let sql = "UPDATE playlists SET name = ?, updated_at = ? WHERE id = ?;"
+            var stmt: OpaquePointer?
+            if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+                sqlite3_bind_text(stmt, 1, (clean as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_double(stmt, 2, now)
+                sqlite3_bind_text(stmt, 3, (id as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_step(stmt)
+                sqlite3_finalize(stmt)
+            }
+        }
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: Self.playlistsDidChangeNotification, object: nil)
+        }
+    }
+
+    public func reorderPlaylistItems(playlistId: String, orderedVideoIds: [String]) {
+        guard !playlistId.isEmpty else { return }
+        let now = Date().timeIntervalSince1970
+        dbQueue.sync { [weak self] in
+            guard let self = self, let db = self.db else { return }
+            let sql = "UPDATE playlist_items SET sort_order = ? WHERE playlist_id = ? AND video_id = ?;"
+            var stmt: OpaquePointer?
+            if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+                for (idx, vid) in orderedVideoIds.enumerated() {
+                    sqlite3_reset(stmt)
+                    sqlite3_clear_bindings(stmt)
+                    sqlite3_bind_int(stmt, 1, Int32(idx))
+                    sqlite3_bind_text(stmt, 2, (playlistId as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                    sqlite3_bind_text(stmt, 3, (vid as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                    sqlite3_step(stmt)
+                }
+                sqlite3_finalize(stmt)
+            }
+            let touchSQL = "UPDATE playlists SET updated_at = ? WHERE id = ?;"
+            var tStmt: OpaquePointer?
+            if sqlite3_prepare_v2(db, touchSQL, -1, &tStmt, nil) == SQLITE_OK {
+                sqlite3_bind_double(tStmt, 1, now)
+                sqlite3_bind_text(tStmt, 2, (playlistId as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_step(tStmt)
+                sqlite3_finalize(tStmt)
+            }
+        }
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: Self.playlistsDidChangeNotification, object: nil)
         }
     }
 }

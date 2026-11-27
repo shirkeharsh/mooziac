@@ -206,6 +206,7 @@ extension PlaylistLibraryView {
         case .list:
             guard row < filteredPlaylists.count else { return [] }
             let playlist = filteredPlaylists[row]
+            guard !playlist.isSmart else { return [] }
             let deleteAction = NSTableViewRowAction(style: .destructive, title: "Delete") { [weak self] _, _ in
                 self?.confirmAndDeletePlaylist(playlist)
             }
@@ -214,7 +215,7 @@ extension PlaylistLibraryView {
             return [deleteAction]
 
         case .detail(let playlist):
-            guard row < filteredPlaylistItems.count else { return [] }
+            guard !playlist.isSmart, row < filteredPlaylistItems.count else { return [] }
             let item = filteredPlaylistItems[row]
             let deleteAction = NSTableViewRowAction(style: .destructive, title: "Remove") { [weak self] _, _ in
                 PlaylistManager.shared.removeItem(itemID: item.id, from: playlist.id)
@@ -291,24 +292,26 @@ extension PlaylistLibraryView {
         let isSearch = !searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let currentIndex = allPlaylistItems.firstIndex(where: { $0.id == item.id }) ?? -1
 
-        let moveUpItem = NSMenuItem(title: "Move Up", action: #selector(handleContextMoveUpItem(_:)), keyEquivalent: "")
-        moveUpItem.target = self
-        moveUpItem.representedObject = ["itemID": item.id, "playlistID": playlist.id]
-        moveUpItem.isEnabled = currentIndex > 0 && !isSearch
-        menu.addItem(moveUpItem)
+        if !playlist.isSmart {
+            let moveUpItem = NSMenuItem(title: "Move Up", action: #selector(handleContextMoveUpItem(_:)), keyEquivalent: "")
+            moveUpItem.target = self
+            moveUpItem.representedObject = ["itemID": item.id, "playlistID": playlist.id]
+            moveUpItem.isEnabled = currentIndex > 0 && !isSearch
+            menu.addItem(moveUpItem)
 
-        let moveDownItem = NSMenuItem(title: "Move Down", action: #selector(handleContextMoveDownItem(_:)), keyEquivalent: "")
-        moveDownItem.target = self
-        moveDownItem.representedObject = ["itemID": item.id, "playlistID": playlist.id]
-        moveDownItem.isEnabled = (currentIndex >= 0 && currentIndex < allPlaylistItems.count - 1) && !isSearch
-        menu.addItem(moveDownItem)
+            let moveDownItem = NSMenuItem(title: "Move Down", action: #selector(handleContextMoveDownItem(_:)), keyEquivalent: "")
+            moveDownItem.target = self
+            moveDownItem.representedObject = ["itemID": item.id, "playlistID": playlist.id]
+            moveDownItem.isEnabled = (currentIndex >= 0 && currentIndex < allPlaylistItems.count - 1) && !isSearch
+            menu.addItem(moveDownItem)
 
-        menu.addItem(NSMenuItem.separator())
+            menu.addItem(NSMenuItem.separator())
 
-        let deleteItem = NSMenuItem(title: "Remove from Playlist", action: #selector(handleContextRemoveItem(_:)), keyEquivalent: "")
-        deleteItem.target = self
-        deleteItem.representedObject = ["itemID": item.id, "playlistID": playlist.id]
-        menu.addItem(deleteItem)
+            let deleteItem = NSMenuItem(title: "Remove from Playlist", action: #selector(handleContextRemoveItem(_:)), keyEquivalent: "")
+            deleteItem.target = self
+            deleteItem.representedObject = ["itemID": item.id, "playlistID": playlist.id]
+            menu.addItem(deleteItem)
+        }
 
         let point = NSPoint(x: 0, y: sender.bounds.height + 4)
         menu.popUp(positioning: nil, at: point, in: sender)
@@ -558,7 +561,9 @@ extension PlaylistLibraryView {
 
     public func tableView(_ tableView: NSTableView, writeRowsWith rowIndexes: IndexSet, to pboard: NSPasteboard) -> Bool {
         switch mode {
-        case .detail, .likedSongs, .downloads:
+        case .detail(let pl) where !pl.isSmart:
+            break
+        case .likedSongs, .downloads:
             break
         default:
             return false

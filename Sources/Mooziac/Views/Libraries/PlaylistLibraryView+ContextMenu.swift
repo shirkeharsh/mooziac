@@ -9,13 +9,42 @@ extension PlaylistLibraryView {
         let row = tableView.row(at: point)
         guard row >= 0 else { return super.menu(for: event) }
 
-        tableView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+        if !tableView.selectedRowIndexes.contains(row) {
+            tableView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+        }
+        let selectedIndexes = tableView.selectedRowIndexes
 
         let menu = NSMenu(title: "Context Menu")
 
         switch mode {
         case .list:
             guard row < filteredPlaylists.count else { return nil }
+            if selectedIndexes.count > 1 {
+                let selectedPlaylists = selectedIndexes.compactMap { idx -> PlaylistRecord? in
+                    guard idx < filteredPlaylists.count else { return nil }
+                    return filteredPlaylists[idx]
+                }.filter { !$0.isSmart }
+                if selectedPlaylists.count > 1 {
+                    let targets = PlaylistManager.shared.fetchPlaylists()
+                    let mergeItem = NSMenuItem(title: "Merge \(selectedPlaylists.count) Playlists into…", action: nil, keyEquivalent: "")
+                    let mergeSubmenu = NSMenu(title: "Merge")
+                    for target in targets {
+                        let tItem = NSMenuItem(title: target.name, action: #selector(handleContextBatchMergePlaylists(_:)), keyEquivalent: "")
+                        tItem.target = self
+                        tItem.representedObject = ["sources": selectedPlaylists.map { $0.id }, "targetID": target.id, "targetName": target.name]
+                        mergeSubmenu.addItem(tItem)
+                    }
+                    mergeItem.submenu = mergeSubmenu
+                    menu.addItem(mergeItem)
+
+                    let delBatchItem = NSMenuItem(title: "Delete \(selectedPlaylists.count) Playlists…", action: #selector(handleContextBatchDeletePlaylists(_:)), keyEquivalent: "")
+                    delBatchItem.target = self
+                    delBatchItem.representedObject = selectedPlaylists
+                    menu.addItem(delBatchItem)
+                    return menu
+                }
+            }
+
             let playlist = filteredPlaylists[row]
 
             let openItem = NSMenuItem(title: "Open Playlist", action: #selector(handleContextOpenPlaylist(_:)), keyEquivalent: "")
@@ -23,12 +52,58 @@ extension PlaylistLibraryView {
             openItem.representedObject = playlist
             menu.addItem(openItem)
 
-            let addCurrentItem = NSMenuItem(title: "Add Current Track", action: #selector(handleContextAddCurrentFromList(_:)), keyEquivalent: "")
-            addCurrentItem.target = self
-            addCurrentItem.representedObject = playlist
-            menu.addItem(addCurrentItem)
+            if !playlist.isSmart {
+                let addCurrentItem = NSMenuItem(title: "Add Current Track", action: #selector(handleContextAddCurrentFromList(_:)), keyEquivalent: "")
+                addCurrentItem.target = self
+                addCurrentItem.representedObject = playlist
+                menu.addItem(addCurrentItem)
+            }
 
             menu.addItem(NSMenuItem.separator())
+
+            let dupItem = NSMenuItem(title: "Duplicate Playlist", action: #selector(handleContextDuplicatePlaylist(_:)), keyEquivalent: "")
+            dupItem.target = self
+            dupItem.representedObject = playlist
+            menu.addItem(dupItem)
+
+            if !playlist.isSmart {
+                let others = PlaylistManager.shared.fetchPlaylists().filter { $0.id != playlist.id }
+                if !others.isEmpty {
+                    let mergeItem = NSMenuItem(title: "Merge into Playlist", action: nil, keyEquivalent: "")
+                    let mergeMenu = NSMenu(title: "Merge")
+                    for target in others {
+                        let mItem = NSMenuItem(title: target.name, action: #selector(handleContextMergePlaylist(_:)), keyEquivalent: "")
+                        mItem.target = self
+                        mItem.representedObject = ["sourceID": playlist.id, "targetID": target.id, "targetName": target.name]
+                        mergeMenu.addItem(mItem)
+                    }
+                    mergeItem.submenu = mergeMenu
+                    menu.addItem(mergeItem)
+                }
+
+                let folders = PlaylistManager.shared.fetchFolders()
+                let folderItem = NSMenuItem(title: "Move to Folder", action: nil, keyEquivalent: "")
+                let folderMenu = NSMenu(title: "Folders")
+                let rootItem = NSMenuItem(title: "None (Root)", action: #selector(handleContextMovePlaylistToFolder(_:)), keyEquivalent: "")
+                rootItem.target = self
+                rootItem.representedObject = ["playlistID": playlist.id, "folderID": ""]
+                rootItem.state = (playlist.folderId == nil) ? .on : .off
+                folderMenu.addItem(rootItem)
+                for folder in folders {
+                    let fItem = NSMenuItem(title: folder.name, action: #selector(handleContextMovePlaylistToFolder(_:)), keyEquivalent: "")
+                    fItem.target = self
+                    fItem.representedObject = ["playlistID": playlist.id, "folderID": folder.id]
+                    fItem.state = (playlist.folderId == folder.id) ? .on : .off
+                    folderMenu.addItem(fItem)
+                }
+                folderMenu.addItem(NSMenuItem.separator())
+                let newFolderItem = NSMenuItem(title: "+ New Folder…", action: #selector(handleContextNewFolderWithPlaylist(_:)), keyEquivalent: "")
+                newFolderItem.target = self
+                newFolderItem.representedObject = playlist.id
+                folderMenu.addItem(newFolderItem)
+                folderItem.submenu = folderMenu
+                menu.addItem(folderItem)
+            }
 
             let exportItem = NSMenuItem(title: "Export Playlist", action: nil, keyEquivalent: "")
             let exportMenu = NSMenu(title: "Export Playlist")
@@ -42,20 +117,53 @@ extension PlaylistLibraryView {
             exportItem.submenu = exportMenu
             menu.addItem(exportItem)
 
-            menu.addItem(NSMenuItem.separator())
+            if !playlist.isSmart {
+                menu.addItem(NSMenuItem.separator())
 
-            let renameItem = NSMenuItem(title: "Rename Playlist…", action: #selector(handleContextRename(_:)), keyEquivalent: "")
-            renameItem.target = self
-            renameItem.representedObject = playlist
-            menu.addItem(renameItem)
+                let metaItem = NSMenuItem(title: "Edit Details & Cover…", action: #selector(handleContextEditMetadata(_:)), keyEquivalent: "")
+                metaItem.target = self
+                metaItem.representedObject = playlist
+                menu.addItem(metaItem)
 
-            let deleteItem = NSMenuItem(title: "Delete Playlist", action: #selector(handleContextDeletePlaylist(_:)), keyEquivalent: "")
-            deleteItem.target = self
-            deleteItem.representedObject = playlist
-            menu.addItem(deleteItem)
+                let renameItem = NSMenuItem(title: "Rename Playlist…", action: #selector(handleContextRename(_:)), keyEquivalent: "")
+                renameItem.target = self
+                renameItem.representedObject = playlist
+                menu.addItem(renameItem)
+
+                let deleteItem = NSMenuItem(title: "Delete Playlist", action: #selector(handleContextDeletePlaylist(_:)), keyEquivalent: "")
+                deleteItem.target = self
+                deleteItem.representedObject = playlist
+                menu.addItem(deleteItem)
+            }
 
         case .detail(let playlist):
             guard row < filteredPlaylistItems.count else { return nil }
+            if selectedIndexes.count > 1 {
+                let selectedItems = selectedIndexes.compactMap { idx -> PlaylistItemRecord? in
+                    guard idx < filteredPlaylistItems.count else { return nil }
+                    return filteredPlaylistItems[idx]
+                }
+                let otherPlaylists = PlaylistManager.shared.fetchPlaylists().filter { $0.id != playlist.id }
+                let copyMenu = NSMenu(title: "Copy")
+                for pl in otherPlaylists {
+                    let subItem = NSMenuItem(title: pl.name, action: #selector(handleContextBatchCopyItems(_:)), keyEquivalent: "")
+                    subItem.target = self
+                    subItem.representedObject = ["items": selectedItems, "playlistID": pl.id, "playlistName": pl.name]
+                    copyMenu.addItem(subItem)
+                }
+                let copyParent = NSMenuItem(title: "Copy \(selectedItems.count) Tracks to Playlist", action: nil, keyEquivalent: "")
+                copyParent.submenu = copyMenu
+                menu.addItem(copyParent)
+
+                if !playlist.isSmart {
+                    menu.addItem(NSMenuItem.separator())
+                    let removeBatch = NSMenuItem(title: "Remove \(selectedItems.count) Tracks from Playlist", action: #selector(handleContextBatchRemoveItems(_:)), keyEquivalent: "")
+                    removeBatch.target = self
+                    removeBatch.representedObject = ["itemIDs": selectedItems.map { $0.id }, "playlistID": playlist.id]
+                    menu.addItem(removeBatch)
+                }
+                return menu
+            }
             let item = filteredPlaylistItems[row]
 
             let playItem = NSMenuItem(title: "Play Track", action: #selector(handleContextPlayItem(_:)), keyEquivalent: "")
@@ -100,27 +208,29 @@ extension PlaylistLibraryView {
                 menu.addItem(dlItem)
             }
 
-            menu.addItem(NSMenuItem.separator())
+            if !playlist.isSmart {
+                menu.addItem(NSMenuItem.separator())
 
-            let isSearch = !searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            let moveUpItem = NSMenuItem(title: "Move Up", action: #selector(handleContextMoveUpItem(_:)), keyEquivalent: "")
-            moveUpItem.target = self
-            moveUpItem.representedObject = ["itemID": item.id, "playlistID": playlist.id]
-            moveUpItem.isEnabled = row > 0 && !isSearch
-            menu.addItem(moveUpItem)
+                let isSearch = !searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                let moveUpItem = NSMenuItem(title: "Move Up", action: #selector(handleContextMoveUpItem(_:)), keyEquivalent: "")
+                moveUpItem.target = self
+                moveUpItem.representedObject = ["itemID": item.id, "playlistID": playlist.id]
+                moveUpItem.isEnabled = row > 0 && !isSearch
+                menu.addItem(moveUpItem)
 
-            let moveDownItem = NSMenuItem(title: "Move Down", action: #selector(handleContextMoveDownItem(_:)), keyEquivalent: "")
-            moveDownItem.target = self
-            moveDownItem.representedObject = ["itemID": item.id, "playlistID": playlist.id]
-            moveDownItem.isEnabled = (row < filteredPlaylistItems.count - 1) && !isSearch
-            menu.addItem(moveDownItem)
+                let moveDownItem = NSMenuItem(title: "Move Down", action: #selector(handleContextMoveDownItem(_:)), keyEquivalent: "")
+                moveDownItem.target = self
+                moveDownItem.representedObject = ["itemID": item.id, "playlistID": playlist.id]
+                moveDownItem.isEnabled = (row < filteredPlaylistItems.count - 1) && !isSearch
+                menu.addItem(moveDownItem)
 
-            menu.addItem(NSMenuItem.separator())
+                menu.addItem(NSMenuItem.separator())
 
-            let deleteItem = NSMenuItem(title: "Remove from Playlist", action: #selector(handleContextRemoveItem(_:)), keyEquivalent: "")
-            deleteItem.target = self
-            deleteItem.representedObject = ["itemID": item.id, "playlistID": playlist.id]
-            menu.addItem(deleteItem)
+                let deleteItem = NSMenuItem(title: "Remove from Playlist", action: #selector(handleContextRemoveItem(_:)), keyEquivalent: "")
+                deleteItem.target = self
+                deleteItem.representedObject = ["itemID": item.id, "playlistID": playlist.id]
+                menu.addItem(deleteItem)
+            }
 
         case .likedSongs:
             guard row < filteredLikedSongs.count else { return nil }
@@ -326,23 +436,17 @@ extension PlaylistLibraryView {
         return menu
     }
 
-    @objc private func handleExportPlaylist(_ sender: NSMenuItem) {
+    @objc func handleExportPlaylist(_ sender: NSMenuItem) {
         guard let payload = sender.representedObject as? [String: Any],
               let playlist = payload["playlist"] as? PlaylistRecord,
               let rawFormat = payload["format"] as? String,
               let format = PlaylistFileCodec.Format(rawValue: rawFormat) else { return }
 
-        let items = PlaylistManager.shared.fetchPlaylistItems(playlistID: playlist.id)
-        let localItems = items.filter { $0.refType == "local" && !$0.refID.isEmpty }
-        guard !localItems.isEmpty else {
-            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "⚠️ This playlist has no local tracks to export")
+        let document = PlaylistManager.shared.exportDocument(for: playlist)
+        guard !document.tracks.isEmpty else {
+            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "⚠️ This playlist has no tracks to export")
             return
         }
-
-        let document = PlaylistFileCodec.Document(
-            name: playlist.name,
-            tracks: localItems.map { PlaylistFileCodec.Track(path: $0.refID, title: $0.title, artist: $0.artist) }
-        )
         do {
             let data = try PlaylistFileCodec.encode(document, as: format)
             let panel = NSSavePanel()
@@ -351,22 +455,111 @@ extension PlaylistLibraryView {
             panel.canCreateDirectories = true
             panel.prompt = "Export"
             NSApp.activate(ignoringOtherApps: true)
-            panel.begin { response in
+            panel.begin { [weak self] response in
                 guard response == .OK, let url = panel.url else { return }
                 do {
                     try data.write(to: url, options: .atomic)
-                    let skippedCount = items.count - localItems.count
-                    let skipped = skippedCount > 0 ? " (\(skippedCount) online entr\(skippedCount == 1 ? "y" : "ies") omitted)" : ""
                     CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(
-                        text: "✓ Exported \(localItems.count) track(s)\(skipped)"
+                        text: "✓ Exported \(document.tracks.count) track(s)"
                     )
                 } catch {
-                    self.showPlaylistFileError(error.localizedDescription)
+                    self?.showPlaylistFileError(error.localizedDescription)
                 }
             }
         } catch {
             showPlaylistFileError(error.localizedDescription)
         }
+    }
+
+    @objc private func handleContextDuplicatePlaylist(_ sender: NSMenuItem) {
+        guard let playlist = sender.representedObject as? PlaylistRecord else { return }
+        if let newID = PlaylistManager.shared.duplicatePlaylist(id: playlist.id) {
+            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "✓ Duplicated \"\(playlist.name)\"")
+            if let copied = PlaylistManager.shared.fetchPlaylists().first(where: { $0.id == newID }) {
+                mode = .detail(copied)
+            } else {
+                reload()
+            }
+        }
+    }
+
+    @objc private func handleContextMergePlaylist(_ sender: NSMenuItem) {
+        guard let info = sender.representedObject as? [String: String],
+              let sourceID = info["sourceID"],
+              let targetID = info["targetID"],
+              let targetName = info["targetName"] else { return }
+        let added = PlaylistManager.shared.mergePlaylists(sourceID: sourceID, into: targetID)
+        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "✓ Merged \(added) track(s) into \"\(targetName)\"")
+    }
+
+    @objc private func handleContextBatchMergePlaylists(_ sender: NSMenuItem) {
+        guard let info = sender.representedObject as? [String: Any],
+              let sourceIDs = info["sources"] as? [String],
+              let targetID = info["targetID"] as? String,
+              let targetName = info["targetName"] as? String else { return }
+        var totalAdded = 0
+        for sid in sourceIDs where sid != targetID {
+            totalAdded += PlaylistManager.shared.mergePlaylists(sourceID: sid, into: targetID)
+        }
+        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "✓ Merged \(totalAdded) track(s) into \"\(targetName)\"")
+    }
+
+    @objc private func handleContextBatchDeletePlaylists(_ sender: NSMenuItem) {
+        guard let playlists = sender.representedObject as? [PlaylistRecord], !playlists.isEmpty else { return }
+        let alert = NSAlert()
+        alert.window.level = .statusBar + 1
+        alert.messageText = "Delete \(playlists.count) Playlists?"
+        alert.informativeText = "Are you sure you want to delete the selected playlists locally? This cannot be undone."
+        alert.alertStyle = .warning
+        let delBtn = alert.addButton(withTitle: "Delete")
+        delBtn.hasDestructiveAction = true
+        alert.addButton(withTitle: "Cancel")
+        if alert.runModal() == .alertFirstButtonReturn {
+            for pl in playlists where !pl.isSmart {
+                PlaylistManager.shared.deletePlaylist(id: pl.id)
+            }
+            reload()
+        }
+    }
+
+    @objc private func handleContextMovePlaylistToFolder(_ sender: NSMenuItem) {
+        guard let info = sender.representedObject as? [String: String],
+              let pid = info["playlistID"],
+              let rawFid = info["folderID"] else { return }
+        PlaylistManager.shared.movePlaylist(id: pid, toFolder: rawFid.isEmpty ? nil : rawFid)
+        reload()
+    }
+
+    @objc private func handleContextNewFolderWithPlaylist(_ sender: NSMenuItem) {
+        guard let pid = sender.representedObject as? String else { return }
+        promptForName(title: "New Folder", defaultName: "My Folder", actionTitle: "Create") { [weak self] name in
+            if let fid = PlaylistManager.shared.createFolder(name: name) {
+                PlaylistManager.shared.movePlaylist(id: pid, toFolder: fid)
+                self?.reload()
+            }
+        }
+    }
+
+    @objc private func handleContextEditMetadata(_ sender: NSMenuItem) {
+        guard let playlist = sender.representedObject as? PlaylistRecord, !playlist.isSmart else { return }
+        promptForPlaylistMetadata(playlist)
+    }
+
+    @objc private func handleContextBatchCopyItems(_ sender: NSMenuItem) {
+        guard let info = sender.representedObject as? [String: Any],
+              let items = info["items"] as? [PlaylistItemRecord],
+              let targetID = info["playlistID"] as? String,
+              let targetName = info["playlistName"] as? String else { return }
+        let added = PlaylistManager.shared.copyItems(items, to: targetID)
+        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "✓ Copied \(added) track(s) to \"\(targetName)\"")
+    }
+
+    @objc private func handleContextBatchRemoveItems(_ sender: NSMenuItem) {
+        guard let info = sender.representedObject as? [String: Any],
+              let itemIDs = info["itemIDs"] as? [String],
+              let pid = info["playlistID"] as? String else { return }
+        PlaylistManager.shared.removeItems(itemIDs: itemIDs, from: pid)
+        reload()
     }
 
     private func showPlaylistFileError(_ message: String) {

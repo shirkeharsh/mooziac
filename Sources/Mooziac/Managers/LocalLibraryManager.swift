@@ -400,14 +400,87 @@ public final class LocalLibraryManager: NSObject {
         }
     }
 
-    // MARK: - Import Files
-    public func importFiles(from sourceURLs: [URL], completion: @escaping (Int) -> Void) {
+    // MARK: - Standalone Track Construction (External Local Folders / Playlists)
+    public func makeLocalTrack(
+        forFileAt fileURL: URL,
+        fallbackID: String? = nil,
+        fallbackTitle: String? = nil,
+        fallbackArtist: String? = nil,
+        fallbackDurationString: String = "",
+        isLiked: Bool = false,
+        ytVideoId: String? = nil
+    ) -> LocalTrack {
+        let baseName = fileURL.deletingPathExtension().lastPathComponent
+        let cleanTitle = (fallbackTitle?.isEmpty == false) ? fallbackTitle! : baseName
+        let cleanArtist = (fallbackArtist?.isEmpty == false) ? fallbackArtist! : "Local Audio"
+
+        let lrcSidecar = fileURL.deletingPathExtension().appendingPathExtension("lrc")
+        let lrcURL = FileManager.default.fileExists(atPath: lrcSidecar.path) ? lrcSidecar : nil
+
+        var artworkURL: URL? = nil
+        for ext in ["jpg", "png", "jpeg", "webp"] {
+            let imgSidecar = fileURL.deletingPathExtension().appendingPathExtension(ext)
+            if FileManager.default.fileExists(atPath: imgSidecar.path) {
+                artworkURL = imgSidecar
+                break
+            }
+        }
+
+        let parts = fallbackDurationString.split(separator: ":").compactMap { Double($0) }
+        let parsedDuration: Double
+        if parts.count == 2 {
+            parsedDuration = (parts[0] * 60) + parts[1]
+        } else if parts.count == 3 {
+            parsedDuration = (parts[0] * 3600) + (parts[1] * 60) + parts[2]
+        } else {
+            parsedDuration = parts.first ?? 0
+        }
+
+        return LocalTrack(
+            id: fallbackID ?? fileURL.path,
+            title: cleanTitle,
+            artist: cleanArtist,
+            album: "",
+            duration: parsedDuration,
+            fileURL: fileURL,
+            artwork: nil,
+            artworkURL: artworkURL,
+            lrcURL: lrcURL,
+            isLiked: isLiked,
+            ytVideoId: ytVideoId
+        )
+    }
+
+    // MARK: - Import Files & Local Folders
+    public struct LocalImportResult {
+        public let importedDownloadFiles: Int
+        public let createdPlaylists: [(playlistID: String, name: String, trackCount: Int)]
+
+        public var totalCount: Int {
+            importedDownloadFiles + createdPlaylists.reduce(0) { $0 + $1.trackCount }
+        }
+    }
+
+    /// Imports individual audio files into Downloads (`musicFolderURL`), while any selected
+    /// folders are added in-place as local playlists named after each folder without appearing in Downloads.
+    public func importLocalItems(from sourceURLs: [URL], completion: @escaping (LocalImportResult) -> Void) {
         queue.async { [weak self] in
             guard let self = self else { return }
-            var importedCount = 0
+            var importedDownloadCount = 0
+            var createdPlaylists: [(playlistID: String, name: String, trackCount: Int)] = []
             let destFolder = self.musicFolderURL
 
             for src in sourceURLs {
+                let resourceValues = try? src.resourceValues(forKeys: [.isDirectoryKey])
+                let isDir = (resourceValues?.isDirectory == true) || src.hasDirectoryPath
+
+                if isDir {
+                    if let created = self.createPlaylistFromFolderLocked(folderURL: src) {
+                        createdPlaylists.append(created)
+                    }
+                    continue
+                }
+
                 let ext = src.pathExtension.lowercased()
                 guard self.supportedExtensions.contains(ext) || ext == "lrc" else { continue }
 
@@ -417,15 +490,97 @@ public final class LocalLibraryManager: NSObject {
                         try FileManager.default.removeItem(at: targetURL)
                     }
                     try FileManager.default.copyItem(at: src, to: targetURL)
-                    if ext != "lrc" { importedCount += 1 }
+                    if ext != "lrc" { importedDownloadCount += 1 }
                 } catch {
                     Log.download.error("Error copying \(src.lastPathComponent): \(error)")
                 }
             }
 
-            self.scanLibrary { tracks in
-                completion(importedCount)
+            if !createdPlaylists.isEmpty {
+                DispatchQueue.main.async {
+                    PlaylistManager.shared.handleAccountDidChange()
+                    NotificationCenter.default.post(name: NSNotification.Name("Mooziac_PlaylistsUpdated"), object: nil)
+                    NotificationCenter.default.post(name: NSNotification.Name("Mooziac_LibraryUpdated"), object: nil)
+                }
             }
+
+            if importedDownloadCount > 0 {
+                self.scanLibrary { _ in
+                    completion(LocalImportResult(
+                        importedDownloadFiles: importedDownloadCount,
+                        createdPlaylists: createdPlaylists
+                    ))
+                }
+            } else {
+                DispatchQueue.main.async {
+                    completion(LocalImportResult(
+                        importedDownloadFiles: 0,
+                        createdPlaylists: createdPlaylists
+                    ))
+                }
+            }
+        }
+    }
+
+    private func createPlaylistFromFolderLocked(folderURL: URL) -> (playlistID: String, name: String, trackCount: Int)? {
+        guard let enumerator = FileManager.default.enumerator(
+            at: folderURL,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else {
+            return nil
+        }
+
+        var audioURLs: [URL] = []
+        for case let fileURL as URL in enumerator {
+            let ext = fileURL.pathExtension.lowercased()
+            guard supportedExtensions.contains(ext) else { continue }
+            guard let vals = try? fileURL.resourceValues(forKeys: [.isRegularFileKey]),
+                  vals.isRegularFile == true else { continue }
+            audioURLs.append(fileURL)
+        }
+
+        guard !audioURLs.isEmpty else { return nil }
+        audioURLs.sort { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+
+        let rawName = folderURL.lastPathComponent.trimmingCharacters(in: .whitespacesAndNewlines)
+        let playlistName = rawName.isEmpty ? "Local Folder" : rawName
+
+        guard let playlistID = LocalDatabaseManager.shared.createPlaylist(name: playlistName) else {
+            return nil
+        }
+
+        var seenPaths = Set<String>()
+        var sortOrder = 0
+        for audioURL in audioURLs {
+            let path = audioURL.path
+            guard !seenPaths.contains(path) else { continue }
+            seenPaths.insert(path)
+
+            let isLiked = LocalDatabaseManager.shared.isLiked(filePath: path)
+            let track = extractMetadata(from: audioURL, isLiked: isLiked)
+            LocalDatabaseManager.shared.appendPlaylistItem(PlaylistItemRecord(
+                playlistID: playlistID,
+                sortOrder: sortOrder,
+                refType: "local",
+                refID: path,
+                ytVideoId: nil,
+                title: track.title,
+                artist: track.artist,
+                artworkUrl: track.artworkURL?.path ?? "",
+                duration: PlaylistManager.formattedDuration(track.duration),
+                isLiked: track.isLiked
+            ))
+            sortOrder += 1
+        }
+
+        Log.download.info("Created playlist '\(playlistName)' from local folder with \(sortOrder) tracks (excluded from Downloads)")
+        return (playlistID: playlistID, name: playlistName, trackCount: sortOrder)
+    }
+
+    public func importFiles(from sourceURLs: [URL], completion: @escaping (Int) -> Void) {
+        importLocalItems(from: sourceURLs) { result in
+            completion(result.totalCount)
         }
     }
 

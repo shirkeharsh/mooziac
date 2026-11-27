@@ -353,6 +353,24 @@ extension StatusItemManager {
         quickMenu.addItem(launchRes.menuItem)
 
         quickMenu.addItem(NSMenuItem.separator())
+        let adBlockRes = makeCapsuleToggleMenuItem(
+            title: "Ad Blocker",
+            isOn: YouTubeSettings.shared.isAdBlockEnabled,
+            onToggle: { enabled in
+                YouTubeSettings.shared.isAdBlockEnabled = enabled
+                if #available(macOS 15.4, *) {
+                    Task { @MainActor in
+                        await WebExtensionManager.shared.setAdBlockExtensionsEnabled(enabled)
+                    }
+                }
+                CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(
+                    text: enabled ? "✓ Ad Blocker: Enabled" : "Ad Blocker: Disabled"
+                )
+            }
+        )
+        quickMenu.addItem(adBlockRes.menuItem)
+
+        quickMenu.addItem(NSMenuItem.separator())
         addScrobbleToggle(for: .lastFM, to: quickMenu)
         addScrobbleToggle(for: .listenBrainz, to: quickMenu)
         quickMenu.addItem(NSMenuItem.separator())
@@ -418,6 +436,9 @@ extension StatusItemManager {
         let importAudioItem = NSMenuItem(title: "Import Audio Files to Location…", action: #selector(importAudioFilesFromMenu), keyEquivalent: "")
         importAudioItem.target = self
         settingsMenu.addItem(importAudioItem)
+        let addFolderPlaylistItem = NSMenuItem(title: "Add Local Songs Folder as Playlist…", action: #selector(addLocalFolderPlaylistFromMenu), keyEquivalent: "")
+        addFolderPlaylistItem.target = self
+        settingsMenu.addItem(addFolderPlaylistItem)
         let importPlaylistFileItem = NSMenuItem(title: "Import Playlist File… (.m3u8, .json)", action: #selector(importPlaylistFileFromMenu), keyEquivalent: "")
         importPlaylistFileItem.target = self
         settingsMenu.addItem(importPlaylistFileItem)
@@ -443,18 +464,48 @@ extension StatusItemManager {
         settingsParent.submenu = settingsMenu
         menu.addItem(settingsParent)
 
-        let syncItem = NSMenuItem(title: "Sync with YouTube Music", action: #selector(syncNowFromMenu), keyEquivalent: "")
-        syncItem.isEnabled = LikedSongsManager.shared.isSignedIn
-        syncItem.target = self
-        accountMenu.addItem(syncItem)
-        let resetLoginItem = NSMenuItem(title: "Reset Login…", action: #selector(confirmResetLoginFromMenu), keyEquivalent: "")
-        resetLoginItem.target = self
-        accountMenu.addItem(resetLoginItem)
+        let isSignedIn = LikedSongsManager.shared.isSignedIn
+        let identitySuffix = AccountSessionManager.shared.displayIdentity.map { " (\($0))" } ?? ""
+        let signInLabel = isSignedIn ? "Signed In\(identitySuffix)" : "Not Signed In"
+
+        let activeHeader = NSMenuItem(title: "Google Account (YouTube & YTM)", action: nil, keyEquivalent: "")
+        activeHeader.isEnabled = false
+        accountMenu.addItem(activeHeader)
+
+        let accountStatusItem = NSMenuItem(title: signInLabel, action: nil, keyEquivalent: "")
+        accountStatusItem.isEnabled = false
+        accountMenu.addItem(accountStatusItem)
+
+        if !isSignedIn {
+            let signInItem = NSMenuItem(title: "Sign In with Google…", action: #selector(signInGoogleFromMenu), keyEquivalent: "")
+            signInItem.target = self
+            accountMenu.addItem(signInItem)
+        } else {
+            let signOutItem = NSMenuItem(title: "Sign Out…", action: #selector(confirmResetLoginFromMenu), keyEquivalent: "")
+            signOutItem.target = self
+            accountMenu.addItem(signOutItem)
+        }
 
         accountMenu.addItem(NSMenuItem.separator())
-        addScrobbleAccountItems(for: .lastFM, to: accountMenu)
+
+        let syncHeader = NSMenuItem(title: "YouTube Music Sync", action: nil, keyEquivalent: "")
+        syncHeader.isEnabled = false
+        accountMenu.addItem(syncHeader)
+
+        let syncItem = NSMenuItem(title: "Sync Playlists & Liked Songs", action: #selector(syncNowFromMenu), keyEquivalent: "")
+        syncItem.isEnabled = isSignedIn
+        syncItem.target = self
+        accountMenu.addItem(syncItem)
+
         accountMenu.addItem(NSMenuItem.separator())
-        addScrobbleAccountItems(for: .listenBrainz, to: accountMenu)
+
+        let scrobbleParent = NSMenuItem(title: "Scrobbling", action: nil, keyEquivalent: "")
+        let scrobbleMenu = NSMenu(title: "Scrobbling")
+        addScrobbleAccountItems(for: .lastFM, to: scrobbleMenu)
+        scrobbleMenu.addItem(NSMenuItem.separator())
+        addScrobbleAccountItems(for: .listenBrainz, to: scrobbleMenu)
+        scrobbleParent.submenu = scrobbleMenu
+        accountMenu.addItem(scrobbleParent)
 
         let accountParent = NSMenuItem(title: "Account & Sync", action: nil, keyEquivalent: "")
         accountParent.submenu = accountMenu
@@ -485,10 +536,10 @@ extension StatusItemManager {
 
     @objc private func confirmResetLoginFromMenu() {
         let alert = NSAlert()
-        alert.messageText = "Reset YouTube Music Login?"
-        alert.informativeText = "This clears the saved YouTube Music sign-in and starts a fresh session."
+        alert.messageText = "Sign Out of Google?"
+        alert.informativeText = "This clears your saved Google login across both YouTube Music and YouTube Mode."
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "Reset Login")
+        alert.addButton(withTitle: "Sign Out")
         alert.addButton(withTitle: "Cancel")
         if alert.runModal() == .alertFirstButtonReturn { resetLoginFromMenu() }
     }
@@ -557,12 +608,43 @@ extension StatusItemManager {
 
         panel.begin { [weak self] response in
             guard let self = self, response == .OK else { return }
-            LocalLibraryManager.shared.importFiles(from: panel.urls) { count in
+            LocalLibraryManager.shared.importLocalItems(from: panel.urls) { result in
                 DispatchQueue.main.async {
-                    CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "✓ Imported \(count) audio track(s)")
+                    if let first = result.createdPlaylists.first {
+                        let extra = result.createdPlaylists.count > 1 ? " (+\(result.createdPlaylists.count - 1) more)" : ""
+                        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "✓ Added playlist \"\(first.name)\"\(extra)")
+                    } else {
+                        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "✓ Imported \(result.importedDownloadFiles) audio track(s)")
+                    }
                     if self.panel.isVisible {
                         self.mainViewController.dynamicIslandPlayer.refreshPlaylistsSection()
                         self.mainViewController.dynamicIslandPlayer.updateDownloadButtonState()
+                    }
+                }
+            }
+        }
+    }
+
+    @objc private func addLocalFolderPlaylistFromMenu() {
+        let panel = NSOpenPanel()
+        panel.title = "Add Local Songs Folder as Playlist"
+        panel.prompt = "Add Folder as Playlist"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+
+        NSApp.activate(ignoringOtherApps: true)
+        panel.begin { [weak self] response in
+            guard let self = self, response == .OK else { return }
+            LocalLibraryManager.shared.importLocalItems(from: panel.urls) { result in
+                DispatchQueue.main.async {
+                    if let first = result.createdPlaylists.first {
+                        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "✓ Added playlist \"\(first.name)\" (\(first.trackCount) songs)")
+                    } else {
+                        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "No audio files found in selected folder")
+                    }
+                    if self.panel.isVisible {
+                        self.mainViewController.dynamicIslandPlayer.refreshPlaylistsSection()
                     }
                 }
             }
@@ -810,6 +892,11 @@ extension StatusItemManager {
         let newState = !YouTubeSettings.shared.isAdBlockEnabled
         YouTubeSettings.shared.isAdBlockEnabled = newState
         sender.state = newState ? .on : .off
+        if #available(macOS 15.4, *) {
+            Task { @MainActor in
+                await WebExtensionManager.shared.setAdBlockExtensionsEnabled(newState)
+            }
+        }
         FloatingHUDWindowController.shared.showCustomTextOverlay(text: newState ? "Ad Blocker: Enabled" : "Ad Blocker: Disabled")
         MainVideoWindowController.shared.reconfigureAndReload()
     }

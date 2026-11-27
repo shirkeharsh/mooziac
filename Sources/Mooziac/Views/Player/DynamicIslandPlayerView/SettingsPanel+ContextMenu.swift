@@ -924,25 +924,41 @@ extension DynamicIslandPlayerView {
     }
 
     @objc func handleDeletePlaylistFromHeader() {
-        guard let playlist = playlistDetailMode else { return }
+        guard let playlist = playlistDetailMode, !playlist.isSmart else { return }
         let alert = NSAlert()
         alert.window.level = .statusBar + 1
         alert.messageText = "Delete Playlist"
-        alert.informativeText = "Delete \"\(playlist.name)\"? This cannot be undone."
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "Delete")
-        alert.addButton(withTitle: "Cancel")
-        if alert.runModal() == .alertFirstButtonReturn {
-            PlaylistManager.shared.deletePlaylist(id: playlist.id)
-            playlistDetailMode = nil
-            playlistAddMode = false
-            resetPlaylistSectionChrome()
-            if let search = playlistSearchField {
-                search.stringValue = ""
+        if playlist.ytPlaylistId != nil {
+            alert.informativeText = "\"\(playlist.name)\" is synced with YouTube Music. Delete it only from Mooziac, or also remove it from YouTube Music?"
+            alert.alertStyle = .warning
+            let ytmBtn = alert.addButton(withTitle: "Delete Locally & on YTM")
+            ytmBtn.hasDestructiveAction = true
+            alert.addButton(withTitle: "Delete Locally Only")
+            alert.addButton(withTitle: "Cancel")
+            let resp = alert.runModal()
+            if resp == .alertFirstButtonReturn {
+                PlaylistManager.shared.deletePlaylist(id: playlist.id, deleteFromYTM: true)
+            } else if resp == .alertSecondButtonReturn {
+                PlaylistManager.shared.deletePlaylist(id: playlist.id, deleteFromYTM: false)
+            } else {
+                return
             }
-            refreshPlaylistsSection()
-            updateSettingsThemeHighlight()
+        } else {
+            alert.informativeText = "Delete \"\(playlist.name)\"? This cannot be undone."
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "Delete")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+            PlaylistManager.shared.deletePlaylist(id: playlist.id)
         }
+        playlistDetailMode = nil
+        playlistAddMode = false
+        resetPlaylistSectionChrome()
+        if let search = playlistSearchField {
+            search.stringValue = ""
+        }
+        refreshPlaylistsSection()
+        updateSettingsThemeHighlight()
     }
 
     @objc func handleAddCurrentSongToDetailPlaylist() {
@@ -1033,9 +1049,13 @@ extension DynamicIslandPlayerView {
 
     @objc func handlePlaylistsUpdated() {
         if let currentDetail = playlistDetailMode {
-            if let updated = PlaylistManager.shared.fetchPlaylists().first(where: { $0.id == currentDetail.id }) {
+            let available = PlaylistManager.shared.fetchPlaylists() + PlaylistManager.shared.fetchSmartPlaylists()
+            if let updated = available.first(where: { $0.id == currentDetail.id }) {
                 self.playlistDetailMode = updated
                 self.playlistSectionLabel.stringValue = updated.name.uppercased()
+            } else {
+                self.playlistDetailMode = nil
+                self.resetPlaylistSectionChrome()
             }
         }
         refreshPlaylistsSection()
@@ -1045,6 +1065,54 @@ extension DynamicIslandPlayerView {
     // MARK: - Playlist File Import & Export
 
     @objc func handleImportPlaylistTapped() {
+        let menu = NSMenu(title: "Import")
+        let addFolderItem = NSMenuItem(title: "Add Local Songs Folder as Playlist…", action: #selector(handleAddLocalFolderAsPlaylistTapped), keyEquivalent: "")
+        addFolderItem.target = self
+        menu.addItem(addFolderItem)
+
+        let importFileItem = NSMenuItem(title: "Import Playlist File (.m3u8, .json)…", action: #selector(handleImportPlaylistFileTapped), keyEquivalent: "")
+        importFileItem.target = self
+        menu.addItem(importFileItem)
+
+        let point = NSPoint(x: 0, y: playlistImportButton.bounds.height + 4)
+        menu.popUp(positioning: nil, at: point, in: playlistImportButton)
+    }
+
+    @objc func handleAddLocalFolderAsPlaylistTapped() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Add Folder as Playlist"
+
+        NSApp.activate(ignoringOtherApps: true)
+        panel.begin { [weak self] response in
+            guard response == .OK else { return }
+            LocalLibraryManager.shared.importLocalItems(from: panel.urls) { result in
+                DispatchQueue.main.async {
+                    guard let self = self else { return }
+                    guard let first = result.createdPlaylists.first else {
+                        self.showToastBanner(message: "⚠️ No supported audio tracks found in selected folder", isWarning: true)
+                        return
+                    }
+                    self.refreshPlaylistsSection()
+                    if result.createdPlaylists.count == 1 {
+                        self.showToastBanner(message: "✓ Added playlist \"\(first.name)\" (\(first.trackCount) songs)")
+                    } else {
+                        self.showToastBanner(message: "✓ Added \(result.createdPlaylists.count) folder playlists")
+                    }
+                    if let playlist = PlaylistManager.shared.fetchPlaylists().first(where: { $0.id == first.playlistID }) {
+                        self.playlistDetailMode = playlist
+                        self.playlistSectionLabel.stringValue = playlist.name.uppercased()
+                        self.resetPlaylistSectionChrome()
+                        self.refreshPlaylistsSection()
+                    }
+                }
+            }
+        }
+    }
+
+    @objc func handleImportPlaylistFileTapped() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
@@ -1063,7 +1131,7 @@ extension DynamicIslandPlayerView {
                 let data = try Data(contentsOf: fileURL)
                 let result = try PlaylistFileCodec.decode(data, from: fileURL)
                 guard !result.document.tracks.isEmpty else {
-                    self?.showToastBanner(message: "⚠️ No local tracks found in playlist", isWarning: true)
+                    self?.showToastBanner(message: "⚠️ No valid tracks found in playlist", isWarning: true)
                     return
                 }
                 guard let playlistID = PlaylistManager.shared.importPlaylistFile(result.document) else {
@@ -1123,18 +1191,12 @@ extension DynamicIslandPlayerView {
     }
 
     private func exportPlaylist(_ playlist: PlaylistRecord, format: PlaylistFileCodec.Format) {
-        let items = PlaylistManager.shared.fetchPlaylistItems(playlistID: playlist.id)
-        let tracks = items.compactMap { item -> PlaylistFileCodec.Track? in
-            guard item.refType == "local" else { return nil }
-            return PlaylistFileCodec.Track(path: item.refID, title: item.title, artist: item.artist)
-        }
+        let doc = PlaylistManager.shared.exportDocument(for: playlist)
 
-        guard !tracks.isEmpty else {
-            showToastBanner(message: "⚠️ No local tracks in this playlist to export", isWarning: true)
+        guard !doc.tracks.isEmpty else {
+            showToastBanner(message: "⚠️ No tracks in this playlist to export", isWarning: true)
             return
         }
-
-        let doc = PlaylistFileCodec.Document(name: playlist.name, tracks: tracks)
 
         let panel = NSSavePanel()
         panel.title = "Export Playlist"

@@ -354,20 +354,18 @@ class StatusItemManager: NSObject {
                 showYouTubeContextMenu(sender)
             } else {
                 let winController = MainVideoWindowController.shared
-                if let win = winController.window, win.isVisible && !win.isMiniaturized {
+                if let win = winController.window, win.isVisible && !win.isMiniaturized && win.alphaValue > 0.01 {
                     // Window is currently visible on screen: toggle it OFF (hide)
-                    win.orderOut(nil)
-                    KeyboardShortcutHandler.shared.stopMonitoring()
+                    if winController.isPiPActive {
+                        winController.performMinimize()
+                    } else {
+                        win.orderOut(nil)
+                        KeyboardShortcutHandler.shared.stopMonitoring()
+                    }
                     NSApp.presentationOptions = []
                 } else {
                     // Window is hidden or miniaturized: toggle it ON (show and bring to front)
-                    if winController.window?.isMiniaturized == true {
-                        winController.window?.deminiaturize(nil)
-                    }
-                    winController.showWindow(nil)
-                    winController.window?.makeKeyAndOrderFront(nil)
-                    KeyboardShortcutHandler.shared.startMonitoring()
-                    NSApp.activate(ignoringOtherApps: true)
+                    winController.restoreWindowFromMinimizeOrHidden()
                 }
             }
             return
@@ -494,8 +492,8 @@ class StatusItemManager: NSObject {
         // Switch activation policy back to accessory (cleans up macOS Dock)
         NSApp.setActivationPolicy(.accessory)
 
-        // Un-suppress playback flag
-        mainViewController.webViewContainer.webView.evaluateJavaScript("window.__mooziacPlaybackSuppressed = false;", completionHandler: nil)
+        // Un-suppress playback flags
+        mainViewController.webViewContainer.webView.evaluateJavaScript("window.__mooziacPlaybackSuppressed = false; window.__mooziacBlockAutoplay = false;", completionHandler: nil)
 
         // Dock back to menu bar
         dockBackToMenuBar()
@@ -850,20 +848,26 @@ class StatusItemManager: NSObject {
     }
     
     @objc func resetLoginFromMenu() {
-        let dataStore = WKWebsiteDataStore.default()
-        let dataTypes = WKWebsiteDataStore.allWebsiteDataTypes()
-        dataStore.fetchDataRecords(ofTypes: dataTypes) { [weak self] records in
-            dataStore.removeData(ofTypes: dataTypes, for: records) { [weak self] in
-                DispatchQueue.main.async { [weak self] in
-                    guard let self = self else { return }
-                    UserDefaults.standard.set(false, forKey: "YTM_hasLoggedInOnce")
-                    NowPlayingManager.shared.flushSessionState(keepCookies: false)
-                    self.mainViewController.setBrowserVisible(false)
-                    self.mainViewController.webViewContainer.loadMusicHome(autoPlayRandom: true)
-                    CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "✓ Reset Login & Started Fresh")
-                }
+        AccountSessionManager.shared.clearSharedSession { [weak self] in
+            guard let self = self else { return }
+            UserDefaults.standard.set(false, forKey: "YTM_hasLoggedInOnce")
+            NowPlayingManager.shared.flushSessionState(keepCookies: false)
+            self.mainViewController.setBrowserVisible(false)
+            self.mainViewController.webViewContainer.loadMusicHome(autoPlayRandom: false)
+            MainVideoWindowController.shared.teardownWebView()
+            LikedSongsManager.shared.refreshSignInStatus()
+            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "✓ Signed Out")
+        }
+    }
+
+    @objc func signInGoogleFromMenu() {
+        if !panel.isVisible {
+            if let btn = statusItem.button {
+                togglePanel(btn)
             }
         }
+        mainViewController.setBrowserVisible(true)
+        mainViewController.webViewContainer.loadGoogleSignIn()
     }
     
     @objc func reloadFromMenu() {
@@ -881,7 +885,20 @@ class StatusItemManager: NSObject {
             return
         }
         CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "⟳ Syncing with YouTube Music…")
-        PlaylistSyncManager.shared.syncNow()
+        PlaylistSyncManager.shared.syncNow { [weak self] count, error in
+            if let error = error {
+                if case YTMClient.YTMError.notSignedIn = error {
+                    CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "⚠️ Not logged in to YouTube Music")
+                } else {
+                    CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "⚠️ Sync failed — try reloading Music Player")
+                }
+                return
+            }
+            if let self = self, self.panel.isVisible {
+                self.mainViewController.dynamicIslandPlayer.refreshPlaylistsSection()
+            }
+            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "✓ Synced \(count) playlist(s) from YouTube Music")
+        }
     }
     
     @objc func quitFromMenu() {

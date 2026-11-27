@@ -2,7 +2,7 @@ import Foundation
 import CryptoKit
 
 private let scrobbleUserAgent: String = {
-    let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.5"
+    let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.6"
     return "Mooziac/\(v) (https://github.com/shirkeharsh/mooziac)"
 }()
 

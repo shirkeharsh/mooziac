@@ -15,11 +15,13 @@ public enum PlaylistFileCodec {
         public let path: String
         public let title: String
         public let artist: String
+        public let ytVideoId: String?
 
-        public init(path: String, title: String = "", artist: String = "") {
+        public init(path: String, title: String = "", artist: String = "", ytVideoId: String? = nil) {
             self.path = path
             self.title = title
             self.artist = artist
+            self.ytVideoId = ytVideoId
         }
     }
 
@@ -72,12 +74,25 @@ public enum PlaylistFileCodec {
         case .m3u8:
             var lines = ["#EXTM3U", "#PLAYLIST:\(singleLine(document.name))"]
             for track in document.tracks {
-                guard !track.path.contains("\n"), !track.path.contains("\r") else {
+                let targetPath: String
+                if track.path.isEmpty, let vid = track.ytVideoId, !vid.isEmpty {
+                    targetPath = "https://music.youtube.com/watch?v=\(vid)"
+                } else {
+                    targetPath = track.path
+                }
+                guard !targetPath.contains("\n"), !targetPath.contains("\r") else {
                     throw CodecError.invalidPlaylist("M3U cannot represent a track path containing a newline.")
                 }
-                let displayName = track.title.isEmpty ? URL(fileURLWithPath: track.path).lastPathComponent : track.title
+                let displayName: String
+                if !track.title.isEmpty && !track.artist.isEmpty {
+                    displayName = "\(track.artist) - \(track.title)"
+                } else if !track.title.isEmpty {
+                    displayName = track.title
+                } else {
+                    displayName = URL(fileURLWithPath: targetPath).lastPathComponent
+                }
                 lines.append("#EXTINF:-1,\(singleLine(displayName))")
-                lines.append(track.path)
+                lines.append(targetPath)
             }
             return (lines.joined(separator: "\n") + "\n").data(using: .utf8) ?? Data()
         }
@@ -109,6 +124,15 @@ public enum PlaylistFileCodec {
         var tracks: [Track] = []
         var skipped = 0
         for track in decoded.tracks {
+            if let vid = track.ytVideoId, !vid.isEmpty {
+                let resolvedPath = track.path.isEmpty ? "https://music.youtube.com/watch?v=\(vid)" : track.path
+                tracks.append(Track(path: resolvedPath, title: track.title, artist: track.artist, ytVideoId: vid))
+                continue
+            }
+            if let yt = youtubeEntry(from: track.path) {
+                tracks.append(Track(path: yt.url, title: track.title, artist: track.artist, ytVideoId: yt.videoId))
+                continue
+            }
             guard let path = localPath(track.path, relativeTo: directory) else {
                 skipped += 1
                 continue
@@ -147,7 +171,9 @@ public enum PlaylistFileCodec {
             }
             if trimmed.hasPrefix("#") { continue }
 
-            if let path = localPath(line, relativeTo: directory) {
+            if let yt = youtubeEntry(from: line) {
+                tracks.append(Track(path: yt.url, title: pendingTitle, ytVideoId: yt.videoId))
+            } else if let path = localPath(line, relativeTo: directory) {
                 tracks.append(Track(path: path, title: pendingTitle))
             } else {
                 skipped += 1
@@ -165,6 +191,24 @@ public enum PlaylistFileCodec {
             throw CodecError.invalidPlaylist("No local track entries were found.")
         }
         return DecodedDocument(document: Document(name: name, tracks: tracks), skippedEntryCount: skipped)
+    }
+
+    private static func youtubeEntry(from value: String) -> (url: String, videoId: String)? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: trimmed),
+              let scheme = url.scheme?.lowercased(), (scheme == "http" || scheme == "https"),
+              let host = url.host?.lowercased(),
+              host.contains("youtube.com") || host.contains("youtu.be") else { return nil }
+        if host.contains("youtu.be") {
+            let vid = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            if vid.count == 11 { return (trimmed, vid) }
+        }
+        if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+           let v = components.queryItems?.first(where: { $0.name == "v" })?.value,
+           v.count == 11 {
+            return (trimmed, v)
+        }
+        return nil
     }
 
     private static func localPath(_ value: String, relativeTo directory: URL) -> String? {

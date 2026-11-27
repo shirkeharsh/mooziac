@@ -2,6 +2,8 @@ import AppKit
 import Foundation
 import UniformTypeIdentifiers
 
+private var MetadataFieldAssocKey: UInt8 = 0
+
 protocol PlaylistLibraryViewDelegate: AnyObject {
     func playlistLibraryDidRequestClose()
     func playlistLibraryDidPlayOnline(videoId: String)
@@ -74,6 +76,7 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
 
     var allPlaylists: [PlaylistRecord] = []
     var filteredPlaylists: [PlaylistRecord] = []
+    var selectedFolderID: String? = nil
 
     var allLikedSongs: [LikedSongRecord] = []
     var filteredLikedSongs: [LikedSongRecord] = []
@@ -230,6 +233,7 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
         tableView.intercellSpacing = NSSize(width: 0, height: 4)
         tableView.target = self
         tableView.doubleAction = #selector(handleDoubleAction)
+        tableView.allowsMultipleSelection = true
         tableView.registerForDraggedTypes([Self.dragType])
 
         tableView.onReturnKey = { [weak self] in
@@ -400,7 +404,7 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
     }
 
     @objc private func handleTitleClicked() {
-        if case .detail = mode {
+        if case .detail(let pl) = mode, !pl.isSmart {
             handleRenameCurrentPlaylist()
         }
     }
@@ -408,12 +412,13 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
     @objc private func handlePlaylistsUpdated() {
         switch mode {
         case .list:
-            allPlaylists = PlaylistManager.shared.fetchPlaylists()
+            allPlaylists = PlaylistManager.shared.fetchPlaylists() + PlaylistManager.shared.fetchSmartPlaylists()
             applyFilter()
             emptyStateView.isHidden = !filteredPlaylists.isEmpty
             tableView.reloadData()
         case .detail(let pl):
-            if let updated = PlaylistManager.shared.fetchPlaylists().first(where: { $0.id == pl.id }) {
+            let combined = PlaylistManager.shared.fetchPlaylists() + PlaylistManager.shared.fetchSmartPlaylists()
+            if let updated = combined.first(where: { $0.id == pl.id }) {
                 self.mode = .detail(updated)
             } else {
                 self.mode = .list
@@ -714,7 +719,7 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
     func reload() {
         switch mode {
         case .list:
-            allPlaylists = PlaylistManager.shared.fetchPlaylists()
+            allPlaylists = PlaylistManager.shared.fetchPlaylists() + PlaylistManager.shared.fetchSmartPlaylists()
             applyFilter()
 
             librarySegmentedControl.selectedSegment = 0
@@ -722,7 +727,12 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
             backButton.isHidden = true
             titleStack.isHidden = true
 
-            searchField.placeholderString = "Search playlists..."
+            if let fid = selectedFolderID,
+               let folder = PlaylistManager.shared.fetchFolders().first(where: { $0.id == fid }) {
+                searchField.placeholderString = "Search in folder \"\(folder.name)\"..."
+            } else {
+                searchField.placeholderString = "Search playlists..."
+            }
             saveQueueButton.isHidden = false
             importHeaderButton.isHidden = false
             importHeaderButton.toolTip = "Import Playlist File…"
@@ -731,7 +741,7 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
             addCurrentTrackButton.isHidden = true
             renameHeaderButton.isHidden = true
             downloadButton.isHidden = true
-            moreMenuButton.isHidden = true
+            moreMenuButton.isHidden = false
             headerTitleLabel.toolTip = nil
 
             bottomBar.isHidden = false
@@ -753,7 +763,7 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
             titleStack.isHidden = false
 
             headerTitleLabel.stringValue = playlist.name.uppercased()
-            headerTitleLabel.toolTip = "Click to rename \"\(playlist.name)\""
+            headerTitleLabel.toolTip = playlist.isSmart ? playlist.descriptionText : "Click to rename \"\(playlist.name)\""
             let summary = PlaylistManager.shared.summaryForPlaylist(playlist)
             if !summary.durationText.isEmpty {
                 headerSubtitleLabel.stringValue = "\(summary.countText) • \(summary.durationText)"
@@ -767,14 +777,14 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
             importHeaderButton.isHidden = true
             openFolderHeaderButton.isHidden = true
             downloadCurrentHeaderButton.isHidden = true
-            addCurrentTrackButton.isHidden = false
-            renameHeaderButton.isHidden = false
-            downloadButton.isHidden = allPlaylistItems.isEmpty
+            addCurrentTrackButton.isHidden = playlist.isSmart
+            renameHeaderButton.isHidden = playlist.isSmart
+            downloadButton.isHidden = playlist.isSmart || allPlaylistItems.isEmpty
             moreMenuButton.isHidden = false
 
-            bottomBar.isHidden = false
+            bottomBar.isHidden = playlist.isSmart
             bottomNewPlaylistButton.isHidden = true
-            bottomAddCurrentTrackButton.isHidden = false
+            bottomAddCurrentTrackButton.isHidden = playlist.isSmart
             bottomImportButton.isHidden = true
 
             emptyStateIcon.image = NSImage(systemSymbolName: "music.note", accessibilityDescription: "Empty")
@@ -899,10 +909,14 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
         let query = currentSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         switch mode {
         case .list:
+            var base = allPlaylists
+            if let fid = selectedFolderID {
+                base = base.filter { !$0.isSmart && $0.folderId == fid }
+            }
             if query.isEmpty {
-                filteredPlaylists = allPlaylists
+                filteredPlaylists = base
             } else {
-                filteredPlaylists = allPlaylists.filter { $0.name.lowercased().contains(query) }
+                filteredPlaylists = base.filter { $0.name.lowercased().contains(query) }
             }
         case .detail:
             if query.isEmpty {
@@ -991,7 +1005,7 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
                 let data = try Data(contentsOf: fileURL)
                 let result = try PlaylistFileCodec.decode(data, from: fileURL)
                 guard !result.document.tracks.isEmpty else {
-                    self?.showPlaylistFileError("No local track entries were found in this playlist.")
+                    self?.showPlaylistFileError("No valid track entries were found in this playlist.")
                     return
                 }
                 guard let playlistID = PlaylistManager.shared.importPlaylistFile(result.document) else {
@@ -1112,6 +1126,63 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
     }
 
     @objc private func handleMoreMenuTapped(_ sender: NSButton) {
+        if case .list = mode {
+            let menu = NSMenu(title: "Library Options")
+
+            let folders = PlaylistManager.shared.fetchFolders()
+            let folderMenu = NSMenu(title: "Folder")
+            let allItem = NSMenuItem(title: "All Playlists", action: #selector(handleSelectFolderFilter(_:)), keyEquivalent: "")
+            allItem.target = self
+            allItem.representedObject = nil
+            allItem.state = (selectedFolderID == nil) ? .on : .off
+            folderMenu.addItem(allItem)
+
+            if !folders.isEmpty {
+                folderMenu.addItem(NSMenuItem.separator())
+                for f in folders {
+                    let fItem = NSMenuItem(title: f.name, action: #selector(handleSelectFolderFilter(_:)), keyEquivalent: "")
+                    fItem.target = self
+                    fItem.representedObject = f.id
+                    fItem.state = (selectedFolderID == f.id) ? .on : .off
+                    folderMenu.addItem(fItem)
+                }
+            }
+            folderMenu.addItem(NSMenuItem.separator())
+            let newFolderItem = NSMenuItem(title: "+ New Folder…", action: #selector(handleCreateFolderTapped), keyEquivalent: "")
+            newFolderItem.target = self
+            folderMenu.addItem(newFolderItem)
+
+            if let fid = selectedFolderID {
+                let renameFolderItem = NSMenuItem(title: "Rename Current Folder…", action: #selector(handleRenameSelectedFolderTapped), keyEquivalent: "")
+                renameFolderItem.target = self
+                renameFolderItem.representedObject = fid
+                folderMenu.addItem(renameFolderItem)
+
+                let delFolderItem = NSMenuItem(title: "Delete Current Folder", action: #selector(handleDeleteSelectedFolderTapped), keyEquivalent: "")
+                delFolderItem.target = self
+                delFolderItem.representedObject = fid
+                folderMenu.addItem(delFolderItem)
+            }
+
+            let folderFilterItem = NSMenuItem(title: "Folders", action: nil, keyEquivalent: "")
+            folderFilterItem.submenu = folderMenu
+            menu.addItem(folderFilterItem)
+
+            menu.addItem(NSMenuItem.separator())
+
+            let ytImportItem = NSMenuItem(title: "Import from YouTube URL…", action: #selector(handleImportYouTubePlaylistTapped), keyEquivalent: "")
+            ytImportItem.target = self
+            menu.addItem(ytImportItem)
+
+            let fileImportItem = NSMenuItem(title: "Import M3U8 / JSON File…", action: #selector(handleImportPlaylistFileFromMenu), keyEquivalent: "")
+            fileImportItem.target = self
+            menu.addItem(fileImportItem)
+
+            let point = NSPoint(x: 0, y: sender.bounds.height + 4)
+            menu.popUp(positioning: nil, at: point, in: sender)
+            return
+        }
+
         if case .history = mode {
             let menu = NSMenu(title: "History Options")
             let clearItem = NSMenuItem(title: "Clear Listening History…", action: #selector(handleClearHistoryPrompt), keyEquivalent: "")
@@ -1123,26 +1194,80 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
             return
         }
 
-        guard case .detail = mode else { return }
+        guard case .detail(let playlist) = mode else { return }
         let menu = NSMenu(title: "Playlist Options")
-        
-        let renameItem = NSMenuItem(title: "Rename Playlist...", action: #selector(handleRenameCurrentPlaylist), keyEquivalent: "r")
-        renameItem.target = self
-        menu.addItem(renameItem)
 
-        let addCurrentItem = NSMenuItem(title: "Add Currently Playing Track", action: #selector(handleAddCurrentTrackToDetailPlaylist), keyEquivalent: "a")
-        addCurrentItem.target = self
-        menu.addItem(addCurrentItem)
+        if !playlist.isSmart {
+            let sortItem = NSMenuItem(title: "Sort By", action: nil, keyEquivalent: "")
+            let sortMenu = NSMenu(title: "Sort By")
+            for sortMode in PlaylistSortMode.allCases {
+                let sItem = NSMenuItem(title: sortMode.displayName, action: #selector(handleSelectPlaylistSortMode(_:)), keyEquivalent: "")
+                sItem.target = self
+                sItem.representedObject = ["playlistID": playlist.id, "sortMode": sortMode.rawValue]
+                sItem.state = (playlist.sortMode == sortMode.rawValue) ? .on : .off
+                sortMenu.addItem(sItem)
+            }
+            sortItem.submenu = sortMenu
+            menu.addItem(sortItem)
 
-        let downloadItem = NSMenuItem(title: "Download All Tracks", action: #selector(handleDownloadAllTapped), keyEquivalent: "d")
-        downloadItem.target = self
-        menu.addItem(downloadItem)
+            let editMetaItem = NSMenuItem(title: "Edit Details & Cover…", action: #selector(handleEditCurrentPlaylistMetadata), keyEquivalent: "")
+            editMetaItem.target = self
+            menu.addItem(editMetaItem)
 
-        menu.addItem(NSMenuItem.separator())
+            let renameItem = NSMenuItem(title: "Rename Playlist...", action: #selector(handleRenameCurrentPlaylist), keyEquivalent: "r")
+            renameItem.target = self
+            menu.addItem(renameItem)
+        }
 
-        let deleteItem = NSMenuItem(title: "Delete Playlist", action: #selector(handleDeleteCurrentPlaylist), keyEquivalent: "")
-        deleteItem.target = self
-        menu.addItem(deleteItem)
+        let dupItem = NSMenuItem(title: "Duplicate Playlist", action: #selector(handleDuplicateCurrentPlaylist), keyEquivalent: "")
+        dupItem.target = self
+        menu.addItem(dupItem)
+
+        if !playlist.isSmart {
+            let otherPlaylists = PlaylistManager.shared.fetchPlaylists().filter { $0.id != playlist.id }
+            if !otherPlaylists.isEmpty {
+                let mergeItem = NSMenuItem(title: "Merge into Playlist", action: nil, keyEquivalent: "")
+                let mergeMenu = NSMenu(title: "Merge into Playlist")
+                for target in otherPlaylists {
+                    let tItem = NSMenuItem(title: target.name, action: #selector(handleMergeCurrentIntoPlaylist(_:)), keyEquivalent: "")
+                    tItem.target = self
+                    tItem.representedObject = ["sourceID": playlist.id, "targetID": target.id, "targetName": target.name]
+                    mergeMenu.addItem(tItem)
+                }
+                mergeItem.submenu = mergeMenu
+                menu.addItem(mergeItem)
+            }
+        }
+
+        let exportItem = NSMenuItem(title: "Export Playlist", action: nil, keyEquivalent: "")
+        let exportMenu = NSMenu(title: "Export Playlist")
+        for format in PlaylistFileCodec.Format.allCases {
+            let title = format == .m3u8 ? "M3U8…" : "JSON…"
+            let fItem = NSMenuItem(title: title, action: #selector(handleExportPlaylist(_:)), keyEquivalent: "")
+            fItem.target = self
+            fItem.representedObject = ["playlist": playlist, "format": format.rawValue]
+            exportMenu.addItem(fItem)
+        }
+        exportItem.submenu = exportMenu
+        menu.addItem(exportItem)
+
+        if !playlist.isSmart {
+            menu.addItem(NSMenuItem.separator())
+
+            let addCurrentItem = NSMenuItem(title: "Add Currently Playing Track", action: #selector(handleAddCurrentTrackToDetailPlaylist), keyEquivalent: "a")
+            addCurrentItem.target = self
+            menu.addItem(addCurrentItem)
+
+            let downloadItem = NSMenuItem(title: "Download All Tracks", action: #selector(handleDownloadAllTapped), keyEquivalent: "d")
+            downloadItem.target = self
+            menu.addItem(downloadItem)
+
+            menu.addItem(NSMenuItem.separator())
+
+            let deleteItem = NSMenuItem(title: "Delete Playlist", action: #selector(handleDeleteCurrentPlaylist), keyEquivalent: "")
+            deleteItem.target = self
+            menu.addItem(deleteItem)
+        }
 
         let point = NSPoint(x: 0, y: sender.bounds.height + 4)
         menu.popUp(positioning: nil, at: point, in: sender)
@@ -1238,18 +1363,24 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
     }
 
     private func handleDeleteKeyAction() {
+        let selected = tableView.selectedRowIndexes
         let row = tableView.selectedRow
-        guard row >= 0 else { return }
+        guard row >= 0 || !selected.isEmpty else { return }
 
         switch mode {
         case .list:
             guard row < filteredPlaylists.count else { return }
             let playlist = filteredPlaylists[row]
+            guard !playlist.isSmart else { return }
             confirmAndDeletePlaylist(playlist)
         case .detail(let playlist):
-            guard row < filteredPlaylistItems.count else { return }
-            let item = filteredPlaylistItems[row]
-            PlaylistManager.shared.removeItem(itemID: item.id, from: playlist.id)
+            guard !playlist.isSmart else { return }
+            let ids = selected.compactMap { idx -> String? in
+                guard idx < filteredPlaylistItems.count else { return nil }
+                return filteredPlaylistItems[idx].id
+            }
+            guard !ids.isEmpty else { return }
+            PlaylistManager.shared.removeItems(itemIDs: ids, from: playlist.id)
             reload()
         case .likedSongs:
             guard row < filteredLikedSongs.count else { return }
@@ -1296,22 +1427,215 @@ public class PlaylistLibraryView: NSView, NSTableViewDelegate, NSTableViewDataSo
     }
 
     func confirmAndDeletePlaylist(_ playlist: PlaylistRecord) {
+        guard !playlist.isSmart else { return }
         let alert = NSAlert()
         alert.window.level = .statusBar + 1
         alert.messageText = "Delete \"\(playlist.name)\"?"
-        alert.informativeText = "Are you sure you want to delete this playlist? This action cannot be undone."
-        alert.alertStyle = .warning
-        let deleteBtn = alert.addButton(withTitle: "Delete")
-        deleteBtn.hasDestructiveAction = true
+        if playlist.ytPlaylistId != nil {
+            alert.informativeText = "This playlist is synced with YouTube Music. Delete it only locally, or also remove it from your YouTube Music account?"
+            alert.alertStyle = .warning
+            let ytmBtn = alert.addButton(withTitle: "Delete Locally & on YTM")
+            ytmBtn.hasDestructiveAction = true
+            alert.addButton(withTitle: "Delete Locally Only")
+            alert.addButton(withTitle: "Cancel")
+
+            let resp = alert.runModal()
+            if resp == .alertFirstButtonReturn {
+                PlaylistManager.shared.deletePlaylist(id: playlist.id, deleteFromYTM: true)
+            } else if resp == .alertSecondButtonReturn {
+                PlaylistManager.shared.deletePlaylist(id: playlist.id, deleteFromYTM: false)
+            } else {
+                return
+            }
+        } else {
+            alert.informativeText = "Are you sure you want to delete this playlist? This action cannot be undone."
+            alert.alertStyle = .warning
+            let deleteBtn = alert.addButton(withTitle: "Delete")
+            deleteBtn.hasDestructiveAction = true
+            alert.addButton(withTitle: "Cancel")
+
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+            PlaylistManager.shared.deletePlaylist(id: playlist.id)
+        }
+
+        if case .detail(let current) = mode, current.id == playlist.id {
+            openPlaylists()
+        } else {
+            reload()
+        }
+    }
+
+    // MARK: - Extended Playlist Actions (Folders, Sort, Metadata, Duplicate, Merge, URL Import)
+
+    @objc private func handleSelectFolderFilter(_ sender: NSMenuItem) {
+        selectedFolderID = sender.representedObject as? String
+        reload()
+    }
+
+    @objc private func handleCreateFolderTapped() {
+        promptForName(title: "New Folder", defaultName: "My Folder", actionTitle: "Create") { [weak self] name in
+            if let fid = PlaylistManager.shared.createFolder(name: name) {
+                self?.selectedFolderID = fid
+                self?.reload()
+            }
+        }
+    }
+
+    @objc private func handleRenameSelectedFolderTapped(_ sender: NSMenuItem) {
+        guard let fid = sender.representedObject as? String,
+              let folder = PlaylistManager.shared.fetchFolders().first(where: { $0.id == fid }) else { return }
+        promptForName(title: "Rename Folder", defaultName: folder.name, actionTitle: "Rename") { [weak self] name in
+            PlaylistManager.shared.renameFolder(id: fid, name: name)
+            self?.reload()
+        }
+    }
+
+    @objc private func handleDeleteSelectedFolderTapped(_ sender: NSMenuItem) {
+        guard let fid = sender.representedObject as? String else { return }
+        PlaylistManager.shared.deleteFolder(id: fid)
+        if selectedFolderID == fid { selectedFolderID = nil }
+        reload()
+    }
+
+    @objc private func handleImportPlaylistFileFromMenu() {
+        handleImportPlaylistTapped()
+    }
+
+    @objc private func handleImportYouTubePlaylistTapped() {
+        promptForName(title: "Import YouTube Playlist", defaultName: "", actionTitle: "Import") { [weak self] urlOrId in
+            let trimmed = urlOrId.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return }
+            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "⬇ Importing playlist…")
+            PlaylistManager.shared.importPlaylist(from: trimmed) { result in
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success(let info):
+                        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(
+                            text: "✓ Imported \"\(info.title)\" (\(info.trackCount) tracks)"
+                        )
+                        self?.reload()
+                    case .failure(let err):
+                        self?.showPlaylistFileError(err.localizedDescription)
+                    }
+                }
+            }
+        }
+    }
+
+    @objc private func handleSelectPlaylistSortMode(_ sender: NSMenuItem) {
+        guard let info = sender.representedObject as? [String: String],
+              let pid = info["playlistID"],
+              let raw = info["sortMode"],
+              let sortMode = PlaylistSortMode(rawValue: raw) else { return }
+        PlaylistManager.shared.setSortMode(sortMode, for: pid)
+        if let updated = PlaylistManager.shared.fetchPlaylists().first(where: { $0.id == pid }) {
+            mode = .detail(updated)
+        } else {
+            reload()
+        }
+    }
+
+    @objc private func handleEditCurrentPlaylistMetadata() {
+        guard case .detail(let playlist) = mode, !playlist.isSmart else { return }
+        promptForPlaylistMetadata(playlist)
+    }
+
+    @objc private func handleDuplicateCurrentPlaylist() {
+        guard case .detail(let playlist) = mode else { return }
+        if let newID = PlaylistManager.shared.duplicatePlaylist(id: playlist.id),
+           let copied = PlaylistManager.shared.fetchPlaylists().first(where: { $0.id == newID }) {
+            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "✓ Duplicated \"\(playlist.name)\"")
+            mode = .detail(copied)
+        }
+    }
+
+    @objc private func handleMergeCurrentIntoPlaylist(_ sender: NSMenuItem) {
+        guard let info = sender.representedObject as? [String: String],
+              let sourceID = info["sourceID"],
+              let targetID = info["targetID"],
+              let targetName = info["targetName"] else { return }
+        let added = PlaylistManager.shared.mergePlaylists(sourceID: sourceID, into: targetID)
+        CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(
+            text: "✓ Merged \(added) new track(s) into \"\(targetName)\""
+        )
+    }
+
+    func promptForPlaylistMetadata(_ playlist: PlaylistRecord) {
+        let alert = NSAlert()
+        alert.window.level = .statusBar + 1
+        alert.messageText = "Edit Playlist Details"
+        alert.informativeText = "Update name, description, privacy, or cover image:"
+        alert.alertStyle = .informational
+
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 280, height: 146))
+        let nameField = NSTextField(frame: NSRect(x: 0, y: 118, width: 280, height: 24))
+        nameField.stringValue = playlist.name
+        nameField.placeholderString = "Playlist Name"
+
+        let descField = NSTextField(frame: NSRect(x: 0, y: 66, width: 280, height: 44))
+        descField.stringValue = playlist.descriptionText
+        descField.placeholderString = "Description (optional)"
+
+        let privacyPopup = NSPopUpButton(frame: NSRect(x: 0, y: 34, width: 140, height: 26), pullsDown: false)
+        privacyPopup.addItems(withTitles: ["Private", "Unlisted", "Public"])
+        switch playlist.privacyStatus.lowercased() {
+        case "public": privacyPopup.selectItem(at: 2)
+        case "unlisted": privacyPopup.selectItem(at: 1)
+        default: privacyPopup.selectItem(at: 0)
+        }
+
+        let artField = NSTextField(frame: NSRect(x: 0, y: 2, width: 200, height: 24))
+        artField.stringValue = playlist.artworkPath
+        artField.placeholderString = "Cover image path (optional)"
+        artField.isEditable = true
+
+        let browseBtn = NSButton(frame: NSRect(x: 206, y: 0, width: 74, height: 26))
+        browseBtn.title = "Cover…"
+        browseBtn.bezelStyle = .rounded
+        browseBtn.target = self
+        browseBtn.action = #selector(handleChooseCoverImageIntoField(_:))
+        objc_setAssociatedObject(browseBtn, &MetadataFieldAssocKey, artField, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+
+        container.addSubview(nameField)
+        container.addSubview(descField)
+        container.addSubview(privacyPopup)
+        container.addSubview(artField)
+        container.addSubview(browseBtn)
+        alert.accessoryView = container
+
+        alert.addButton(withTitle: "Save")
         alert.addButton(withTitle: "Cancel")
 
         if alert.runModal() == .alertFirstButtonReturn {
-            PlaylistManager.shared.deletePlaylist(id: playlist.id)
-            if case .detail(let current) = mode, current.id == playlist.id {
-                openPlaylists()
+            let privacyMap = ["Private": "private", "Unlisted": "unlisted", "Public": "public"]
+            let privacy = privacyMap[privacyPopup.titleOfSelectedItem ?? "Private"] ?? "private"
+            PlaylistManager.shared.updatePlaylistMetadata(
+                id: playlist.id,
+                name: nameField.stringValue,
+                descriptionText: descField.stringValue,
+                artworkPath: artField.stringValue,
+                privacyStatus: privacy
+            )
+            if case .detail(let current) = mode, current.id == playlist.id,
+               let updated = PlaylistManager.shared.fetchPlaylists().first(where: { $0.id == playlist.id }) {
+                mode = .detail(updated)
             } else {
                 reload()
             }
+            CenteredMenuBarLyricsWindowController.shared.showCustomTextOverlay(text: "✓ Saved playlist details")
+        }
+    }
+
+    @objc private func handleChooseCoverImageIntoField(_ sender: NSButton) {
+        guard let field = objc_getAssociatedObject(sender, &MetadataFieldAssocKey) as? NSTextField else { return }
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.image, .png, .jpeg]
+        panel.prompt = "Choose Cover"
+        if panel.runModal() == .OK, let url = panel.url {
+            field.stringValue = url.path
         }
     }
 

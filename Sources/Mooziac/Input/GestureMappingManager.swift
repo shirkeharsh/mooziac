@@ -184,12 +184,10 @@ public final class GestureMappingManager {
             VideoPlayerCoordinator.shared.toggleMute()
         case .togglePlayer:
             if let win = MainVideoWindowController.shared.window {
-                if win.isKeyWindow {
+                if win.isKeyWindow && win.alphaValue > 0.01 {
                     MainVideoWindowController.shared.performMinimize()
                 } else {
-                    MainVideoWindowController.shared.showWindow(nil)
-                    win.makeKeyAndOrderFront(nil)
-                    NSApp.activate(ignoringOtherApps: true)
+                    MainVideoWindowController.shared.restoreWindowFromMinimizeOrHidden()
                 }
             }
         case .seekForward:

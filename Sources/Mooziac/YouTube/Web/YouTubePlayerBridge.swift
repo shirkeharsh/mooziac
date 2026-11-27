@@ -220,6 +220,7 @@ public final class YouTubePlayerBridge: NSObject, WKScriptMessageHandler {
                                    (title !== lastState.title) ||
                                    (quality !== lastState.quality) ||
                                    (isMuted !== lastState.isMuted) ||
+                                   (isPiP !== lastState.isPiP) ||
                                    (isCaptionsActive !== lastState.isCaptionsActive) ||
                                    (isCaptionsAvailable !== lastState.isCaptionsAvailable) ||
                                    (timeDelta >= 0.5) ||
@@ -281,8 +282,19 @@ public final class YouTubePlayerBridge: NSObject, WKScriptMessageHandler {
                 document.addEventListener(evt, throttledPoll, true);
             });
             document.addEventListener('fullscreenchange', throttledPoll, true);
-            document.addEventListener('enterpictureinpicture', throttledPoll, true);
-            document.addEventListener('leavepictureinpicture', throttledPoll, true);
+            function handlePiPEvent(e) {
+                throttledPoll();
+                var v = (e && e.target && e.target.tagName === 'VIDEO')
+                    ? e.target
+                    : (document.querySelector('#movie_player video') || document.querySelector('video'));
+                var inPiP = document.pictureInPictureElement !== null || (v && v.webkitPresentationMode === 'picture-in-picture');
+                if (e && (e.type === 'leavepictureinpicture' || (e.type === 'webkitpresentationmodechanged' && !inPiP))) {
+                    postBridge({ event: 'pipDidExit' });
+                }
+            }
+            document.addEventListener('enterpictureinpicture', handlePiPEvent, true);
+            document.addEventListener('leavepictureinpicture', handlePiPEvent, true);
+            document.addEventListener('webkitpresentationmodechanged', handlePiPEvent, true);
             window.addEventListener('yt-navigate-finish', function() { setTimeout(throttledPoll, 300); });
             // Slow safety net for things that change without a media event (title, quality list, ad state)
             setInterval(pollPlayerState, 2000);
@@ -308,6 +320,10 @@ public final class YouTubePlayerBridge: NSObject, WKScriptMessageHandler {
                 if (!player) { invisibleSince = 0; return; }
                 var video = player.querySelector('video');
                 if (!video || video.paused || video.ended) { invisibleSince = 0; return; }
+                if (document.pictureInPictureElement !== null || video.webkitPresentationMode === 'picture-in-picture') {
+                    invisibleSince = 0;
+                    return;
+                }
 
                 // Check visibility without forcing getClientRects layout reflow
                 var visible = player.offsetWidth > 1 && player.offsetHeight > 1;
@@ -725,6 +741,13 @@ public final class YouTubePlayerBridge: NSObject, WKScriptMessageHandler {
         if event == "bestPartReset" {
             DispatchQueue.main.async {
                 MainVideoWindowController.shared.resetBestPart()
+            }
+            return
+        }
+
+        if event == "pipDidExit" {
+            DispatchQueue.main.async {
+                MainVideoWindowController.shared.handleBridgePiPDidExit()
             }
             return
         }

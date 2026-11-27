@@ -19,6 +19,7 @@ public final class YouTubeSettings {
         static let defaultPlaybackSpeed = "app.mooziac.youtube.settings.defaultPlaybackSpeed"
         static let playerTheme = "app.mooziac.youtube.settings.playerTheme"
         static let hasUserExplicitlySetAdBlock = "app.mooziac.youtube.settings.hasUserExplicitlySetAdBlock"
+        static let hasAppliedPremiumDefault = "app.mooziac.youtube.settings.hasAppliedPremiumDefault"
         static let isPiPKeepAcrossSpaces = "app.mooziac.youtube.settings.pipKeepAcrossSpaces"
     }
 
@@ -101,12 +102,44 @@ public final class YouTubeSettings {
         }
     }
 
-    /// When user signs in, if they haven't explicitly manually forced ad-blocking, default to OFF
+    public static let premiumDetectionJS = """
+    (function() {
+        try {
+            if (window.yt && window.yt.config_ && window.yt.config_.IS_PREMIUM === true) return true;
+            if (window.ytcfg && typeof window.ytcfg.get === 'function') {
+                if (window.ytcfg.get('IS_PREMIUM') === true) return true;
+            }
+            var logo = document.querySelector('ytmusic-logo, ytd-topbar-logo-renderer, #logo');
+            if (logo) {
+                if (logo.hasAttribute('is-premium')) return true;
+                var aria = (logo.getAttribute('aria-label') || '').toLowerCase();
+                if (aria.indexOf('premium') !== -1) return true;
+            }
+            return false;
+        } catch(e) { return false; }
+    })();
+    """
+
+    /// When signed in to a Google/YouTube account and the user has not manually
+    /// overridden Ad Blocker, default Ad Blocker to OFF once (keeping SponsorBlock ON).
+    /// The user can always turn Ad Blocker back ON from Quick Controls or the Shield menu.
     public func applySignedInDefaultsIfNeeded() {
-        guard !hasUserExplicitlySetAdBlock else { return }
+        guard !hasUserExplicitlySetAdBlock,
+              !defaults.bool(forKey: Keys.hasAppliedPremiumDefault) else { return }
+        defaults.set(true, forKey: Keys.hasAppliedPremiumDefault)
         defaults.set(false, forKey: Keys.isAdBlockEnabled)
-        defaults.set(false, forKey: Keys.isSponsorBlockEnabled)
         NotificationCenter.default.post(name: Self.adBlockDidChangeNotification, object: false)
-        NotificationCenter.default.post(name: Self.sponsorBlockDidChangeNotification, object: false)
+    }
+
+    public func applyPremiumDefaultsIfNeeded() {
+        applySignedInDefaultsIfNeeded()
+    }
+
+    public func restoreAdBlockDefaultOnSignOutIfNeeded() {
+        guard !hasUserExplicitlySetAdBlock,
+              defaults.bool(forKey: Keys.hasAppliedPremiumDefault) else { return }
+        defaults.set(false, forKey: Keys.hasAppliedPremiumDefault)
+        defaults.set(true, forKey: Keys.isAdBlockEnabled)
+        NotificationCenter.default.post(name: Self.adBlockDidChangeNotification, object: true)
     }
 }

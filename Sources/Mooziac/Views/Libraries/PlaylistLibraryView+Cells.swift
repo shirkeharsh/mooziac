@@ -189,6 +189,18 @@ class PlaylistRowCellView: NSTableCellView {
         swipeContainer.close(animated: false)
         titleLabel.stringValue = playlist.name
         countLabel.stringValue = summary.countText
+        editButton.isHidden = playlist.isSmart
+
+        let iconConfig = NSImage.SymbolConfiguration(pointSize: 13, weight: .medium)
+        if !playlist.artworkPath.isEmpty,
+           FileManager.default.fileExists(atPath: playlist.artworkPath),
+           let customArt = NSImage(contentsOfFile: playlist.artworkPath) {
+            iconImageView.image = customArt
+        } else if playlist.isSmart {
+            iconImageView.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: "Smart Playlist")?.withSymbolConfiguration(iconConfig)
+        } else {
+            iconImageView.image = NSImage(systemSymbolName: "music.note.list", accessibilityDescription: "Playlist")?.withSymbolConfiguration(iconConfig)
+        }
 
         let isLight = (design == .glassMode || (design == .liquidFluid && !SystemAppearanceHelper.isDarkSystemAppearance))
         let isLiquidDark = (design == .liquidFluid && SystemAppearanceHelper.isDarkSystemAppearance)
